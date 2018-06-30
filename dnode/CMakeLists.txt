@@ -1,5 +1,6 @@
 set(SOURCES
     main.cpp
+    Logger.cpp
 )
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)

@@ -25,6 +25,12 @@ set(Boost_USE_MULTITHREADED ON)
 find_package(Threads)
 find_package(PkgConfig)
 find_package(Boost COMPONENTS date_time filesystem program_options system thread random regex chrono REQUIRED)
+pkg_check_modules(LOG4CPLUS log4cplus)
+add_definitions(${LOG4CPLUS_CFLAGS})
+include_directories(${LOG4CPLUS_INCLUDEDIR})
+link_directories(${LOG4CPLUS_LIBRARY_DIRS})
+unset(LOG4CPLUS_LIBRARIES CACHE)
+set(LOG4CPLUS_LIBRARIES log4cplus CACHE INTERNAL "" FORCE)
 
 #fix output directories
 
