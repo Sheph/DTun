@@ -24,7 +24,7 @@ set(Boost_USE_MULTITHREADED ON)
 
 find_package(Threads)
 find_package(PkgConfig)
-find_package(Boost COMPONENTS system thread REQUIRED)
+find_package(Boost COMPONENTS date_time filesystem program_options system thread random regex chrono REQUIRED)
 
 #fix output directories
 
@@ -42,4 +42,5 @@ set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--no-undefined -Wl,--e
 
 add_definitions(${Boost_LIB_DIAGNOSTIC_DEFINITIONS})
 
+add_subdirectory(dutil)
 add_subdirectory(dnode)
