@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.6)
 cmake_policy(SET CMP0014 NEW)
 
-project(UDTSTRESS)
+project(DTUN)
 
 #platform setup
 
@@ -11,12 +11,12 @@ endif ()
 
 #out dir
 
-set(UDTSTRESS_OUT_DIR ${UDTSTRESS_BINARY_DIR}/out)
+set(DTUN_OUT_DIR ${DTUN_BINARY_DIR}/out)
 
 #set includes/libs
 
-set(UDTSTRESS_INCLUDE_DIR "${UDTSTRESS_SOURCE_DIR}/include")
-include_directories(${UDTSTRESS_INCLUDE_DIR})
+set(DTUN_INCLUDE_DIR "${DTUN_SOURCE_DIR}/include")
+include_directories(${DTUN_INCLUDE_DIR})
 
 #find packages
 
@@ -28,9 +28,9 @@ find_package(Boost COMPONENTS system thread REQUIRED)
 
 #fix output directories
 
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${UDTSTRESS_OUT_DIR}/lib)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${UDTSTRESS_OUT_DIR}/bin)
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${UDTSTRESS_OUT_DIR}/lib)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${DTUN_OUT_DIR}/lib)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${DTUN_OUT_DIR}/bin)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${DTUN_OUT_DIR}/lib)
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wno-deprecated-declarations -D_REENTRANT -fPIC -DPIC")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-deprecated-declarations -D_REENTRANT -fPIC -DPIC")
@@ -42,4 +42,4 @@ set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--no-undefined -Wl,--e
 
 add_definitions(${Boost_LIB_DIAGNOSTIC_DEFINITIONS})
 
-add_subdirectory(UDTNode)
+add_subdirectory(dnode)
