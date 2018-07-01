@@ -47,6 +47,19 @@ set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--no-undefined -
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--no-undefined -Wl,--exclude-libs,ALL")
 
 add_definitions(${Boost_LIB_DIAGNOSTIC_DEFINITIONS})
+add_definitions(-DBADVPN_THREADWORK_USE_PTHREAD)
+add_definitions(-DBADVPN_THREAD_SAFE=1)
+add_definitions(-DBADVPN_LINUX)
+add_definitions(-DBADVPN_LITTLE_ENDIAN)
+add_definitions(-DBADVPN_USE_EPOLL)
+add_definitions(-DBADVPN_BREACTOR_BADVPN)
+add_definitions(-DBADVPN_USE_SIGNALFD)
+
+include_directories(
+    lwip/custom
+    lwip/src/include
+)
 
 add_subdirectory(dutil)
+add_subdirectory(lwip)
 add_subdirectory(dnode)
