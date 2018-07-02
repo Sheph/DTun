@@ -74,11 +74,9 @@ fail0:
     return;
 }
 
-int DNodeTCPClient_Init(DNodeTCPClient* dtcp_client, BAddr dest_addr, DNodeTCPClient_handler handler, void* handler_data, BReactor* reactor)
+int DNodeTCPClient_Init(DNodeTCPClient* dtcp_client, BAddr dest_addr, BIPAddr inner_addr, DNodeTCPClient_handler handler, void* handler_data, BReactor* reactor)
 {
     ASSERT(dest_addr.type == BADDR_TYPE_IPV4 || dest_addr.type == BADDR_TYPE_IPV6)
-
-    ASSERT_FORCE(BAddr_Parse2(&dest_addr, "127.0.0.1:1234", NULL, 0, 1))
 
     // init arguments
     dtcp_client->dest_addr = dest_addr;
@@ -86,7 +84,7 @@ int DNodeTCPClient_Init(DNodeTCPClient* dtcp_client, BAddr dest_addr, DNodeTCPCl
     dtcp_client->handler_data = handler_data;
     dtcp_client->reactor = reactor;
 
-    if (!BConnector_Init(&dtcp_client->connector, dest_addr, dtcp_client->reactor, dtcp_client, (BConnector_handler)connector_handler)) {
+    if (!BConnector_Init2(&dtcp_client->connector, dest_addr, inner_addr, dtcp_client->reactor, dtcp_client, (BConnector_handler)connector_handler)) {
         BLog(BLOG_ERROR, "BConnector_Init failed");
         goto fail0;
     }

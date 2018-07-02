@@ -1,9 +1,9 @@
 /**
  * @file BConnection.h
  * @author Ambroz Bizjak <ambrop7@gmail.com>
- * 
+ *
  * @section LICENSE
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  * 1. Redistributions of source code must retain the above copyright
@@ -14,7 +14,7 @@
  * 3. Neither the name of the author nor the
  *    names of its contributors may be used to endorse or promote products
  *    derived from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -41,7 +41,7 @@
 
 /**
  * Checks if the given address is supported by {@link BConnection} and related objects.
- * 
+ *
  * @param addr address to check. Must be a proper {@link BAddr} object according to
  *             {@link BIPAddr_Assert}.
  * @return 1 if supported, 0 if not
@@ -100,14 +100,14 @@ typedef struct BListener_s BListener;
  * BCONNECTION_SOURCE_LISTENER 'source' argument.
  * If no attempt is made to accept the connection from the job closure of this handler,
  * the connection will be discarded.
- * 
+ *
  * @param user as in {@link BListener_Init}
  */
 typedef void (*BListener_handler) (void *user);
 
 /**
  * Common listener initialization function.
- * 
+ *
  * The other type-specific init functions are wrappers around this one.
  */
 int BListener_InitFrom (BListener *o, struct BLisCon_from from,
@@ -117,7 +117,7 @@ int BListener_InitFrom (BListener *o, struct BLisCon_from from,
 /**
  * Initializes the object for listening on an address.
  * {@link BNetwork_GlobalInit} must have been done.
- * 
+ *
  * @param o the object
  * @param addr address to listen on
  * @param reactor reactor we live in
@@ -132,7 +132,7 @@ int BListener_Init (BListener *o, BAddr addr, BReactor *reactor, void *user,
 /**
  * Initializes the object for listening on a Unix socket.
  * {@link BNetwork_GlobalInit} must have been done.
- * 
+ *
  * @param o the object
  * @param socket_path socket path for listening
  * @param reactor reactor we live in
@@ -146,7 +146,7 @@ int BListener_InitUnix (BListener *o, const char *socket_path, BReactor *reactor
 
 /**
  * Frees the object.
- * 
+ *
  * @param o the object
  */
 void BListener_Free (BListener *o);
@@ -167,8 +167,8 @@ typedef struct BConnector_s BConnector;
  * If the connection attempt succeeded (is_error==0), the new connection can be used by calling
  * {@link BConnection_Init} with a BCONNECTION_SOURCE_TYPE_CONNECTOR 'source' argument.
  * This handler will be called at most once. The connector object need not be freed after it
- * is called. 
- * 
+ * is called.
+ *
  * @param user as in {@link BConnector_Init}
  * @param is_error whether the connection attempt succeeded (0) or failed (1)
  */
@@ -176,16 +176,19 @@ typedef void (*BConnector_handler) (void *user, int is_error);
 
 /**
  * Common connector initialization function.
- * 
+ *
  * The other type-specific init functions are wrappers around this one.
  */
 int BConnector_InitFrom (BConnector *o, struct BLisCon_from from, BReactor *reactor, void *user,
                          BConnector_handler handler) WARN_UNUSED;
 
+int BConnector_InitFrom2 (BConnector *o, struct BLisCon_from from, struct BLisCon_from bind_addr, BReactor *reactor, void *user,
+    BConnector_handler handler) WARN_UNUSED;
+
 /**
  * Initializes the object for connecting to an address.
  * {@link BNetwork_GlobalInit} must have been done.
- * 
+ *
  * @param o the object
  * @param addr address to connect to
  * @param reactor reactor we live in
@@ -196,11 +199,14 @@ int BConnector_InitFrom (BConnector *o, struct BLisCon_from from, BReactor *reac
 int BConnector_Init (BConnector *o, BAddr addr, BReactor *reactor, void *user,
                      BConnector_handler handler) WARN_UNUSED;
 
+int BConnector_Init2 (BConnector *o, BAddr addr, BIPAddr bind_addr, BReactor *reactor, void *user,
+    BConnector_handler handler) WARN_UNUSED;
+
 #ifndef BADVPN_USE_WINAPI
 /**
  * Initializes the object for connecting to a Unix socket.
  * {@link BNetwork_GlobalInit} must have been done.
- * 
+ *
  * @param o the object
  * @param socket_path socket path for connecting
  * @param reactor reactor we live in
@@ -214,7 +220,7 @@ int BConnector_InitUnix (BConnector *o, const char *socket_path, BReactor *react
 
 /**
  * Frees the object.
- * 
+ *
  * @param o the object
  */
 void BConnector_Free (BConnector *o);
@@ -293,7 +299,7 @@ typedef struct BConnection_s BConnection;
  *   must occur.
  * - If event is BCONNECTION_EVENT_RECVCLOSED, no further receive I/O or receive interface
  *   initialization must occur. It is guarantted that the receive interface was initialized.
- * 
+ *
  * @param user as in {@link BConnection_Init} or {@link BConnection_SetHandlers}
  * @param event what happened - BCONNECTION_EVENT_ERROR or BCONNECTION_EVENT_RECVCLOSED
  */
@@ -302,7 +308,7 @@ typedef void (*BConnection_handler) (void *user, int event);
 /**
  * Initializes the object.
  * {@link BNetwork_GlobalInit} must have been done.
- * 
+ *
  * @param o the object
  * @param source specifies what the connection comes from. This argument must be created with one of the
  *               following macros:
@@ -333,14 +339,14 @@ int BConnection_Init (BConnection *o, struct BConnection_source source, BReactor
  * The send and receive interfaces must not be initialized.
  * If the connection was created with a BCONNECTION_SOURCE_PIPE 'source' argument, the file descriptor
  * will not be closed.
- * 
+ *
  * @param o the object
  */
 void BConnection_Free (BConnection *o);
 
 /**
  * Updates the handler function.
- * 
+ *
  * @param o the object
  * @param user argument to handler
  * @param handler new handler function, as in {@link BConnection_Init}. Additionally, may be NULL to
@@ -352,7 +358,7 @@ void BConnection_SetHandlers (BConnection *o, void *user, BConnection_handler ha
 
 /**
  * Sets the SO_SNDBUF socket option.
- * 
+ *
  * @param o the object
  * @param buf_size value for SO_SNDBUF option
  * @return 1 on success, 0 on failure
@@ -362,7 +368,7 @@ int BConnection_SetSendBuffer (BConnection *o, int buf_size);
 /**
  * Initializes the send interface for the connection.
  * The send interface must not be initialized.
- * 
+ *
  * @param o the object
  */
 void BConnection_SendAsync_Init (BConnection *o);
@@ -372,7 +378,7 @@ void BConnection_SendAsync_Init (BConnection *o);
  * The send interface must be initialized.
  * If the send interface was busy when this is called, the connection is no longer usable and must be
  * freed before any further I/O or interface initialization.
- * 
+ *
  * @param o the object
  */
 void BConnection_SendAsync_Free (BConnection *o);
@@ -380,7 +386,7 @@ void BConnection_SendAsync_Free (BConnection *o);
 /**
  * Returns the send interface.
  * The send interface must be initialized.
- * 
+ *
  * @param o the object
  * @return send interface
  */
@@ -389,7 +395,7 @@ StreamPassInterface * BConnection_SendAsync_GetIf (BConnection *o);
 /**
  * Initializes the receive interface for the connection.
  * The receive interface must not be initialized.
- * 
+ *
  * @param o the object
  */
 void BConnection_RecvAsync_Init (BConnection *o);
@@ -399,7 +405,7 @@ void BConnection_RecvAsync_Init (BConnection *o);
  * The receive interface must be initialized.
  * If the receive interface was busy when this is called, the connection is no longer usable and must be
  * freed before any further I/O or interface initialization.
- * 
+ *
  * @param o the object
  */
 void BConnection_RecvAsync_Free (BConnection *o);
@@ -407,7 +413,7 @@ void BConnection_RecvAsync_Free (BConnection *o);
 /**
  * Returns the receive interface.
  * The receive interface must be initialized.
- * 
+ *
  * @param o the object
  * @return receive interface
  */

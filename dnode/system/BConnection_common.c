@@ -1,9 +1,9 @@
 /**
  * @file BConnection_common.c
  * @author Ambroz Bizjak <ambrop7@gmail.com>
- * 
+ *
  * @section LICENSE
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  * 1. Redistributions of source code must retain the above copyright
@@ -14,7 +14,7 @@
  * 3. Neither the name of the author nor the
  *    names of its contributors may be used to endorse or promote products
  *    derived from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -47,6 +47,12 @@ int BConnector_Init (BConnector *o, BAddr addr, BReactor *reactor, void *user,
                      BConnector_handler handler)
 {
     return BConnector_InitFrom(o, BLisCon_from_addr(addr), reactor, user, handler);
+}
+
+int BConnector_Init2 (BConnector *o, BAddr addr, BIPAddr bind_addr, BReactor *reactor, void *user,
+                     BConnector_handler handler)
+{
+    return BConnector_InitFrom2(o, BLisCon_from_addr(addr), BLisCon_from_addr(BAddr_MakeFromIpaddrAndPort(bind_addr, 0)), reactor, user, handler);
 }
 
 #ifndef BADVPN_USE_WINAPI
