@@ -102,7 +102,7 @@ struct {
     char *tundev;
     char *netif_ipaddr;
     char *netif_netmask;
-    char *inner_ipaddr;
+    char *tun_ns;
     char *netif_ip6addr;
     char *username;
     char *password;
@@ -138,8 +138,6 @@ BIPAddr netif_ipaddr;
 
 // netmask of netif
 BIPAddr netif_netmask;
-
-BIPAddr inner_ipaddr;
 
 // IP6 address of netif
 struct ipv6_addr netif_ip6addr;
@@ -313,7 +311,7 @@ int tun2socks_main (int argc, char **argv)
     }
 
     // init TUN device
-    if (!BTap_Init(&device, &ss, options.tundev, device_error_handler, NULL, 1)) {
+    if (!BTap_Init(&device, &ss, options.tundev, options.tun_ns, device_error_handler, NULL, 1)) {
         BLog(BLOG_ERROR, "BTap_Init failed");
         goto fail3;
     }
@@ -473,7 +471,7 @@ int parse_arguments (int argc, char *argv[])
     options.tundev = NULL;
     options.netif_ipaddr = NULL;
     options.netif_netmask = NULL;
-    options.inner_ipaddr = NULL;
+    options.tun_ns = NULL;
     options.netif_ip6addr = NULL;
     options.username = NULL;
     options.password = NULL;
@@ -580,12 +578,12 @@ int parse_arguments (int argc, char *argv[])
             options.netif_netmask = argv[i + 1];
             i++;
         }
-        else if (!strcmp(arg, "--inner-ipaddr")) {
+        else if (!strcmp(arg, "--tun-ns")) {
             if (1 >= argc - i) {
                 fprintf(stderr, "%s: requires an argument\n", arg);
                 return 0;
             }
-            options.inner_ipaddr = argv[i + 1];
+            options.tun_ns = argv[i + 1];
             i++;
         }
         else if (!strcmp(arg, "--netif-ip6addr")) {
@@ -643,8 +641,8 @@ int parse_arguments (int argc, char *argv[])
         return 0;
     }
 
-    if (!options.inner_ipaddr) {
-        fprintf(stderr, "--inner-ipaddr is required\n");
+    if (!options.tun_ns) {
+        fprintf(stderr, "--tun-ns is required\n");
         return 0;
     }
 
@@ -684,16 +682,6 @@ int process_arguments (void)
     }
     if (netif_netmask.type != BADDR_TYPE_IPV4) {
         BLog(BLOG_ERROR, "netif netmask: must be an IPv4 address");
-        return 0;
-    }
-
-    // resolve inner ipaddr
-    if (!BIPAddr_Resolve(&inner_ipaddr, options.inner_ipaddr, 0)) {
-        BLog(BLOG_ERROR, "inner ipaddr: BIPAddr_Resolve failed");
-        return 0;
-    }
-    if (inner_ipaddr.type != BADDR_TYPE_IPV4) {
-        BLog(BLOG_ERROR, "inner ipaddr: must be an IPv4 address");
         return 0;
     }
 
@@ -1053,7 +1041,7 @@ err_t listener_accept_func (void *arg, struct tcp_pcb *newpcb, err_t err)
     ASSERT_FORCE(BAddr_Parse2(&addr, OVERRIDE_DEST_ADDR, NULL, 0, 1))
 #endif
 
-    if (!DNodeTCPClient_Init(&client->dtcp_client, addr, inner_ipaddr, (DNodeTCPClient_handler)client_dtcp_handler, client, &ss)) {
+    if (!DNodeTCPClient_Init(&client->dtcp_client, addr, (DNodeTCPClient_handler)client_dtcp_handler, client, &ss)) {
         BLog(BLOG_ERROR, "listener accept: DNodeTCPClient_Init failed");
         goto fail1;
     }

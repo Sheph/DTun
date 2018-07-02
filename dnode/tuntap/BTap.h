@@ -1,9 +1,9 @@
 /**
  * @file BTap.h
  * @author Ambroz Bizjak <ambrop7@gmail.com>
- * 
+ *
  * @section LICENSE
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  * 1. Redistributions of source code must retain the above copyright
@@ -14,7 +14,7 @@
  * 3. Neither the name of the author nor the
  *    names of its contributors may be used to endorse or promote products
  *    derived from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -25,9 +25,9 @@
  * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- * 
+ *
  * @section DESCRIPTION
- * 
+ *
  * TAP device abstraction.
  */
 
@@ -57,7 +57,7 @@
  * Handler called when an error occurs on the device.
  * The object must be destroyed from the job context of this
  * handler, and no further I/O may occur.
- * 
+ *
  * @param user as in {@link BTap_Init}
  */
 typedef void (*BTap_handler_error) (void *used);
@@ -69,7 +69,7 @@ typedef struct {
     int frame_mtu;
     PacketRecvInterface output;
     uint8_t *output_packet;
-    
+
 #ifdef BADVPN_USE_WINAPI
     HANDLE device;
     BReactorIOCPOverlapped send_olap;
@@ -80,7 +80,7 @@ typedef struct {
     BFileDescriptor bfd;
     int poll_events;
 #endif
-    
+
     DebugError d_err;
     DebugObject d_obj;
 } BTap;
@@ -105,7 +105,7 @@ typedef struct {
  * @param tun whether to create a TUN (IP) device or a TAP (Ethernet) device. Must be 0 or 1.
  * @return 1 on success, 0 on failure
  */
-int BTap_Init (BTap *o, BReactor *bsys, char *devname, BTap_handler_error handler_error, void *handler_error_user, int tun) WARN_UNUSED;
+int BTap_Init (BTap *o, BReactor *bsys, char *devname, char* nsname, BTap_handler_error handler_error, void *handler_error_user, int tun) WARN_UNUSED;
 
 enum BTap_dev_type {BTAP_DEV_TUN, BTAP_DEV_TAP};
 
@@ -157,7 +157,7 @@ struct BTap_init_data {
  * @param handler_error_user value passed to error handler
  * @return 1 on success, 0 on failure
  */
-int BTap_Init2 (BTap *o, BReactor *reactor, struct BTap_init_data init_data, BTap_handler_error handler_error, void *handler_error_user) WARN_UNUSED;
+int BTap_Init2 (BTap *o, BReactor *reactor, struct BTap_init_data init_data, char* nsname, BTap_handler_error handler_error, void *handler_error_user) WARN_UNUSED;
 
 /**
  * Frees the TAP device.
@@ -177,7 +177,7 @@ int BTap_GetMTU (BTap *o);
 /**
  * Sends a packet to the device.
  * Any errors will be reported via a job.
- * 
+ *
  * @param o the object
  * @param data packet to send
  * @param data_len length of packet. Must be >=0 and <=MTU, as reported by {@link BTap_GetMTU}.
@@ -187,7 +187,7 @@ void BTap_Send (BTap *o, uint8_t *data, int data_len);
 /**
  * Returns a {@link PacketRecvInterface} for reading packets from the device.
  * The MTU of the interface will be {@link BTap_GetMTU}.
- * 
+ *
  * @param o the object
  * @return output interface
  */

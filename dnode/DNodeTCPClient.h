@@ -29,7 +29,7 @@ typedef struct {
     DebugObject d_obj;
 } DNodeTCPClient;
 
-int DNodeTCPClient_Init(DNodeTCPClient* dtcp_client, BAddr dest_addr, BIPAddr inner_addr, DNodeTCPClient_handler handler, void* handler_data, BReactor* reactor);
+int DNodeTCPClient_Init(DNodeTCPClient* dtcp_client, BAddr dest_addr, DNodeTCPClient_handler handler, void* handler_data, BReactor* reactor);
 
 void DNodeTCPClient_Free(DNodeTCPClient* dtcp_client);
 
