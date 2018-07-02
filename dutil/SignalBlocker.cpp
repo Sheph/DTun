@@ -1,4 +1,5 @@
 #include "DTun/SignalBlocker.h"
+#include <cassert>
 
 #include <boost/thread/once.hpp>
 
