@@ -18,11 +18,15 @@
 typedef void (*DNodeTCPClient_handler) (void* handler_data, int event);
 
 typedef struct {
+    BAddr dest_addr;
     DNodeTCPClient_handler handler;
     void* handler_data;
     BReactor* reactor;
+    int state;
     BConnector connector;
     BConnection con;
+    DebugError d_err;
+    DebugObject d_obj;
 } DNodeTCPClient;
 
 int DNodeTCPClient_Init(DNodeTCPClient* dtcp_client, BAddr dest_addr, DNodeTCPClient_handler handler, void* handler_data, BReactor* reactor);

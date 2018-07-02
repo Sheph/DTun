@@ -2,7 +2,6 @@ set(SOURCES
     main.cpp
     Logger.cpp
     tun2socks.c
-    SocksUdpGwClient.c
     DNodeTCPClient.c
     base/DebugObject.c
     base/BLog.c
