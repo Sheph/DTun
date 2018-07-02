@@ -107,10 +107,6 @@ struct {
     char *password;
     char *password_file;
     int append_source_to_username;
-    char *udpgw_remote_server_addr;
-    int udpgw_max_connections;
-    int udpgw_connection_buffer_size;
-    int udpgw_transparent_dns;
 } options;
 
 // TCP client
@@ -147,9 +143,6 @@ struct ipv6_addr netif_ip6addr;
 
 // allocated password file contents
 uint8_t *password_file_contents;
-
-// remote udpgw server addr, if provided
-BAddr udpgw_remote_server_addr;
 
 // reactor
 BReactor ss;
@@ -226,7 +219,6 @@ static void client_dtcp_recv_initiate (struct tcp_client *client);
 static void client_dtcp_recv_handler_done (struct tcp_client *client, int data_len);
 static int client_dtcp_recv_send_out (struct tcp_client *client);
 static err_t client_sent_func (void *arg, struct tcp_pcb *tpcb, u16_t len);
-static void udpgw_client_handler_received (void *unused, BAddr local_addr, BAddr remote_addr, const uint8_t *data, int data_len);
 
 int tun2socks_main (int argc, char **argv)
 {
@@ -447,10 +439,6 @@ void print_help (const char *name)
         "        [--password <password>]\n"
         "        [--password-file <file>]\n"
         "        [--append-source-to-username]\n"
-        "        [--udpgw-remote-server-addr <addr>]\n"
-        "        [--udpgw-max-connections <number>]\n"
-        "        [--udpgw-connection-buffer-size <number>]\n"
-        "        [--udpgw-transparent-dns]\n"
         "Address format is a.b.c.d:port (IPv4) or [addr]:port (IPv6).\n",
         name
     );
@@ -486,10 +474,6 @@ int parse_arguments (int argc, char *argv[])
     options.password = NULL;
     options.password_file = NULL;
     options.append_source_to_username = 0;
-    options.udpgw_remote_server_addr = NULL;
-    options.udpgw_max_connections = DEFAULT_UDPGW_MAX_CONNECTIONS;
-    options.udpgw_connection_buffer_size = DEFAULT_UDPGW_CONNECTION_BUFFER_SIZE;
-    options.udpgw_transparent_dns = 0;
 
     int i;
     for (i = 1; i < argc; i++) {
@@ -625,39 +609,6 @@ int parse_arguments (int argc, char *argv[])
         }
         else if (!strcmp(arg, "--append-source-to-username")) {
             options.append_source_to_username = 1;
-        }
-        else if (!strcmp(arg, "--udpgw-remote-server-addr")) {
-            if (1 >= argc - i) {
-                fprintf(stderr, "%s: requires an argument\n", arg);
-                return 0;
-            }
-            options.udpgw_remote_server_addr = argv[i + 1];
-            i++;
-        }
-        else if (!strcmp(arg, "--udpgw-max-connections")) {
-            if (1 >= argc - i) {
-                fprintf(stderr, "%s: requires an argument\n", arg);
-                return 0;
-            }
-            if ((options.udpgw_max_connections = atoi(argv[i + 1])) <= 0) {
-                fprintf(stderr, "%s: wrong argument\n", arg);
-                return 0;
-            }
-            i++;
-        }
-        else if (!strcmp(arg, "--udpgw-connection-buffer-size")) {
-            if (1 >= argc - i) {
-                fprintf(stderr, "%s: requires an argument\n", arg);
-                return 0;
-            }
-            if ((options.udpgw_connection_buffer_size = atoi(argv[i + 1])) <= 0) {
-                fprintf(stderr, "%s: wrong argument\n", arg);
-                return 0;
-            }
-            i++;
-        }
-        else if (!strcmp(arg, "--udpgw-transparent-dns")) {
-            options.udpgw_transparent_dns = 1;
         }
         else {
             fprintf(stderr, "unknown option: %s\n", arg);
@@ -1581,99 +1532,4 @@ out:
 
     // Return ERR_ABRT if and only if tcp_abort was called from this callback.
     return (DEAD_KILLED > 0) ? ERR_ABRT : ERR_OK;
-}
-
-void udpgw_client_handler_received (void *unused, BAddr local_addr, BAddr remote_addr, const uint8_t *data, int data_len)
-{
-    ASSERT(options.udpgw_remote_server_addr)
-    ASSERT(local_addr.type == BADDR_TYPE_IPV4 || local_addr.type == BADDR_TYPE_IPV6)
-    ASSERT(local_addr.type == remote_addr.type)
-    ASSERT(data_len >= 0)
-
-    int packet_length = 0;
-
-    switch (local_addr.type) {
-        case BADDR_TYPE_IPV4: {
-            BLog(BLOG_INFO, "UDP: from udpgw %d bytes", data_len);
-
-            if (data_len > UINT16_MAX - (sizeof(struct ipv4_header) + sizeof(struct udp_header)) ||
-                data_len > BTap_GetMTU(&device) - (int)(sizeof(struct ipv4_header) + sizeof(struct udp_header))
-            ) {
-                BLog(BLOG_ERROR, "UDP: packet is too large");
-                return;
-            }
-
-            // build IP header
-            struct ipv4_header iph;
-            iph.version4_ihl4 = IPV4_MAKE_VERSION_IHL(sizeof(iph));
-            iph.ds = hton8(0);
-            iph.total_length = hton16(sizeof(iph) + sizeof(struct udp_header) + data_len);
-            iph.identification = hton16(0);
-            iph.flags3_fragmentoffset13 = hton16(0);
-            iph.ttl = hton8(64);
-            iph.protocol = hton8(IPV4_PROTOCOL_UDP);
-            iph.checksum = hton16(0);
-            iph.source_address = remote_addr.ipv4.ip;
-            iph.destination_address = local_addr.ipv4.ip;
-            iph.checksum = ipv4_checksum(&iph, NULL, 0);
-
-            // build UDP header
-            struct udp_header udph;
-            udph.source_port = remote_addr.ipv4.port;
-            udph.dest_port = local_addr.ipv4.port;
-            udph.length = hton16(sizeof(udph) + data_len);
-            udph.checksum = hton16(0);
-            udph.checksum = udp_checksum(&udph, data, data_len, iph.source_address, iph.destination_address);
-
-            // write packet
-            memcpy(device_write_buf, &iph, sizeof(iph));
-            memcpy(device_write_buf + sizeof(iph), &udph, sizeof(udph));
-            memcpy(device_write_buf + sizeof(iph) + sizeof(udph), data, data_len);
-            packet_length = sizeof(iph) + sizeof(udph) + data_len;
-        } break;
-
-        case BADDR_TYPE_IPV6: {
-            BLog(BLOG_INFO, "UDP/IPv6: from udpgw %d bytes", data_len);
-
-            if (!options.netif_ip6addr) {
-                BLog(BLOG_ERROR, "got IPv6 packet from udpgw but IPv6 is disabled");
-                return;
-            }
-
-            if (data_len > UINT16_MAX - sizeof(struct udp_header) ||
-                data_len > BTap_GetMTU(&device) - (int)(sizeof(struct ipv6_header) + sizeof(struct udp_header))
-            ) {
-                BLog(BLOG_ERROR, "UDP/IPv6: packet is too large");
-                return;
-            }
-
-            // build IPv6 header
-            struct ipv6_header iph;
-            iph.version4_tc4 = hton8((6 << 4));
-            iph.tc4_fl4 = hton8(0);
-            iph.fl = hton16(0);
-            iph.payload_length = hton16(sizeof(struct udp_header) + data_len);
-            iph.next_header = hton8(IPV6_NEXT_UDP);
-            iph.hop_limit = hton8(64);
-            memcpy(iph.source_address, remote_addr.ipv6.ip, 16);
-            memcpy(iph.destination_address, local_addr.ipv6.ip, 16);
-
-            // build UDP header
-            struct udp_header udph;
-            udph.source_port = remote_addr.ipv6.port;
-            udph.dest_port = local_addr.ipv6.port;
-            udph.length = hton16(sizeof(udph) + data_len);
-            udph.checksum = hton16(0);
-            udph.checksum = udp_ip6_checksum(&udph, data, data_len, iph.source_address, iph.destination_address);
-
-            // write packet
-            memcpy(device_write_buf, &iph, sizeof(iph));
-            memcpy(device_write_buf + sizeof(iph), &udph, sizeof(udph));
-            memcpy(device_write_buf + sizeof(iph) + sizeof(udph), data, data_len);
-            packet_length = sizeof(iph) + sizeof(udph) + data_len;
-        } break;
-    }
-
-    // submit packet
-    BTap_Send(&device, device_write_buf, packet_length);
 }
