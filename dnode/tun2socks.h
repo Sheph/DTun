@@ -1,6 +1,6 @@
 /*
  * Copyright (C) Ambroz Bizjak <ambrop7@gmail.com>
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  * 1. Redistributions of source code must retain the above copyright
@@ -11,7 +11,7 @@
  * 3. Neither the name of the author nor the
  *    names of its contributors may be used to endorse or promote products
  *    derived from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -27,8 +27,8 @@
 // name of the program
 #define PROGRAM_NAME "tun2socks"
 
-// size of temporary buffer for passing data from the SOCKS server to TCP for sending
-#define CLIENT_SOCKS_RECV_BUF_SIZE 8192
+// size of temporary buffer for passing data from the DTCP server to TCP for sending
+#define CLIENT_DTCP_RECV_BUF_SIZE 8192
 
 // maximum number of udpgw connections
 #define DEFAULT_UDPGW_MAX_CONNECTIONS 256

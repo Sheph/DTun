@@ -50,12 +50,12 @@ static char *level_names[] = { NULL, "ERROR", "WARNING", "NOTICE", "INFO", "DEBU
 
 static void stdout_log (int channel, int level, const char *msg)
 {
-    fprintf(stdout, "%s(%s): %s\n", level_names[level], blog_global.channels[channel].name, msg);
+    fprintf(stdout, "%s: %s\n", level_names[level], msg);
 }
 
 static void stderr_log (int channel, int level, const char *msg)
 {
-    fprintf(stderr, "%s(%s): %s\n", level_names[level], blog_global.channels[channel].name, msg);
+    fprintf(stderr, "%s: %s\n", level_names[level], msg);
 }
 
 static void stdout_stderr_free (void)

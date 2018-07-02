@@ -23,9 +23,9 @@ int main(int argc, char* argv[])
     log4cplus::PropertyConfigurator propConf(props);
     propConf.configure();
 
-    DTun::SignalBlocker signalBlocker;
+    //DTun::SignalBlocker signalBlocker;
 
-    DTun::SignalHandler sigHandler(&signalHandler);
+    //DTun::SignalHandler sigHandler(&signalHandler);
 
     LOG4CPLUS_INFO(DNode::logger(), "Started");
 
