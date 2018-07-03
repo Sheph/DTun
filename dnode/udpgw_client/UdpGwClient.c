@@ -542,10 +542,10 @@ void UdpGwClient_ConnectServer (UdpGwClient *o, PacketPassInterface* send_if, Pa
     PacketPassInterface_Init(&o->recv_if, o->udpgw_mtu, (PacketPassInterface_handler_send)recv_interface_handler_send, o, BReactor_PendingGroup(o->reactor));
 
     // connect recv connector
+    o->recv_connector = recv_connector;
     PacketPassConnector_ConnectOutput(recv_connector, &o->recv_if);
 
     // connect send connector
-    o->recv_connector = recv_connector;
     PacketPassConnector_ConnectOutput(&o->send_connector, send_if);
 
     // set have server

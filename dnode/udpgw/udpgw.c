@@ -359,6 +359,9 @@ void client_recv_if_handler_send (struct client *client, uint8_t *data, int data
     ASSERT(data_len >= 0)
     ASSERT(data_len <= udpgw_mtu)
 
+    // accept packet
+    PacketPassInterface_Done(&client->recv_if);
+
     // parse header
     if (data_len < sizeof(struct udpgw_header)) {
         client_log(client, BLOG_ERROR, "missing header");
