@@ -110,7 +110,6 @@ struct connection {
 };
 
 static struct {
-    int udp_mtu;
     int max_connections_for_client;
     int local_udp_num_ports;
     char *local_udp_addr;
@@ -120,6 +119,7 @@ static struct {
 } options;
 
 // MTUs
+static int udp_mtu;
 static int udpgw_mtu;
 
 // local UDP port range, if options.local_udp_num_ports>=0
@@ -164,7 +164,7 @@ static struct connection * find_connection (struct client *client, uint16_t coni
 static int uint16_comparator (void *unused, uint16_t *v1, uint16_t *v2);
 static void maybe_update_dns (void);
 
-void udpgw_init (int argc, char **argv, BReactor* udpgw_reactor)
+void udpgw_init (int argc, char **argv, BReactor* udpgw_reactor, int udp_mtu_)
 {
     // parse command-line arguments
     parse_arguments(argc, argv);
@@ -175,7 +175,8 @@ void udpgw_init (int argc, char **argv, BReactor* udpgw_reactor)
     ss = udpgw_reactor;
 
     // compute MTUs
-    udpgw_mtu = udpgw_compute_mtu(options.udp_mtu);
+    udp_mtu = udp_mtu_;
+    udpgw_mtu = udpgw_compute_mtu(udp_mtu);
     if (udpgw_mtu < 0 || udpgw_mtu > PACKETPROTO_MAXPAYLOAD) {
         udpgw_mtu = PACKETPROTO_MAXPAYLOAD;
     }
@@ -209,7 +210,6 @@ void parse_arguments (int argc, char *argv[])
         return;
     }
 
-    options.udp_mtu = DEFAULT_UDP_MTU;
     options.max_connections_for_client = DEFAULT_MAX_CONNECTIONS_FOR_CLIENT;
     options.local_udp_num_ports = -1;
     options.local_udp_ip6_num_ports = -1;
@@ -219,18 +219,7 @@ void parse_arguments (int argc, char *argv[])
     for (i = 1; i < argc; i++) {
         char *arg = argv[i];
 
-        if (!strcmp(arg, "--udp-mtu")) {
-            if (1 >= argc - i) {
-                fprintf(stderr, "%s: requires an argument\n", arg);
-                return;
-            }
-            if ((options.udp_mtu = atoi(argv[i + 1])) < 0) {
-                fprintf(stderr, "%s: wrong argument\n", arg);
-                return;
-            }
-            i++;
-        }
-        else if (!strcmp(arg, "--max-connections-for-client")) {
+        if (!strcmp(arg, "--max-connections-for-client")) {
             if (1 >= argc - i) {
                 fprintf(stderr, "%s: requires an argument\n", arg);
                 return;
@@ -413,7 +402,7 @@ void client_recv_if_handler_send (struct client *client, uint8_t *data, int data
     }
 
     // check payload length
-    if (data_len > options.udp_mtu) {
+    if (data_len > udp_mtu) {
         client_log(client, BLOG_ERROR, "too much data");
         return;
     }
@@ -546,7 +535,7 @@ void connection_init (struct client *client, uint16_t conid, BAddr addr, BAddr o
     ASSERT(addr.type == BADDR_TYPE_IPV4 || addr.type == BADDR_TYPE_IPV6)
     ASSERT(orig_addr.type == BADDR_TYPE_IPV4 || orig_addr.type == BADDR_TYPE_IPV6)
     ASSERT(data_len >= 0)
-    ASSERT(data_len <= options.udp_mtu)
+    ASSERT(data_len <= udp_mtu)
 
     // allocate structure
     struct connection *con = (struct connection *)malloc(sizeof(*con));
@@ -665,11 +654,11 @@ void connection_init (struct client *client, uint16_t conid, BAddr addr, BAddr o
     BDatagram_SetSendAddrs(&con->udp_dgram, addr, ipaddr);
 
     // init UDP dgram interfaces
-    BDatagram_SendAsync_Init(&con->udp_dgram, options.udp_mtu);
-    BDatagram_RecvAsync_Init(&con->udp_dgram, options.udp_mtu);
+    BDatagram_SendAsync_Init(&con->udp_dgram, udp_mtu);
+    BDatagram_RecvAsync_Init(&con->udp_dgram, udp_mtu);
 
     // init UDP writer
-    BufferWriter_Init(&con->udp_send_writer, options.udp_mtu, BReactor_PendingGroup(ss));
+    BufferWriter_Init(&con->udp_send_writer, udp_mtu, BReactor_PendingGroup(ss));
 
     // init UDP buffer
     if (!PacketBuffer_Init(&con->udp_send_buffer, BufferWriter_GetOutput(&con->udp_send_writer), BDatagram_SendAsync_GetIf(&con->udp_dgram), CONNECTION_UDP_BUFFER_SIZE, BReactor_PendingGroup(ss))) {
@@ -678,7 +667,7 @@ void connection_init (struct client *client, uint16_t conid, BAddr addr, BAddr o
     }
 
     // init UDP recv interface
-    PacketPassInterface_Init(&con->udp_recv_if, options.udp_mtu, (PacketPassInterface_handler_send)connection_udp_recv_if_handler_send, con, BReactor_PendingGroup(ss));
+    PacketPassInterface_Init(&con->udp_recv_if, udp_mtu, (PacketPassInterface_handler_send)connection_udp_recv_if_handler_send, con, BReactor_PendingGroup(ss));
 
     // init UDP recv buffer
     if (!SinglePacketBuffer_Init(&con->udp_recv_buffer, BDatagram_RecvAsync_GetIf(&con->udp_dgram), &con->udp_recv_if, BReactor_PendingGroup(ss))) {
@@ -803,7 +792,7 @@ void connection_first_job_handler (struct connection *con)
 void connection_send_to_client (struct connection *con, uint8_t flags, const uint8_t *data, int data_len)
 {
     ASSERT(data_len >= 0)
-    ASSERT(data_len <= options.udp_mtu)
+    ASSERT(data_len <= udp_mtu)
 
     size_t addr_len = (con->orig_addr.type == BADDR_TYPE_IPV6) ? sizeof(struct udpgw_addr_ipv6) :
                       (con->orig_addr.type == BADDR_TYPE_IPV4) ? sizeof(struct udpgw_addr_ipv4) : 0;
@@ -863,7 +852,7 @@ int connection_send_to_udp (struct connection *con, const uint8_t *data, int dat
     struct client *client = con->client;
     ASSERT(!con->closing)
     ASSERT(data_len >= 0)
-    ASSERT(data_len <= options.udp_mtu)
+    ASSERT(data_len <= udp_mtu)
 
     connection_log(con, BLOG_DEBUG, "from client %d bytes", data_len);
 
@@ -954,7 +943,7 @@ void connection_udp_recv_if_handler_send (struct connection *con, uint8_t *data,
     struct client *client = con->client;
     ASSERT(!con->closing)
     ASSERT(data_len >= 0)
-    ASSERT(data_len <= options.udp_mtu)
+    ASSERT(data_len <= udp_mtu)
 
     connection_log(con, BLOG_DEBUG, "from UDP %d bytes", data_len);
 

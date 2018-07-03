@@ -2,7 +2,7 @@
  * Copyright (C) Ambroz Bizjak <ambrop7@gmail.com>
  * Contributions:
  * Transparent DNS: Copyright (C) Kerem Hadimli <kerem.hadimli@gmail.com>
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  * 1. Redistributions of source code must retain the above copyright
@@ -13,7 +13,7 @@
  * 3. Neither the name of the author nor the
  *    names of its contributors may be used to endorse or promote products
  *    derived from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -41,7 +41,7 @@
 #include <base/BPending.h>
 #include <flow/PacketPassFairQueue.h>
 #include <flow/PacketStreamSender.h>
-#include <flow/PacketProtoFlow.h>
+#include <flow/PacketProtoFlowPassthru.h>
 #include <flow/PacketProtoDecoder.h>
 #include <flow/PacketPassConnector.h>
 #include <flowextra/PacketPassInactivityMonitor.h>
@@ -63,10 +63,8 @@ typedef struct {
     btime_t keepalive_time;
     BReactor *reactor;
     void *user;
-    UdpGwClient_handler_servererror handler_servererror;
     UdpGwClient_handler_received handler_received;
     int udpgw_mtu;
-    int pp_mtu;
     BAVL connections_tree_by_conaddr;
     BAVL connections_tree_by_conid;
     LinkedList1 connections_list;
@@ -80,8 +78,7 @@ typedef struct {
     PacketPassFairQueueFlow keepalive_qflow;
     int keepalive_sending;
     int have_server;
-    PacketStreamSender send_sender;
-    PacketProtoDecoder recv_decoder;
+    PacketPassConnector* recv_connector;
     PacketPassInterface recv_if;
     DebugObject d_obj;
 } UdpGwClient;
@@ -100,7 +97,7 @@ struct UdpGwClient_connection {
     uint16_t conid;
     BPending first_job;
     BufferWriter *send_if;
-    PacketProtoFlow send_ppflow;
+    PacketProtoFlowPassthru send_ppflow;
     PacketPassFairQueueFlow send_qflow;
     BAVLNode connections_tree_by_conaddr_node;
     BAVLNode connections_tree_by_conid_node;
@@ -108,11 +105,10 @@ struct UdpGwClient_connection {
 };
 
 int UdpGwClient_Init (UdpGwClient *o, int udp_mtu, int max_connections, int send_buffer_size, btime_t keepalive_time, BReactor *reactor, void *user,
-                      UdpGwClient_handler_servererror handler_servererror,
                       UdpGwClient_handler_received handler_received) WARN_UNUSED;
 void UdpGwClient_Free (UdpGwClient *o);
 void UdpGwClient_SubmitPacket (UdpGwClient *o, BAddr local_addr, BAddr remote_addr, int is_dns, const uint8_t *data, int data_len);
-int UdpGwClient_ConnectServer (UdpGwClient *o, StreamPassInterface *send_if, StreamRecvInterface *recv_if) WARN_UNUSED;
+void UdpGwClient_ConnectServer (UdpGwClient *o, PacketPassInterface* send_if, PacketPassConnector* recv_connector);
 void UdpGwClient_DisconnectServer (UdpGwClient *o);
 
 #endif

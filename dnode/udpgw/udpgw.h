@@ -28,9 +28,6 @@
 #include <flow/PacketPassInterface.h>
 #include <flow/PacketPassConnector.h>
 
-// maximum datagram size
-#define DEFAULT_UDP_MTU 65520
-
 // connection buffer size for sending to client, in packets
 #define CONNECTION_CLIENT_BUFFER_SIZE 1
 
@@ -43,7 +40,7 @@
 // SO_SNDBFUF socket option for clients, 0 to not set
 #define CLIENT_DEFAULT_SOCKET_SEND_BUFFER 1048576
 
-void udpgw_init (int argc, char **argv, BReactor* udpgw_reactor);
+void udpgw_init (int argc, char **argv, BReactor* udpgw_reactor, int udp_mtu_);
 
 PacketPassInterface* udpgw_get_input ();
 PacketPassConnector* udpgw_get_output ();
