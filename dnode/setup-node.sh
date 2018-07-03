@@ -1,3 +1,4 @@
+sudo killall dnsmasq
 sudo ip netns add dnode1
 sudo ip tuntap add dev tun0 mode tun user stas
 sudo ip link set tun0 netns dnode1
