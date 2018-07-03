@@ -53,7 +53,6 @@ set(SOURCES
     udpgw/udpgw.c
     flowextra/PacketPassInactivityMonitor.c
     flowextra/KeepaliveIO.c
-    socksclient/BSocksClient.c
     tuntap/BTap.c
 )
 
