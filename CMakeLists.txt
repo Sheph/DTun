@@ -61,6 +61,7 @@ include_directories(
     lwip/src/include
 )
 
+add_subdirectory(udt)
 add_subdirectory(dutil)
 add_subdirectory(lwip)
 add_subdirectory(dnode)
