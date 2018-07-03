@@ -47,7 +47,6 @@
 #include <structure/LinkedList1.h>
 #include <structure/BAVL.h>
 #include <base/BLog.h>
-#include <system/BReactor.h>
 #include <system/BNetwork.h>
 #include <system/BConnection.h>
 #include <system/BDatagram.h>
@@ -55,7 +54,7 @@
 #include <flow/PacketProtoDecoder.h>
 #include <flow/PacketPassFairQueue.h>
 #include <flow/PacketStreamSender.h>
-#include <flow/PacketProtoFlow.h>
+#include <flow/PacketProtoFlowPassthru.h>
 #include <flow/SinglePacketBuffer.h>
 
 #ifndef BADVPN_USE_WINAPI
@@ -66,19 +65,13 @@
 
 #include <udpgw/udpgw.h>
 
-#define LOGGER_STDOUT 1
-#define LOGGER_SYSLOG 2
-
 #define DNS_UPDATE_TIME 2000
 
 struct client {
-    BConnection con;
-    BAddr addr;
-    BTimer disconnect_timer;
-    PacketProtoDecoder recv_decoder;
+    PacketPassConnector send_connector;
+    PacketPassConnector recv_connector;
     PacketPassInterface recv_if;
     PacketPassFairQueue send_queue;
-    PacketStreamSender send_sender;
     BAVL connections_tree;
     LinkedList1 connections_list;
     int num_connections;
@@ -97,7 +90,7 @@ struct connection {
     int closing;
     BPending first_job;
     BufferWriter *send_if;
-    PacketProtoFlow send_ppflow;
+    PacketProtoFlowPassthru send_ppflow;
     PacketPassFairQueueFlow send_qflow;
     union {
         struct {
@@ -116,23 +109,9 @@ struct connection {
     };
 };
 
-// command-line options
-struct {
-    int help;
-    int version;
-    int logger;
-    #ifndef BADVPN_USE_WINAPI
-    char *logger_syslog_facility;
-    char *logger_syslog_ident;
-    #endif
-    int loglevel;
-    int loglevels[BLOG_NUM_CHANNELS];
-    char *listen_addrs[MAX_LISTEN_ADDRS];
-    int num_listen_addrs;
+static struct {
     int udp_mtu;
-    int max_clients;
     int max_connections_for_client;
-    int client_socket_sndbuf;
     int local_udp_num_ports;
     char *local_udp_addr;
     int local_udp_ip6_num_ports;
@@ -141,46 +120,30 @@ struct {
 } options;
 
 // MTUs
-int udpgw_mtu;
-int pp_mtu;
-
-// listen addresses
-BAddr listen_addrs[MAX_LISTEN_ADDRS];
-int num_listen_addrs;
+static int udpgw_mtu;
 
 // local UDP port range, if options.local_udp_num_ports>=0
-BAddr local_udp_addr;
+static BAddr local_udp_addr;
 
 // local UDP/IPv6 port range, if options.local_udp_ip6_num_ports>=0
-BAddr local_udp_ip6_addr;
+static BAddr local_udp_ip6_addr;
 
 // DNS forwarding
-BAddr dns_addr;
-btime_t last_dns_update_time;
+static BAddr dns_addr;
+static btime_t last_dns_update_time;
 
 // reactor
-BReactor ss;
+static BReactor* ss;
 
-// listeners
-BListener listeners[MAX_LISTEN_ADDRS];
-int num_listeners;
+// the one and only client
+static struct client the_client;
 
-// clients
-LinkedList1 clients_list;
-int num_clients;
-
-static void print_help (const char *name);
-static void print_version (void);
-static int parse_arguments (int argc, char *argv[]);
-static int process_arguments (void);
-static void signal_handler (void *unused);
-static void listener_handler (BListener *listener);
+static void parse_arguments (int argc, char *argv[]);
+static void process_arguments (void);
+static void client_init (struct client *client);
 static void client_free (struct client *client);
 static void client_logfunc (struct client *client);
 static void client_log (struct client *client, int level, const char *fmt, ...);
-static void client_disconnect_timer_handler (struct client *client);
-static void client_connection_handler (struct client *client, int event);
-static void client_decoder_handler_error (struct client *client);
 static void client_recv_if_handler_send (struct client *client, uint8_t *data, int data_len);
 static int get_local_num_ports (int addr_type);
 static BAddr get_local_addr (int addr_type);
@@ -201,202 +164,53 @@ static struct connection * find_connection (struct client *client, uint16_t coni
 static int uint16_comparator (void *unused, uint16_t *v1, uint16_t *v2);
 static void maybe_update_dns (void);
 
-int udpgw_main (int argc, char **argv)
+void udpgw_init (int argc, char **argv, BReactor* udpgw_reactor)
 {
-    if (argc <= 0) {
-        return 1;
-    }
-
-    // open standard streams
-    open_standard_streams();
-
     // parse command-line arguments
-    if (!parse_arguments(argc, argv)) {
-        fprintf(stderr, "Failed to parse arguments\n");
-        print_help(argv[0]);
-        goto fail0;
-    }
-
-    // handle --help and --version
-    if (options.help) {
-        print_version();
-        print_help(argv[0]);
-        return 0;
-    }
-    if (options.version) {
-        print_version();
-        return 0;
-    }
-
-    // initialize logger
-    switch (options.logger) {
-        case LOGGER_STDOUT:
-            BLog_InitStdout();
-            break;
-        #ifndef BADVPN_USE_WINAPI
-        case LOGGER_SYSLOG:
-            if (!BLog_InitSyslog(options.logger_syslog_ident, options.logger_syslog_facility)) {
-                fprintf(stderr, "Failed to initialize syslog logger\n");
-                goto fail0;
-            }
-            break;
-        #endif
-        default:
-            ASSERT(0);
-    }
-
-    // configure logger channels
-    for (int i = 0; i < BLOG_NUM_CHANNELS; i++) {
-        if (options.loglevels[i] >= 0) {
-            BLog_SetChannelLoglevel(i, options.loglevels[i]);
-        }
-        else if (options.loglevel >= 0) {
-            BLog_SetChannelLoglevel(i, options.loglevel);
-        }
-    }
-
-    BLog(BLOG_NOTICE, "initializing "GLOBAL_PRODUCT_NAME" "PROGRAM_NAME" "GLOBAL_VERSION);
-
-    // initialize network
-    if (!BNetwork_GlobalInit()) {
-        BLog(BLOG_ERROR, "BNetwork_GlobalInit failed");
-        goto fail1;
-    }
+    parse_arguments(argc, argv);
 
     // process arguments
-    if (!process_arguments()) {
-        BLog(BLOG_ERROR, "Failed to process arguments");
-        goto fail1;
-    }
+    process_arguments();
+
+    ss = udpgw_reactor;
 
     // compute MTUs
     udpgw_mtu = udpgw_compute_mtu(options.udp_mtu);
     if (udpgw_mtu < 0 || udpgw_mtu > PACKETPROTO_MAXPAYLOAD) {
         udpgw_mtu = PACKETPROTO_MAXPAYLOAD;
     }
-    pp_mtu = udpgw_mtu + sizeof(struct packetproto_header);
-
-    // init time
-    BTime_Init();
 
     // init DNS forwarding
     BAddr_InitNone(&dns_addr);
     last_dns_update_time = INT64_MIN;
     maybe_update_dns();
 
-    // init reactor
-    if (!BReactor_Init(&ss)) {
-        BLog(BLOG_ERROR, "BReactor_Init failed");
-        goto fail1;
-    }
-
-    // setup signal handler
-    if (!BSignal_Init(&ss, signal_handler, NULL)) {
-        BLog(BLOG_ERROR, "BSignal_Init failed");
-        goto fail2;
-    }
-
-    // initialize listeners
-    num_listeners = 0;
-    while (num_listeners < num_listen_addrs) {
-        if (!BListener_Init(&listeners[num_listeners], listen_addrs[num_listeners], &ss, &listeners[num_listeners], (BListener_handler)listener_handler)) {
-            BLog(BLOG_ERROR, "Listener_Init failed");
-            goto fail3;
-        }
-        num_listeners++;
-    }
-
-    // init clients list
-    LinkedList1_Init(&clients_list);
-    num_clients = 0;
-
-    // enter event loop
-    BLog(BLOG_NOTICE, "entering event loop");
-    BReactor_Exec(&ss);
-
-    // free clients
-    while (!LinkedList1_IsEmpty(&clients_list)) {
-        struct client *client = UPPER_OBJECT(LinkedList1_GetFirst(&clients_list), struct client, clients_list_node);
-        client_free(client);
-    }
-fail3:
-    // free listeners
-    while (num_listeners > 0) {
-        num_listeners--;
-        BListener_Free(&listeners[num_listeners]);
-    }
-    // finish signal handling
-    BSignal_Finish();
-fail2:
-    // free reactor
-    BReactor_Free(&ss);
-fail1:
-    // free logger
-    BLog(BLOG_NOTICE, "exiting");
-    BLog_Free();
-fail0:
-    // finish debug objects
-    DebugObjectGlobal_Finish();
-
-    return 1;
+    client_init(&the_client);
 }
 
-void print_help (const char *name)
+PacketPassInterface* udpgw_get_input ()
 {
-    printf(
-        "Usage:\n"
-        "    %s\n"
-        "        [--help]\n"
-        "        [--version]\n"
-        "        [--logger <"LOGGERS_STRING">]\n"
-        #ifndef BADVPN_USE_WINAPI
-        "        (logger=syslog?\n"
-        "            [--syslog-facility <string>]\n"
-        "            [--syslog-ident <string>]\n"
-        "        )\n"
-        #endif
-        "        [--loglevel <0-5/none/error/warning/notice/info/debug>]\n"
-        "        [--channel-loglevel <channel-name> <0-5/none/error/warning/notice/info/debug>] ...\n"
-        "        [--listen-addr <addr>] ...\n"
-        "        [--udp-mtu <bytes>]\n"
-        "        [--max-clients <number>]\n"
-        "        [--max-connections-for-client <number>]\n"
-        "        [--client-socket-sndbuf <bytes / 0>]\n"
-        "        [--local-udp-addrs <addr> <num_ports>]\n"
-        "        [--local-udp-ip6-addrs <addr> <num_ports>]\n"
-        "        [--unique-local-ports]\n"
-        "Address format is a.b.c.d:port (IPv4) or [addr]:port (IPv6).\n",
-        name
-    );
+    return PacketPassConnector_GetInput(&the_client.recv_connector);
 }
 
-void print_version (void)
+PacketPassConnector* udpgw_get_output ()
 {
-    printf(GLOBAL_PRODUCT_NAME" "PROGRAM_NAME" "GLOBAL_VERSION"\n"GLOBAL_COPYRIGHT_NOTICE"\n");
+    return &the_client.send_connector;
 }
 
-int parse_arguments (int argc, char *argv[])
+void udpgw_cleanup ()
+{
+    client_free(&the_client);
+}
+
+void parse_arguments (int argc, char *argv[])
 {
     if (argc <= 0) {
-        return 0;
+        return;
     }
 
-    options.help = 0;
-    options.version = 0;
-    options.logger = LOGGER_STDOUT;
-    #ifndef BADVPN_USE_WINAPI
-    options.logger_syslog_facility = "daemon";
-    options.logger_syslog_ident = argv[0];
-    #endif
-    options.loglevel = -1;
-    for (int i = 0; i < BLOG_NUM_CHANNELS; i++) {
-        options.loglevels[i] = -1;
-    }
-    options.num_listen_addrs = 0;
     options.udp_mtu = DEFAULT_UDP_MTU;
-    options.max_clients = DEFAULT_MAX_CLIENTS;
     options.max_connections_for_client = DEFAULT_MAX_CONNECTIONS_FOR_CLIENT;
-    options.client_socket_sndbuf = CLIENT_DEFAULT_SOCKET_SEND_BUFFER;
     options.local_udp_num_ports = -1;
     options.local_udp_ip6_num_ports = -1;
     options.unique_local_ports = 0;
@@ -404,197 +218,70 @@ int parse_arguments (int argc, char *argv[])
     int i;
     for (i = 1; i < argc; i++) {
         char *arg = argv[i];
-        if (!strcmp(arg, "--help")) {
-            options.help = 1;
-        }
-        else if (!strcmp(arg, "--version")) {
-            options.version = 1;
-        }
-        else if (!strcmp(arg, "--logger")) {
+
+        if (!strcmp(arg, "--udp-mtu")) {
             if (1 >= argc - i) {
                 fprintf(stderr, "%s: requires an argument\n", arg);
-                return 0;
-            }
-            char *arg2 = argv[i + 1];
-            if (!strcmp(arg2, "stdout")) {
-                options.logger = LOGGER_STDOUT;
-            }
-            #ifndef BADVPN_USE_WINAPI
-            else if (!strcmp(arg2, "syslog")) {
-                options.logger = LOGGER_SYSLOG;
-            }
-            #endif
-            else {
-                fprintf(stderr, "%s: wrong argument\n", arg);
-                return 0;
-            }
-            i++;
-        }
-        #ifndef BADVPN_USE_WINAPI
-        else if (!strcmp(arg, "--syslog-facility")) {
-            if (1 >= argc - i) {
-                fprintf(stderr, "%s: requires an argument\n", arg);
-                return 0;
-            }
-            options.logger_syslog_facility = argv[i + 1];
-            i++;
-        }
-        else if (!strcmp(arg, "--syslog-ident")) {
-            if (1 >= argc - i) {
-                fprintf(stderr, "%s: requires an argument\n", arg);
-                return 0;
-            }
-            options.logger_syslog_ident = argv[i + 1];
-            i++;
-        }
-        #endif
-        else if (!strcmp(arg, "--loglevel")) {
-            if (1 >= argc - i) {
-                fprintf(stderr, "%s: requires an argument\n", arg);
-                return 0;
-            }
-            if ((options.loglevel = parse_loglevel(argv[i + 1])) < 0) {
-                fprintf(stderr, "%s: wrong argument\n", arg);
-                return 0;
-            }
-            i++;
-        }
-        else if (!strcmp(arg, "--channel-loglevel")) {
-            if (2 >= argc - i) {
-                fprintf(stderr, "%s: requires two arguments\n", arg);
-                return 0;
-            }
-            int channel = BLogGlobal_GetChannelByName(argv[i + 1]);
-            if (channel < 0) {
-                fprintf(stderr, "%s: wrong channel argument\n", arg);
-                return 0;
-            }
-            int loglevel = parse_loglevel(argv[i + 2]);
-            if (loglevel < 0) {
-                fprintf(stderr, "%s: wrong loglevel argument\n", arg);
-                return 0;
-            }
-            options.loglevels[channel] = loglevel;
-            i += 2;
-        }
-        else if (!strcmp(arg, "--listen-addr")) {
-            if (1 >= argc - i) {
-                fprintf(stderr, "%s: requires an argument\n", arg);
-                return 0;
-            }
-            if (options.num_listen_addrs == MAX_LISTEN_ADDRS) {
-                fprintf(stderr, "%s: too many\n", arg);
-                return 0;
-            }
-            options.listen_addrs[options.num_listen_addrs] = argv[i + 1];
-            options.num_listen_addrs++;
-            i++;
-        }
-        else if (!strcmp(arg, "--udp-mtu")) {
-            if (1 >= argc - i) {
-                fprintf(stderr, "%s: requires an argument\n", arg);
-                return 0;
+                return;
             }
             if ((options.udp_mtu = atoi(argv[i + 1])) < 0) {
                 fprintf(stderr, "%s: wrong argument\n", arg);
-                return 0;
-            }
-            i++;
-        }
-        else if (!strcmp(arg, "--max-clients")) {
-            if (1 >= argc - i) {
-                fprintf(stderr, "%s: requires an argument\n", arg);
-                return 0;
-            }
-            if ((options.max_clients = atoi(argv[i + 1])) <= 0) {
-                fprintf(stderr, "%s: wrong argument\n", arg);
-                return 0;
+                return;
             }
             i++;
         }
         else if (!strcmp(arg, "--max-connections-for-client")) {
             if (1 >= argc - i) {
                 fprintf(stderr, "%s: requires an argument\n", arg);
-                return 0;
+                return;
             }
             if ((options.max_connections_for_client = atoi(argv[i + 1])) <= 0) {
                 fprintf(stderr, "%s: wrong argument\n", arg);
-                return 0;
-            }
-            i++;
-        }
-        else if (!strcmp(arg, "--client-socket-sndbuf")) {
-            if (1 >= argc - i) {
-                fprintf(stderr, "%s: requires an argument\n", arg);
-                return 0;
-            }
-            if ((options.client_socket_sndbuf = atoi(argv[i + 1])) < 0) {
-                fprintf(stderr, "%s: wrong argument\n", arg);
-                return 0;
+                return;
             }
             i++;
         }
         else if (!strcmp(arg, "--local-udp-addrs")) {
             if (2 >= argc - i) {
                 fprintf(stderr, "%s: requires two arguments\n", arg);
-                return 0;
+                return;
             }
             options.local_udp_addr = argv[i + 1];
             if ((options.local_udp_num_ports = atoi(argv[i + 2])) < 0) {
                 fprintf(stderr, "%s: wrong argument\n", arg);
-                return 0;
+                return;
             }
             i += 2;
         }
         else if (!strcmp(arg, "--local-udp-ip6-addrs")) {
             if (2 >= argc - i) {
                 fprintf(stderr, "%s: requires two arguments\n", arg);
-                return 0;
+                return;
             }
             options.local_udp_ip6_addr = argv[i + 1];
             if ((options.local_udp_ip6_num_ports = atoi(argv[i + 2])) < 0) {
                 fprintf(stderr, "%s: wrong argument\n", arg);
-                return 0;
+                return;
             }
             i += 2;
         }
         else if (!strcmp(arg, "--unique-local-ports")) {
             options.unique_local_ports = 1;
         }
-        else {
-            fprintf(stderr, "unknown option: %s\n", arg);
-            return 0;
-        }
     }
-
-    if (options.help || options.version) {
-        return 1;
-    }
-
-    return 1;
 }
 
-int process_arguments (void)
+void process_arguments (void)
 {
-    // resolve listen addresses
-    num_listen_addrs = 0;
-    while (num_listen_addrs < options.num_listen_addrs) {
-        if (!BAddr_Parse(&listen_addrs[num_listen_addrs], options.listen_addrs[num_listen_addrs], NULL, 0)) {
-            BLog(BLOG_ERROR, "listen addr: BAddr_Parse failed");
-            return 0;
-        }
-        num_listen_addrs++;
-    }
-
     // resolve local UDP address
     if (options.local_udp_num_ports >= 0) {
         if (!BAddr_Parse(&local_udp_addr, options.local_udp_addr, NULL, 0)) {
             BLog(BLOG_ERROR, "local udp addr: BAddr_Parse failed");
-            return 0;
+            return;
         }
         if (local_udp_addr.type != BADDR_TYPE_IPV4) {
             BLog(BLOG_ERROR, "local udp addr: must be an IPv4 address");
-            return 0;
+            return;
         }
     }
 
@@ -602,78 +289,29 @@ int process_arguments (void)
     if (options.local_udp_ip6_num_ports >= 0) {
         if (!BAddr_Parse(&local_udp_ip6_addr, options.local_udp_ip6_addr, NULL, 0)) {
             BLog(BLOG_ERROR, "local udp ip6 addr: BAddr_Parse failed");
-            return 0;
+            return;
         }
         if (local_udp_ip6_addr.type != BADDR_TYPE_IPV6) {
             BLog(BLOG_ERROR, "local udp ip6 addr: must be an IPv6 address");
-            return 0;
+            return;
         }
     }
-
-    return 1;
 }
 
-void signal_handler (void *unused)
+void client_init (struct client *client)
 {
-    BLog(BLOG_NOTICE, "termination requested");
+    memset(client, 0, sizeof(*client));
 
-    // exit event loop
-    BReactor_Quit(&ss, 1);
-}
-
-void listener_handler (BListener *listener)
-{
-    if (num_clients == options.max_clients) {
-        BLog(BLOG_ERROR, "maximum number of clients reached");
-        goto fail0;
-    }
-
-    // allocate structure
-    struct client *client = (struct client *)malloc(sizeof(*client));
-    if (!client) {
-        BLog(BLOG_ERROR, "malloc failed");
-        goto fail0;
-    }
-
-    // accept client
-    if (!BConnection_Init(&client->con, BConnection_source_listener(listener, &client->addr), &ss, client, (BConnection_handler)client_connection_handler)) {
-        BLog(BLOG_ERROR, "BConnection_Init failed");
-        goto fail1;
-    }
-
-    // limit socket send buffer, else our scheduling is pointless
-    if (options.client_socket_sndbuf > 0) {
-        if (!BConnection_SetSendBuffer(&client->con, options.client_socket_sndbuf)) {
-            BLog(BLOG_WARNING, "BConnection_SetSendBuffer failed");
-        }
-    }
-
-    // init connection interfaces
-    BConnection_SendAsync_Init(&client->con);
-    BConnection_RecvAsync_Init(&client->con);
-
-    // init disconnect timer
-    BTimer_Init(&client->disconnect_timer, CLIENT_DISCONNECT_TIMEOUT, (BTimer_handler)client_disconnect_timer_handler, client);
-    BReactor_SetTimer(&ss, &client->disconnect_timer);
+    PacketPassConnector_Init(&client->send_connector, udpgw_mtu, BReactor_PendingGroup(ss));
+    PacketPassConnector_Init(&client->recv_connector, udpgw_mtu, BReactor_PendingGroup(ss));
 
     // init recv interface
-    PacketPassInterface_Init(&client->recv_if, udpgw_mtu, (PacketPassInterface_handler_send)client_recv_if_handler_send, client, BReactor_PendingGroup(&ss));
-
-    // init recv decoder
-    if (!PacketProtoDecoder_Init(&client->recv_decoder, BConnection_RecvAsync_GetIf(&client->con), &client->recv_if, BReactor_PendingGroup(&ss), client,
-        (PacketProtoDecoder_handler_error)client_decoder_handler_error
-    )) {
-        BLog(BLOG_ERROR, "PacketProtoDecoder_Init failed");
-        goto fail2;
-    }
-
-    // init send sender
-    PacketStreamSender_Init(&client->send_sender, BConnection_SendAsync_GetIf(&client->con), pp_mtu, BReactor_PendingGroup(&ss));
+    PacketPassInterface_Init(&client->recv_if, udpgw_mtu, (PacketPassInterface_handler_send)client_recv_if_handler_send, client, BReactor_PendingGroup(ss));
+    PacketPassConnector_ConnectOutput(&client->recv_connector, &client->recv_if);
 
     // init send queue
-    if (!PacketPassFairQueue_Init(&client->send_queue, PacketStreamSender_GetInput(&client->send_sender), BReactor_PendingGroup(&ss), 0, 1)) {
+    if (!PacketPassFairQueue_Init(&client->send_queue, PacketPassConnector_GetInput(&client->send_connector), BReactor_PendingGroup(ss), 0, 1)) {
         BLog(BLOG_ERROR, "PacketPassFairQueue_Init failed");
-        goto fail3;
     }
 
     // init connections tree
@@ -687,28 +325,6 @@ void listener_handler (BListener *listener)
 
     // init closing connections list
     LinkedList1_Init(&client->closing_connections_list);
-
-    // insert to clients list
-    LinkedList1_Append(&clients_list, &client->clients_list_node);
-    num_clients++;
-
-    client_log(client, BLOG_INFO, "connected");
-
-    return;
-
-fail3:
-    PacketStreamSender_Free(&client->send_sender);
-    PacketProtoDecoder_Free(&client->recv_decoder);
-fail2:
-    PacketPassInterface_Free(&client->recv_if);
-    BReactor_RemoveTimer(&ss, &client->disconnect_timer);
-    BConnection_RecvAsync_Free(&client->con);
-    BConnection_SendAsync_Free(&client->con);
-    BConnection_Free(&client->con);
-fail1:
-    free(client);
-fail0:
-    return;
 }
 
 void client_free (struct client *client)
@@ -728,42 +344,17 @@ void client_free (struct client *client)
         connection_free(con);
     }
 
-    // remove from clients list
-    LinkedList1_Remove(&clients_list, &client->clients_list_node);
-    num_clients--;
-
     // free send queue
     PacketPassFairQueue_Free(&client->send_queue);
 
-    // free send sender
-    PacketStreamSender_Free(&client->send_sender);
-
-    // free recv decoder
-    PacketProtoDecoder_Free(&client->recv_decoder);
-
-    // free recv interface
+    PacketPassConnector_Free(&client->send_connector);
+    PacketPassConnector_Free(&client->recv_connector);
     PacketPassInterface_Free(&client->recv_if);
-
-    // free disconnect timer
-    BReactor_RemoveTimer(&ss, &client->disconnect_timer);
-
-    // free connection interfaces
-    BConnection_RecvAsync_Free(&client->con);
-    BConnection_SendAsync_Free(&client->con);
-
-    // free connection
-    BConnection_Free(&client->con);
-
-    // free structure
-    free(client);
 }
 
 void client_logfunc (struct client *client)
 {
-    char addr[BADDR_MAX_PRINT_LEN];
-    BAddr_Print(&client->addr, addr);
-
-    BLog_Append("client (%s): ", addr);
+    BLog_Append("udpgw client: ");
 }
 
 void client_log (struct client *client, int level, const char *fmt, ...)
@@ -774,41 +365,10 @@ void client_log (struct client *client, int level, const char *fmt, ...)
     va_end(vl);
 }
 
-void client_disconnect_timer_handler (struct client *client)
-{
-    client_log(client, BLOG_INFO, "timed out, disconnecting");
-
-    // free client
-    client_free(client);
-}
-
-void client_connection_handler (struct client *client, int event)
-{
-    if (event == BCONNECTION_EVENT_RECVCLOSED) {
-        client_log(client, BLOG_INFO, "client closed");
-    } else {
-        client_log(client, BLOG_INFO, "client error");
-    }
-
-    // free client
-    client_free(client);
-}
-
-void client_decoder_handler_error (struct client *client)
-{
-    client_log(client, BLOG_ERROR, "decoder error");
-
-    // free client
-    client_free(client);
-}
-
 void client_recv_if_handler_send (struct client *client, uint8_t *data, int data_len)
 {
     ASSERT(data_len >= 0)
     ASSERT(data_len <= udpgw_mtu)
-
-    // accept packet
-    PacketPassInterface_Done(&client->recv_if);
 
     // parse header
     if (data_len < sizeof(struct udpgw_header)) {
@@ -821,9 +381,6 @@ void client_recv_if_handler_send (struct client *client, uint8_t *data, int data
     data_len -= sizeof(header);
     uint8_t flags = ltoh8(header.flags);
     uint16_t conid = ltoh16(header.conid);
-
-    // reset disconnect timer
-    BReactor_SetTimer(&ss, &client->disconnect_timer);
 
     // if this is keepalive, ignore any payload
     if ((flags & UDPGW_CLIENT_FLAG_KEEPALIVE)) {
@@ -940,8 +497,8 @@ uint8_t * build_port_usage_array_and_find_least_used_connection (BAddr remote_ad
     struct connection *least_con = NULL;
 
     // flag inappropriate ports (those with the same remote address)
-    for (LinkedList1Node *ln = LinkedList1_GetFirst(&clients_list); ln; ln = LinkedList1Node_Next(ln)) {
-        struct client *client = UPPER_OBJECT(ln, struct client, clients_list_node);
+    {
+        struct client *client = &the_client;
 
         for (LinkedList1Node *ln2 = LinkedList1_GetFirst(&client->connections_list); ln2; ln2 = LinkedList1Node_Next(ln2)) {
             struct connection *con = UPPER_OBJECT(ln2, struct connection, connections_list_node);
@@ -1013,21 +570,21 @@ void connection_init (struct client *client, uint16_t conid, BAddr addr, BAddr o
     con->closing = 0;
 
     // init first job
-    BPending_Init(&con->first_job, BReactor_PendingGroup(&ss), (BPending_handler)connection_first_job_handler, con);
+    BPending_Init(&con->first_job, BReactor_PendingGroup(ss), (BPending_handler)connection_first_job_handler, con);
     BPending_Set(&con->first_job);
 
     // init send queue flow
     PacketPassFairQueueFlow_Init(&con->send_qflow, &client->send_queue);
 
     // init send PacketProtoFlow
-    if (!PacketProtoFlow_Init(&con->send_ppflow, udpgw_mtu, CONNECTION_CLIENT_BUFFER_SIZE, PacketPassFairQueueFlow_GetInput(&con->send_qflow), BReactor_PendingGroup(&ss))) {
+    if (!PacketProtoFlowPassthru_Init(&con->send_ppflow, udpgw_mtu, CONNECTION_CLIENT_BUFFER_SIZE, PacketPassFairQueueFlow_GetInput(&con->send_qflow), BReactor_PendingGroup(ss))) {
         client_log(client, BLOG_ERROR, "PacketProtoFlow_Init failed");
         goto fail1;
     }
-    con->send_if = PacketProtoFlow_GetInput(&con->send_ppflow);
+    con->send_if = PacketProtoFlowPassthru_GetInput(&con->send_ppflow);
 
     // init UDP dgram
-    if (!BDatagram_Init(&con->udp_dgram, addr.type, &ss, con, (BDatagram_handler)connection_dgram_handler_event)) {
+    if (!BDatagram_Init(&con->udp_dgram, addr.type, ss, con, (BDatagram_handler)connection_dgram_handler_event)) {
         client_log(client, BLOG_ERROR, "BDatagram_Init failed");
         goto fail2;
     }
@@ -1112,19 +669,19 @@ void connection_init (struct client *client, uint16_t conid, BAddr addr, BAddr o
     BDatagram_RecvAsync_Init(&con->udp_dgram, options.udp_mtu);
 
     // init UDP writer
-    BufferWriter_Init(&con->udp_send_writer, options.udp_mtu, BReactor_PendingGroup(&ss));
+    BufferWriter_Init(&con->udp_send_writer, options.udp_mtu, BReactor_PendingGroup(ss));
 
     // init UDP buffer
-    if (!PacketBuffer_Init(&con->udp_send_buffer, BufferWriter_GetOutput(&con->udp_send_writer), BDatagram_SendAsync_GetIf(&con->udp_dgram), CONNECTION_UDP_BUFFER_SIZE, BReactor_PendingGroup(&ss))) {
+    if (!PacketBuffer_Init(&con->udp_send_buffer, BufferWriter_GetOutput(&con->udp_send_writer), BDatagram_SendAsync_GetIf(&con->udp_dgram), CONNECTION_UDP_BUFFER_SIZE, BReactor_PendingGroup(ss))) {
         client_log(client, BLOG_ERROR, "PacketBuffer_Init failed");
         goto fail4;
     }
 
     // init UDP recv interface
-    PacketPassInterface_Init(&con->udp_recv_if, options.udp_mtu, (PacketPassInterface_handler_send)connection_udp_recv_if_handler_send, con, BReactor_PendingGroup(&ss));
+    PacketPassInterface_Init(&con->udp_recv_if, options.udp_mtu, (PacketPassInterface_handler_send)connection_udp_recv_if_handler_send, con, BReactor_PendingGroup(ss));
 
     // init UDP recv buffer
-    if (!SinglePacketBuffer_Init(&con->udp_recv_buffer, BDatagram_RecvAsync_GetIf(&con->udp_dgram), &con->udp_recv_if, BReactor_PendingGroup(&ss))) {
+    if (!SinglePacketBuffer_Init(&con->udp_recv_buffer, BDatagram_RecvAsync_GetIf(&con->udp_dgram), &con->udp_recv_if, BReactor_PendingGroup(ss))) {
         client_log(client, BLOG_ERROR, "SinglePacketBuffer_Init failed");
         goto fail5;
     }
@@ -1151,7 +708,7 @@ fail4:
     BDatagram_SendAsync_Free(&con->udp_dgram);
     BDatagram_Free(&con->udp_dgram);
 fail2:
-    PacketProtoFlow_Free(&con->send_ppflow);
+    PacketProtoFlowPassthru_Free(&con->send_ppflow);
 fail1:
     PacketPassFairQueueFlow_Free(&con->send_qflow);
     BPending_Free(&con->first_job);
@@ -1183,7 +740,7 @@ void connection_free (struct connection *con)
     }
 
     // free send PacketProtoFlow
-    PacketProtoFlow_Free(&con->send_ppflow);
+    PacketProtoFlowPassthru_Free(&con->send_ppflow);
 
     // free send queue flow
     PacketPassFairQueueFlow_Free(&con->send_qflow);

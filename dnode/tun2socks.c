@@ -64,6 +64,7 @@
 #include <lwip/ip4_frag.h>
 #include <lwip/nd6.h>
 #include <lwip/ip6_frag.h>
+#include <udpgw/udpgw.h>
 
 #ifndef BADVPN_USE_WINAPI
 #include <base/BLog_syslog.h>
@@ -357,9 +358,13 @@ int tun2socks_main (int argc, char **argv)
     // init number of clients
     num_clients = 0;
 
+    udpgw_init(argc, argv, &ss);
+
     // enter event loop
     BLog(BLOG_NOTICE, "entering event loop");
     BReactor_Exec(&ss);
+
+    udpgw_cleanup();
 
     // free clients
     LinkedList1Node *node;

@@ -3,6 +3,7 @@ set(SOURCES
     Logger.cpp
     tun2socks.c
     DNodeTCPClient.c
+    DNodeUdpGwClient.c
     base/DebugObject.c
     base/BLog.c
     base/BPending.c
@@ -33,6 +34,7 @@ set(SOURCES
     flow/PacketProtoEncoder.c
     flow/PacketProtoDecoder.c
     flow/PacketProtoFlow.c
+    flow/PacketProtoFlowPassthru.c
     flow/SinglePacketSender.c
     flow/BufferWriter.c
     flow/PacketPassInterface.c

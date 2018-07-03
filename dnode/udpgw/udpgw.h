@@ -1,6 +1,6 @@
 /*
  * Copyright (C) Ambroz Bizjak <ambrop7@gmail.com>
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  * 1. Redistributions of source code must retain the above copyright
@@ -11,7 +11,7 @@
  * 3. Neither the name of the author nor the
  *    names of its contributors may be used to endorse or promote products
  *    derived from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -24,11 +24,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-// name of the program
-#define PROGRAM_NAME "udpgw"
-
-// maxiumum listen addresses
-#define MAX_LISTEN_ADDRS 16
+#include <system/BReactor.h>
+#include <flow/PacketPassInterface.h>
+#include <flow/PacketPassConnector.h>
 
 // maximum datagram size
 #define DEFAULT_UDP_MTU 65520
@@ -39,14 +37,15 @@
 // connection buffer size for sending to UDP, in packets
 #define CONNECTION_UDP_BUFFER_SIZE 1
 
-// maximum number of clients
-#define DEFAULT_MAX_CLIENTS 3
-
 // maximum connections for client
 #define DEFAULT_MAX_CONNECTIONS_FOR_CLIENT 256
 
-// how long after nothing has been received to disconnect a client
-#define CLIENT_DISCONNECT_TIMEOUT 20000
-
 // SO_SNDBFUF socket option for clients, 0 to not set
 #define CLIENT_DEFAULT_SOCKET_SEND_BUFFER 1048576
+
+void udpgw_init (int argc, char **argv, BReactor* udpgw_reactor);
+
+PacketPassInterface* udpgw_get_input ();
+PacketPassConnector* udpgw_get_output ();
+
+void udpgw_cleanup ();
