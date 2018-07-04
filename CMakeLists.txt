@@ -56,6 +56,14 @@ add_definitions(-DBADVPN_BREACTOR_BADVPN)
 add_definitions(-DBADVPN_USE_SIGNALFD)
 add_definitions(-D_GNU_SOURCE)
 
+set (COMMON_HEADERS
+    ${DTUN_INCLUDE_DIR}/DTun/SignalBlocker.h
+    ${DTUN_INCLUDE_DIR}/DTun/SignalHandler.h
+    ${DTUN_INCLUDE_DIR}/DTun/DProtocol.h
+    ${DTUN_INCLUDE_DIR}/DTun/Types.h
+    ${DTUN_INCLUDE_DIR}/udt.h
+)
+
 include_directories(
     lwip/custom
     lwip/src/include
@@ -65,3 +73,4 @@ add_subdirectory(udt)
 add_subdirectory(dutil)
 add_subdirectory(lwip)
 add_subdirectory(dnode)
+add_subdirectory(dmaster)
