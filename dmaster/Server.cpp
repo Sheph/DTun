@@ -120,6 +120,8 @@ namespace DMaster
 
     void Server::onAccept(UDTSOCKET sock)
     {
+        LOG4CPLUS_INFO(logger(), "onAccept(" << sock << ")");
+        UDT::close(sock);
     }
 
     void Server::onSessionStartPersistent(const boost::shared_ptr<Session>& sess)
