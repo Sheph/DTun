@@ -14,12 +14,6 @@ namespace DNode
 
     DMasterClient::~DMasterClient()
     {
-        if (connector_) {
-            connector_->close();
-        }
-        if (conn_) {
-            conn_->close();
-        }
     }
 
     bool DMasterClient::start()

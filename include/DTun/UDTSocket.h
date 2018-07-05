@@ -17,6 +17,7 @@ namespace DTun
         UDTSocket(UDTReactor& reactor, UDTSOCKET sock)
         : reactor_(reactor)
         , sock_(sock)
+        , inDestructor_(false)
         {
         }
 
@@ -28,6 +29,8 @@ namespace DTun
 
         inline UDTSOCKET sock() const { return sock_; }
 
+        inline bool inDestructor() const { return inDestructor_; }
+
         virtual void close() = 0;
 
         virtual int getPollEvents() const = 0;
@@ -38,10 +41,12 @@ namespace DTun
 
     protected:
         void resetSock() { sock_ = UDT::INVALID_SOCK; }
+        void setInDestructor() { inDestructor_ = true; }
 
     private:
         UDTReactor& reactor_;
         UDTSOCKET sock_;
+        bool inDestructor_;
     };
 }
 

@@ -49,9 +49,6 @@ namespace DMaster
 
     Server::~Server()
     {
-        if (acceptor_) {
-            acceptor_->close();
-        }
     }
 
     bool Server::start()

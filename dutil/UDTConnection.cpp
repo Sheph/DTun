@@ -17,6 +17,8 @@ namespace DTun
 
     UDTConnection::~UDTConnection()
     {
+        setInDestructor();
+        close();
     }
 
     bool UDTConnection::write(const char* first, const char* last, const WriteCallback& callback)
@@ -205,11 +207,13 @@ namespace DTun
         // handleClose will not execute concurrently with read/write, can
         // do stuff without mutex here.
 
-        for (std::list<WriteReq>::iterator it = writeQueue_.begin(); it != writeQueue_.end(); ++it) {
-            it->callback(CUDTException::ENOCONN);
-        }
-        for (std::list<ReadReq>::iterator it = readQueue_.begin(); it != readQueue_.end(); ++it) {
-            it->callback(CUDTException::ENOCONN, it->total_read);
+        if (!inDestructor()) {
+            for (std::list<WriteReq>::iterator it = writeQueue_.begin(); it != writeQueue_.end(); ++it) {
+                it->callback(CUDTException::ENOCONN);
+            }
+            for (std::list<ReadReq>::iterator it = readQueue_.begin(); it != readQueue_.end(); ++it) {
+                it->callback(CUDTException::ENOCONN, it->total_read);
+            }
         }
 
         writeQueue_.clear();

@@ -12,6 +12,8 @@ namespace DTun
 
     UDTAcceptor::~UDTAcceptor()
     {
+        setInDestructor();
+        close();
     }
 
     bool UDTAcceptor::listen(int backlog, const ListenCallback& callback)

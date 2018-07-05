@@ -17,6 +17,8 @@ namespace DTun
 
     UDTConnector::~UDTConnector()
     {
+        setInDestructor();
+        close();
     }
 
     bool UDTConnector::connect(const std::string& address, const std::string& port, const ConnectCallback& callback)
@@ -105,7 +107,11 @@ namespace DTun
         if (callback_) {
             ConnectCallback cb = callback_;
             callback_ = ConnectCallback();
-            cb(CUDTException::ENOCONN);
+            if (inDestructor()) {
+                UDT::close(sock());
+            } else {
+                cb(CUDTException::ENOCONN);
+            }
         }
     }
 }
