@@ -2,7 +2,6 @@ set(SOURCES
     main.cpp
     Logger.cpp
     Server.cpp
-    Connection.cpp
     Session.cpp
     SessionListener.h
 )

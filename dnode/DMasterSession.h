@@ -1,34 +1,24 @@
-#ifndef _SESSION_H_
-#define _SESSION_H_
+#ifndef _DMASTERSESSION_H_
+#define _DMASTERSESSION_H_
 
-#include "SessionListener.h"
 #include "DTun/DProtocol.h"
-#include "DTun/UDTConnection.h"
 #include <boost/noncopyable.hpp>
 #include <map>
+#include "udt.h"
 
-namespace DMaster
+namespace DNode
 {
-    class Session : boost::noncopyable
+    class DMasterSession : boost::noncopyable
     {
     public:
         enum Type
         {
-            TypeUnknown = 0,
-            TypePersistent,
-            TypeConnector,
+            TypeConnector = 0,
             TypeAcceptor
         };
 
-        explicit Session(const boost::shared_ptr<DTun::UDTConnection>& conn);
-        ~Session();
-
-        inline const boost::shared_ptr<DTun::UDTConnection>& conn() const { return conn_; }
-
-        inline const boost::shared_ptr<SessionListener>& listener() const { return listener_; }
-        void setListener(const boost::shared_ptr<SessionListener>& value) { listener_ = value; }
-
-        inline Type type() const { return type_; }
+        DMasterSession(SYSSOCKET s, Type type);
+        ~DMasterSession();
 
         inline DTun::UInt32 nodeId() const { return nodeId_; }
 
@@ -65,7 +55,7 @@ namespace DMaster
 
         boost::shared_ptr<SessionListener> listener_;
 
-        boost::shared_ptr<DTun::UDTConnection> conn_;
+        boost::shared_ptr<DTun::DConnection> conn_;
         Type type_;
         DTun::UInt32 nodeId_;
 

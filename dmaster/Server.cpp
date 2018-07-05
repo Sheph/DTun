@@ -1,5 +1,6 @@
 #include "Server.h"
 #include "Logger.h"
+#include <boost/make_shared.hpp>
 #include <sstream>
 #include <unistd.h>
 #include <cstdlib>
@@ -43,26 +44,19 @@ namespace DMaster
 
     Server::Server(int port)
     : port_(port)
-    , eid_(UDT::ERROR)
-    , stopping_(false)
-    , serverSocket_(UDT::INVALID_SOCK)
     {
     }
 
     Server::~Server()
     {
-        if (serverSocket_ != UDT::INVALID_SOCK) {
-            UDT::close(serverSocket_);
-            UDT::epoll_release(eid_);
+        if (acceptor_) {
+            acceptor_->close();
         }
     }
 
     bool Server::start()
     {
-        eid_ = UDT::epoll_create();
-
-        if (eid_ == UDT::ERROR) {
-            LOG4CPLUS_ERROR(logger(), "Cannot create epoll: " << UDT::getlasterror().getErrorMessage());
+        if (!reactor_.start()) {
             return false;
         }
 
@@ -81,39 +75,31 @@ namespace DMaster
 
         if (::getaddrinfo(NULL, os.str().c_str(), &hints, &res) != 0) {
             LOG4CPLUS_ERROR(logger(), "Illegal port number or port is busy");
-            UDT::epoll_release(eid_);
-            eid_ = UDT::ERROR;
             return false;
         }
 
-        serverSocket_ = UDT::socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+        UDTSOCKET serverSocket = UDT::socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 
-        if (serverSocket_ == UDT::INVALID_SOCK) {
+        if (serverSocket == UDT::INVALID_SOCK) {
             LOG4CPLUS_ERROR(logger(), "Cannot create UDT socket: " << UDT::getlasterror().getErrorMessage());
-            UDT::epoll_release(eid_);
-            eid_ = UDT::ERROR;
             freeaddrinfo(res);
             return false;
         }
 
-        if (UDT::bind(serverSocket_, res->ai_addr, res->ai_addrlen) == UDT::ERROR) {
+        if (UDT::bind(serverSocket, res->ai_addr, res->ai_addrlen) == UDT::ERROR) {
             LOG4CPLUS_ERROR(logger(), "Cannot bind UDT socket: " << UDT::getlasterror().getErrorMessage());
-            UDT::epoll_release(eid_);
-            eid_ = UDT::ERROR;
             freeaddrinfo(res);
-            UDT::close(serverSocket_);
-            serverSocket_ = UDT::INVALID_SOCK;
+            UDT::close(serverSocket);
             return false;
         }
 
         freeaddrinfo(res);
 
-        if (UDT::listen(serverSocket_, 10) == UDT::ERROR) {
-           LOG4CPLUS_ERROR(logger(), "Cannot listen UDT socket: " << UDT::getlasterror().getErrorMessage());
-           UDT::epoll_release(eid_);
-           eid_ = UDT::ERROR;
-           UDT::close(serverSocket_);
-           serverSocket_ = UDT::INVALID_SOCK;
+        acceptor_ = boost::make_shared<DTun::UDTAcceptor>(boost::ref(reactor_), serverSocket);
+
+        if (!acceptor_->listen(10, boost::bind(&Server::onAccept, this, _1))) {
+           UDT::close(serverSocket);
+           acceptor_.reset();
            return false;
         }
 
@@ -124,50 +110,16 @@ namespace DMaster
 
     void Server::run()
     {
-        if (serverSocket_ == UDT::INVALID_SOCK) {
-            LOG4CPLUS_ERROR(logger(), "Server not started");
-            return;
-        }
-
-        int events = UDT_EPOLL_IN;
-        if (UDT::epoll_add_usock(eid_, serverSocket_, &events) == UDT::ERROR) {
-            LOG4CPLUS_ERROR(logger(), "Cannot add server sock to epoll: " << UDT::getlasterror().getErrorMessage());
-            return;
-        }
-
-        std::set<UDTSOCKET> readfds, writefds;
-
-        while (!stopping_) {
-            readfds.clear();
-            writefds.clear();
-            if (UDT::epoll_wait(eid_, &readfds, &writefds, 1000, NULL, NULL) == UDT::ERROR) {
-                if (UDT::getlasterror().getErrorCode() == CUDTException::ETIMEOUT) {
-                    LOG4CPLUS_TRACE(logger(), "epoll timeout");
-                    continue;
-                }
-                LOG4CPLUS_ERROR(logger(), "epoll_wait error: " << UDT::getlasterror().getErrorMessage());
-                break;
-            }
-            for (std::set<UDTSOCKET>::const_iterator it = readfds.begin(); it != readfds.end(); ++it) {
-                LOG4CPLUS_TRACE(logger(), "epoll rd: " << *it);
-            }
-            for (std::set<UDTSOCKET>::const_iterator it = writefds.begin(); it != writefds.end(); ++it) {
-                LOG4CPLUS_TRACE(logger(), "epoll wr: " << *it);
-            }
-            if (readfds.empty() && writefds.empty()) {
-                LOG4CPLUS_TRACE(logger(), "epoll empty run");
-            }
-        }
+        reactor_.run();
     }
 
     void Server::stop()
     {
-        if (serverSocket_ == UDT::INVALID_SOCK) {
-            LOG4CPLUS_ERROR(logger(), "Server not started");
-            return;
-        }
+        reactor_.stop();
+    }
 
-        stopping_ = true;
+    void Server::onAccept(UDTSOCKET sock)
+    {
     }
 
     void Server::onSessionStartPersistent(const boost::shared_ptr<Session>& sess)

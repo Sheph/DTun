@@ -61,6 +61,11 @@ set (COMMON_HEADERS
     ${DTUN_INCLUDE_DIR}/DTun/SignalHandler.h
     ${DTUN_INCLUDE_DIR}/DTun/DProtocol.h
     ${DTUN_INCLUDE_DIR}/DTun/Types.h
+    ${DTUN_INCLUDE_DIR}/DTun/UDTSocket.h
+    ${DTUN_INCLUDE_DIR}/DTun/UDTReactor.h
+    ${DTUN_INCLUDE_DIR}/DTun/UDTAcceptor.h
+    ${DTUN_INCLUDE_DIR}/DTun/UDTConnector.h
+    ${DTUN_INCLUDE_DIR}/DTun/UDTConnection.h
     ${DTUN_INCLUDE_DIR}/udt.h
 )
 

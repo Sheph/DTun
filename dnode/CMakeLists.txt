@@ -4,6 +4,13 @@ set(SOURCES
     tun2socks.c
     DNodeTCPClient.c
     DNodeUdpGwClient.c
+    DMasterClient.cpp
+    DMasterSession.cpp
+    DNodeDirectTCPClient.c
+    DNodeProxyTCPClient.cpp
+    ProxySession.cpp
+    ProxyLocalConnection.cpp
+    ProxyRemoteConnection.cpp
     base/DebugObject.c
     base/BLog.c
     base/BPending.c
@@ -60,4 +67,4 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 add_executable(dnode ${SOURCES})
 
-target_link_libraries(dnode dutil lwip ${Boost_SYSTEM_LIBRARY} ${Boost_THREAD_LIBRARY} rt dl)
+target_link_libraries(dnode dutil lwip udt ${Boost_SYSTEM_LIBRARY} ${Boost_THREAD_LIBRARY} rt dl)

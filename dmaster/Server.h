@@ -2,6 +2,8 @@
 #define _SERVER_H_
 
 #include "Session.h"
+#include "DTun/UDTReactor.h"
+#include "DTun/UDTAcceptor.h"
 #include <boost/noncopyable.hpp>
 #include <boost/weak_ptr.hpp>
 
@@ -46,6 +48,8 @@ namespace DMaster
     private:
         friend class ServerSessionListener;
 
+        void onAccept(UDTSOCKET sock);
+
         void onSessionStartPersistent(const boost::shared_ptr<Session>& sess);
 
         void onSessionStartConnector(const boost::shared_ptr<Session>& sess,
@@ -59,9 +63,8 @@ namespace DMaster
         void onSessionError(const boost::shared_ptr<Session>& sess, int errCode);
 
         int port_;
-        int eid_;
-        bool stopping_;
-        UDTSOCKET serverSocket_;
+        DTun::UDTReactor reactor_;
+        boost::shared_ptr<DTun::UDTAcceptor> acceptor_;
         std::set<boost::shared_ptr<Session> > sessions_;
     };
 }

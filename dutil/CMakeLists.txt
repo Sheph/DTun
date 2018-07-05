@@ -1,6 +1,12 @@
 set(SOURCES
     SignalHandler.cpp
     SignalBlocker.cpp
+    DConnection.cpp
+    UDTReactor.cpp
+    UDTConnector.cpp
+    UDTConnection.cpp
+    UDTAcceptor.cpp
+    Logger.cpp
 )
 
 add_library(dutil STATIC ${SOURCES})

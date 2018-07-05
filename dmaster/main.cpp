@@ -27,7 +27,7 @@ int main(int argc, char* argv[])
     props.setProperty("log4cplus.rootLogger", "TRACE, console");
     props.setProperty("log4cplus.appender.console", "log4cplus::ConsoleAppender");
     props.setProperty("log4cplus.appender.console.layout", "log4cplus::PatternLayout");
-    props.setProperty("log4cplus.appender.console.layout.ConversionPattern", "%-5p %c - %m%n");
+    props.setProperty("log4cplus.appender.console.layout.ConversionPattern", "%-5p %c [%x] - %m%n");
 
     log4cplus::PropertyConfigurator propConf(props);
     propConf.configure();
@@ -38,7 +38,7 @@ int main(int argc, char* argv[])
 
     UDT::startup();
 
-    boost::shared_ptr<Server> server_tmp = boost::make_shared<Server>(3030);
+    boost::shared_ptr<Server> server_tmp = boost::make_shared<Server>(2345);
 
     if (!server_tmp->start()) {
         UDT::cleanup();
