@@ -103,6 +103,8 @@ int CEPoll::add_usock(const int eid, const UDTSOCKET& u, const int* events)
       p->second.m_sUDTSocksIn.insert(u);
    if (!events || (*events & UDT_EPOLL_OUT))
       p->second.m_sUDTSocksOut.insert(u);
+   if (!events || (*events & UDT_EPOLL_ERR))
+      p->second.m_sUDTSocksEx.insert(u);
 
    return 0;
 }
@@ -213,16 +215,24 @@ int CEPoll::wait(const int eid, set<UDTSOCKET>* readfds, set<UDTSOCKET>* writefd
       if ((NULL != readfds) && (!p->second.m_sUDTReads.empty() || !p->second.m_sUDTExcepts.empty()))
       {
          *readfds = p->second.m_sUDTReads;
-         for (set<UDTSOCKET>::const_iterator i = p->second.m_sUDTExcepts.begin(); i != p->second.m_sUDTExcepts.end(); ++ i)
-            readfds->insert(*i);
-         total += p->second.m_sUDTReads.size() + p->second.m_sUDTExcepts.size();
+         for (set<UDTSOCKET>::const_iterator i = p->second.m_sUDTExcepts.begin(); i != p->second.m_sUDTExcepts.end(); ++ i) {
+            if (p->second.m_sUDTSocksIn.count(*i) > 0) {
+               readfds->insert(*i);
+               ++total;
+            }
+         }
+         total += p->second.m_sUDTReads.size();
       }
       if ((NULL != writefds) && (!p->second.m_sUDTWrites.empty() || !p->second.m_sUDTExcepts.empty()))
       {
          *writefds = p->second.m_sUDTWrites;
-         for (set<UDTSOCKET>::const_iterator i = p->second.m_sUDTExcepts.begin(); i != p->second.m_sUDTExcepts.end(); ++ i)
-            writefds->insert(*i);
-         total += p->second.m_sUDTWrites.size() + p->second.m_sUDTExcepts.size();
+         for (set<UDTSOCKET>::const_iterator i = p->second.m_sUDTExcepts.begin(); i != p->second.m_sUDTExcepts.end(); ++ i) {
+            if (p->second.m_sUDTSocksOut.count(*i) > 0) {
+               writefds->insert(*i);
+               ++total;
+            }
+         }
+         total += p->second.m_sUDTWrites.size();
       }
 
       if (lrfds || lwfds)

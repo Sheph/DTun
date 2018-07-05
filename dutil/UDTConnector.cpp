@@ -76,7 +76,7 @@ namespace DTun
 
     int UDTConnector::getPollEvents() const
     {
-        return callback_ ? UDT_EPOLL_OUT : 0;
+        return callback_ ? (UDT_EPOLL_OUT | UDT_EPOLL_ERR) : 0;
     }
 
     void UDTConnector::handleRead()
@@ -88,7 +88,16 @@ namespace DTun
         ConnectCallback cb = callback_;
         callback_ = ConnectCallback();
         reactor().update(this);
-        cb(0);
+
+        int state = BROKEN;
+        int optlen = sizeof(int);
+        if (UDT::getsockopt(sock(), 0, UDT_STATE, &state, &optlen) == UDT::ERROR) {
+            LOG4CPLUS_ERROR(logger(), "Cannot getsockopt UDT socket: " << UDT::getlasterror().getErrorMessage());
+            // UDT is not fucking conforming to POSIX at all, who knows, m.b. it can change the opt here...
+            state = BROKEN;
+        }
+
+        cb((state == CONNECTED) ? 0 : CUDTException::ECONNFAIL);
     }
 
     void UDTConnector::handleClose()

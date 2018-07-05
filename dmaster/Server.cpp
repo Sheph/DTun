@@ -121,6 +121,7 @@ namespace DMaster
     void Server::onAccept(UDTSOCKET sock)
     {
         LOG4CPLUS_INFO(logger(), "onAccept(" << sock << ")");
+        sleep(1);
         UDT::close(sock);
     }
 

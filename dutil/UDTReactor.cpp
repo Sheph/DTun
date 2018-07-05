@@ -152,6 +152,7 @@ namespace DTun
         while (!stopping_) {
             readfds.clear();
             writefds.clear();
+
             if (UDT::epoll_wait(eid_, &readfds, &writefds, -1) == UDT::ERROR) {
                 LOG4CPLUS_ERROR(logger(), "epoll_wait error: " << UDT::getlasterror().getErrorMessage());
                 break;

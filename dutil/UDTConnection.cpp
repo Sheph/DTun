@@ -90,6 +90,9 @@ namespace DTun
         if (!readQueue_.empty()) {
             res |= UDT_EPOLL_IN;
         }
+        if (res != 0) {
+            res |= UDT_EPOLL_ERR;
+        }
 
         return res;
     }

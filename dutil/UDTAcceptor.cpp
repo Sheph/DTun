@@ -38,7 +38,7 @@ namespace DTun
 
     int UDTAcceptor::getPollEvents() const
     {
-        return callback_ ? UDT_EPOLL_IN : 0;
+        return callback_ ? (UDT_EPOLL_IN | UDT_EPOLL_ERR) : 0;
     }
 
     void UDTAcceptor::handleRead()
