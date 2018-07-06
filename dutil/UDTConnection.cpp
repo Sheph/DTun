@@ -116,12 +116,7 @@ namespace DTun
         req->first += res;
         req->total_read += res;
 
-        if (!req->readAll) {
-            cb = req->callback;
-            total_read = req->total_read;
-        }
-
-        if (req->first >= req->last) {
+        if (!req->readAll || (req->first >= req->last)) {
             cb = req->callback;
             total_read = req->total_read;
             {

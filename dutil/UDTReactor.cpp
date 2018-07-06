@@ -211,6 +211,46 @@ namespace DTun
 
             processUpdates();
 
+            for (PollSocketMap::iterator it = pollSockets_.begin(); it != pollSockets_.end(); ++it) {
+                if (it->second.pollEvents == 0) {
+                    continue;
+                }
+                boost::mutex::scoped_lock lock(m_);
+                SocketMap::iterator sIt = sockets_.find(it->second.cookie);
+                if (sIt == sockets_.end()) {
+                    continue;
+                }
+
+                int state = BROKEN;
+                int optlen = sizeof(int);
+                if (UDT::getsockopt(sIt->second.socket->sock(), 0, UDT_STATE, &state, &optlen) == UDT::ERROR) {
+                    LOG4CPLUS_ERROR(logger(), "Cannot getsockopt UDT socket: " << UDT::getlasterror().getErrorMessage());
+                    continue;
+                }
+
+                if (state != BROKEN) {
+                    continue;
+                }
+
+                currentlyHandling_ = sIt->second.socket;
+                lock.unlock();
+                if ((it->second.pollEvents & UDT_EPOLL_OUT) != 0) {
+                    currentlyHandling_->handleWrite();
+                }
+                lock.lock();
+                if (sockets_.count(it->second.cookie) > 0) {
+                    lock.unlock();
+                    if ((it->second.pollEvents & UDT_EPOLL_IN) != 0) {
+                        currentlyHandling_->handleRead();
+                    }
+                    lock.lock();
+                }
+                currentlyHandling_ = NULL;
+                c_.notify_all();
+            }
+
+            processUpdates();
+
             LOG4CPLUS_TRACE(logger(), "epoll run done");
         }
 
