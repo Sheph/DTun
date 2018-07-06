@@ -221,14 +221,15 @@ namespace DTun
                     continue;
                 }
 
-                int state = BROKEN;
-                int optlen = sizeof(int);
-                if (UDT::getsockopt(sIt->second.socket->sock(), 0, UDT_STATE, &state, &optlen) == UDT::ERROR) {
-                    LOG4CPLUS_ERROR(logger(), "Cannot getsockopt UDT socket: " << UDT::getlasterror().getErrorMessage());
-                    continue;
-                }
+                int state = UDT::getsockstate(sIt->second.socket->sock());
 
-                if (state != BROKEN) {
+                if ((state != BROKEN) && (state != CLOSED) && (state != NONEXIST)) {
+                    // FIXME: UDT does a very bad thing, it closes descriptors implicitly
+                    // on connection loss and garbage collects them after a timeout of 1 sec. i.e.
+                    // if we're not fast enough we could get a non-existent socket here and after.
+                    // Even if so, we can handle it, but what if newly created socket gets the same
+                    // id as the closed one ? Well, things won't be pretty... One solution is to make socket
+                    // ids inside UDT unique.
                     continue;
                 }
 
@@ -376,21 +377,25 @@ namespace DTun
         for (PollSocketMap::iterator it = pollSockets_.begin(); it != pollSockets_.end();) {
             SocketMap::iterator sIt = sockets_.find(it->second.cookie);
             if (sIt == sockets_.end()) {
-                if (UDT::epoll_remove_usock(eid_, it->first) == UDT::ERROR) {
-                    LOG4CPLUS_ERROR(logger(), "epoll_remove_usock: " << UDT::getlasterror().getErrorMessage());
+                if (it->second.pollEvents != 0) {
+                    if (UDT::epoll_remove_usock(eid_, it->first) == UDT::ERROR) {
+                        LOG4CPLUS_ERROR(logger(), "epoll_remove_usock: " << UDT::getlasterror().getErrorMessage());
+                    }
                 }
                 pollSockets_.erase(it++);
             } else if (it->second.pollEvents != sIt->second.pollEvents) {
+                if (it->second.pollEvents != 0) {
+                    if (UDT::epoll_remove_usock(eid_, it->first) == UDT::ERROR) {
+                        LOG4CPLUS_ERROR(logger(), "epoll_remove_usock: " << UDT::getlasterror().getErrorMessage());
+                    }
+                }
                 it->second.pollEvents = sIt->second.pollEvents;
                 int pollEvents = it->second.pollEvents;
                 if (pollEvents != 0) {
                     pollEvents |= UDT_EPOLL_ERR;
-                }
-                if (UDT::epoll_remove_usock(eid_, it->first) == UDT::ERROR) {
-                    LOG4CPLUS_ERROR(logger(), "epoll_remove_usock: " << UDT::getlasterror().getErrorMessage());
-                }
-                if (UDT::epoll_add_usock(eid_, it->first, &pollEvents) == UDT::ERROR) {
-                    LOG4CPLUS_ERROR(logger(), "epoll_add_usock: " << UDT::getlasterror().getErrorMessage());
+                    if (UDT::epoll_add_usock(eid_, it->first, &pollEvents) == UDT::ERROR) {
+                        LOG4CPLUS_ERROR(logger(), "epoll_add_usock: " << UDT::getlasterror().getErrorMessage());
+                    }
                 }
                 ++it;
             } else {
@@ -406,9 +411,9 @@ namespace DTun
                 int pollEvents = it->second.pollEvents;
                 if (pollEvents != 0) {
                     pollEvents |= UDT_EPOLL_ERR;
-                }
-                if (UDT::epoll_add_usock(eid_, it->second.socket->sock(), &pollEvents) == UDT::ERROR) {
-                    LOG4CPLUS_ERROR(logger(), "epoll_add_usock: " << UDT::getlasterror().getErrorMessage());
+                    if (UDT::epoll_add_usock(eid_, it->second.socket->sock(), &pollEvents) == UDT::ERROR) {
+                        LOG4CPLUS_ERROR(logger(), "epoll_add_usock: " << UDT::getlasterror().getErrorMessage());
+                    }
                 }
             } else {
                 assert(psIt->second.cookie == it->second.socket->cookie());

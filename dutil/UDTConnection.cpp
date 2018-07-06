@@ -19,7 +19,7 @@ namespace DTun
         close();
     }
 
-    bool UDTConnection::write(const char* first, const char* last, const WriteCallback& callback)
+    void UDTConnection::write(const char* first, const char* last, const WriteCallback& callback)
     {
         WriteReq req;
 
@@ -33,11 +33,9 @@ namespace DTun
         }
 
         reactor().update(this);
-
-        return true;
     }
 
-    bool UDTConnection::read(char* first, char* last, const ReadCallback& callback, bool readAll)
+    void UDTConnection::read(char* first, char* last, const ReadCallback& callback, bool readAll)
     {
         ReadReq req;
 
@@ -53,8 +51,6 @@ namespace DTun
         }
 
         reactor().update(this);
-
-        return true;
     }
 
     void UDTConnection::close()

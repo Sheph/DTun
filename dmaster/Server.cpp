@@ -9,39 +9,6 @@
 
 namespace DMaster
 {
-    ServerSessionListener::ServerSessionListener(Server* server, const boost::shared_ptr<Session>& sess)
-    : server_(server)
-    , sess_(sess)
-    {
-    }
-
-    ServerSessionListener::~ServerSessionListener()
-    {
-    }
-
-    void ServerSessionListener::onStartPersistent()
-    {
-        server_->onSessionStartPersistent(sess_.lock());
-    }
-
-    void ServerSessionListener::onStartConnector(DTun::UInt32 dstNodeId,
-        DTun::UInt32 connId,
-        DTun::UInt32 remoteIp,
-        DTun::UInt16 remotePort)
-    {
-        server_->onSessionStartConnector(sess_.lock(), dstNodeId, connId, remoteIp, remotePort);
-    }
-
-    void ServerSessionListener::onStartAcceptor(DTun::UInt32 connId)
-    {
-        server_->onSessionStartAcceptor(sess_.lock(), connId);
-    }
-
-    void ServerSessionListener::onError(int errCode)
-    {
-        server_->onSessionError(sess_.lock(), errCode);
-    }
-
     Server::Server(int port)
     : port_(port)
     {
@@ -113,33 +80,68 @@ namespace DMaster
     void Server::stop()
     {
         acceptor_.reset();
+        sessions_.clear();
         reactor_.stop();
     }
 
     void Server::onAccept(UDTSOCKET sock)
     {
         LOG4CPLUS_INFO(logger(), "onAccept(" << sock << ")");
-        sleep(3);
-        UDT::close(sock);
+
+        boost::shared_ptr<Session> session = boost::make_shared<Session>(
+            boost::make_shared<DTun::UDTConnection>(boost::ref(reactor_), sock));
+
+        sessions_.insert(session);
+
+        session->setStartPersistentCallback(boost::bind(&Server::onSessionStartPersistent, this, boost::weak_ptr<Session>(session)));
+        session->setStartConnectorCallback(boost::bind(&Server::onSessionStartConnector, this, boost::weak_ptr<Session>(session), _1, _2, _3, _4));
+        session->setStartAcceptorCallback(boost::bind(&Server::onSessionStartAcceptor, this, boost::weak_ptr<Session>(session), _1));
+        session->setErrorCallback(boost::bind(&Server::onSessionError, this, boost::weak_ptr<Session>(session), _1));
+
+        session->start();
     }
 
-    void Server::onSessionStartPersistent(const boost::shared_ptr<Session>& sess)
+    void Server::onSessionStartPersistent(const boost::weak_ptr<Session>& sess)
     {
+        boost::shared_ptr<Session> sess_shared = sess.lock();
+        if (!sess_shared) {
+            return;
+        }
+
+        LOG4CPLUS_TRACE(logger(), "onSessionStartPersistent(" << sess_shared->nodeId() << ")");
     }
 
-    void Server::onSessionStartConnector(const boost::shared_ptr<Session>& sess,
+    void Server::onSessionStartConnector(const boost::weak_ptr<Session>& sess,
         DTun::UInt32 dstNodeId,
         DTun::UInt32 connId,
         DTun::UInt32 remoteIp,
         DTun::UInt16 remotePort)
     {
+        boost::shared_ptr<Session> sess_shared = sess.lock();
+        if (!sess_shared) {
+            return;
+        }
+
+        LOG4CPLUS_TRACE(logger(), "onSessionStartConnector(" << sess_shared->nodeId() << ")");
     }
 
-    void Server::onSessionStartAcceptor(const boost::shared_ptr<Session>& sess, DTun::UInt32 connId)
+    void Server::onSessionStartAcceptor(const boost::weak_ptr<Session>& sess, DTun::UInt32 connId)
     {
+        boost::shared_ptr<Session> sess_shared = sess.lock();
+        if (!sess_shared) {
+            return;
+        }
+
+        LOG4CPLUS_TRACE(logger(), "onSessionStartAcceptor(" << sess_shared->nodeId() << ")");
     }
 
-    void Server::onSessionError(const boost::shared_ptr<Session>& sess, int errCode)
+    void Server::onSessionError(const boost::weak_ptr<Session>& sess, int errCode)
     {
+        boost::shared_ptr<Session> sess_shared = sess.lock();
+        if (!sess_shared) {
+            return;
+        }
+
+        LOG4CPLUS_TRACE(logger(), "onSessionError(" << sess_shared->nodeId() << ", " << errCode << ")");
     }
 }

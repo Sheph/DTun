@@ -16,9 +16,9 @@ namespace DTun
         UDTConnection(UDTReactor& reactor, UDTSOCKET sock);
         ~UDTConnection();
 
-        bool write(const char* first, const char* last, const WriteCallback& callback);
+        void write(const char* first, const char* last, const WriteCallback& callback);
 
-        bool read(char* first, char* last, const ReadCallback& callback, bool readAll);
+        void read(char* first, char* last, const ReadCallback& callback, bool readAll);
 
         virtual void close();
 

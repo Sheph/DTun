@@ -86,14 +86,7 @@ namespace DTun
         callback_ = ConnectCallback();
         reactor().update(this);
 
-        int state = BROKEN;
-        int optlen = sizeof(int);
-        if (UDT::getsockopt(sock(), 0, UDT_STATE, &state, &optlen) == UDT::ERROR) {
-            LOG4CPLUS_ERROR(logger(), "Cannot getsockopt UDT socket: " << UDT::getlasterror().getErrorMessage());
-            // UDT is not fucking conforming to POSIX at all, who knows, m.b. it can change the opt here...
-            state = BROKEN;
-        }
-
+        int state = UDT::getsockstate(sock());
         handedOut_ = true;
         cb((state == CONNECTED) ? 0 : CUDTException::ECONNFAIL);
     }

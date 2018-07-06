@@ -3,7 +3,6 @@ set(SOURCES
     Logger.cpp
     Server.cpp
     Session.cpp
-    SessionListener.h
 )
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
