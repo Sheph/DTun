@@ -90,4 +90,8 @@ namespace DTun
         handedOut_ = true;
         cb((state == CONNECTED) ? 0 : CUDTException::ECONNFAIL);
     }
+
+    void UDTConnector::handleBroken(int err)
+    {
+    }
 }

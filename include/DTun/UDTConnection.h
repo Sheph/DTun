@@ -12,6 +12,7 @@ namespace DTun
     public:
         typedef boost::function<void (int)> WriteCallback;
         typedef boost::function<void (int, int)> ReadCallback;
+        typedef boost::function<void (int)> WatchCallback;
 
         UDTConnection(UDTReactor& reactor, UDTSOCKET sock);
         ~UDTConnection();
@@ -20,12 +21,15 @@ namespace DTun
 
         void read(char* first, char* last, const ReadCallback& callback, bool readAll);
 
+        void watch(const WatchCallback& callback);
+
         virtual void close();
 
         virtual int getPollEvents() const;
 
         virtual void handleRead();
         virtual void handleWrite();
+        virtual void handleBroken(int err);
 
     private:
         struct WriteReq
@@ -47,6 +51,7 @@ namespace DTun
         mutable boost::mutex m_;
         std::list<WriteReq> writeQueue_;
         std::list<ReadReq> readQueue_;
+        WatchCallback watchCallback_;
     };
 }
 

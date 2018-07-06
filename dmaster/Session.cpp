@@ -17,6 +17,7 @@ namespace DMaster
 
     void Session::start()
     {
+        conn_->watch(boost::bind(&Session::onWatch, this, _1));
         buff_.resize(sizeof(DTun::DProtocolHeader));
         conn_->read(&buff_[0], &buff_[0] + buff_.size(),
             boost::bind(&Session::onRecvHeader, this, _1, _2),
@@ -143,6 +144,15 @@ namespace DMaster
                 errorCallback_(err);
             }
             return;
+        }
+    }
+
+    void Session::onWatch(int err)
+    {
+        LOG4CPLUS_TRACE(logger(), "onWatch(" << err << ")");
+
+        if (err && errorCallback_) {
+            errorCallback_(err);
         }
     }
 }

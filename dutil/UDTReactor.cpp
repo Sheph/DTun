@@ -212,9 +212,6 @@ namespace DTun
             processUpdates();
 
             for (PollSocketMap::iterator it = pollSockets_.begin(); it != pollSockets_.end(); ++it) {
-                if (it->second.pollEvents == 0) {
-                    continue;
-                }
                 boost::mutex::scoped_lock lock(m_);
                 SocketMap::iterator sIt = sockets_.find(it->second.cookie);
                 if (sIt == sockets_.end()) {
@@ -234,16 +231,22 @@ namespace DTun
                 }
 
                 currentlyHandling_ = sIt->second.socket;
-                lock.unlock();
+                bool handled = false;
                 if ((it->second.pollEvents & UDT_EPOLL_OUT) != 0) {
-                    currentlyHandling_->handleWrite();
-                }
-                lock.lock();
-                if (sockets_.count(it->second.cookie) > 0) {
                     lock.unlock();
-                    if ((it->second.pollEvents & UDT_EPOLL_IN) != 0) {
-                        currentlyHandling_->handleRead();
-                    }
+                    currentlyHandling_->handleWrite();
+                    lock.lock();
+                    handled = true;
+                }
+                if (((it->second.pollEvents & UDT_EPOLL_IN) != 0) && (sockets_.count(it->second.cookie) > 0)) {
+                    lock.unlock();
+                    currentlyHandling_->handleRead();
+                    lock.lock();
+                    handled = true;
+                }
+                if (!handled && (sockets_.count(it->second.cookie) > 0)) {
+                    lock.unlock();
+                    currentlyHandling_->handleBroken(CUDTException::ECONNLOST);
                     lock.lock();
                 }
                 currentlyHandling_ = NULL;

@@ -53,6 +53,11 @@ namespace DTun
         reactor().update(this);
     }
 
+    void UDTConnection::watch(const WatchCallback& callback)
+    {
+        watchCallback_ = callback;
+    }
+
     void UDTConnection::close()
     {
         UDTSOCKET s = reactor().remove(this);
@@ -171,6 +176,14 @@ namespace DTun
             reactor().update(this);
 
             cb(0);
+        }
+    }
+
+    void UDTConnection::handleBroken(int err)
+    {
+        WatchCallback cb = watchCallback_;
+        if (cb) {
+            cb(err);
         }
     }
 }

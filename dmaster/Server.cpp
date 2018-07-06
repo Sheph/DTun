@@ -144,5 +144,7 @@ namespace DMaster
         }
 
         LOG4CPLUS_TRACE(logger(), "onSessionError(" << sess_shared->nodeId() << ", " << errCode << ")");
+
+        sessions_.erase(sess_shared);
     }
 }
