@@ -2,7 +2,9 @@
 #include "Logger.h"
 #include "DTun/SignalHandler.h"
 #include "DTun/SignalBlocker.h"
+#include "DTun/Utils.h"
 #include <boost/make_shared.hpp>
+#include <boost/scoped_ptr.hpp>
 #include <log4cplus/configurator.h>
 #include <iostream>
 
@@ -32,9 +34,15 @@ int main(int argc, char* argv[])
     log4cplus::PropertyConfigurator propConf(props);
     propConf.configure();
 
-    DTun::SignalBlocker signalBlocker;
+    bool isDebugged = DTun::isDebuggerPresent();
 
-    DTun::SignalHandler sigHandler(&signalHandler);
+    DTun::SignalBlocker signalBlocker(!isDebugged);
+
+    boost::scoped_ptr<DTun::SignalHandler> sigHandler;
+
+    if (!isDebugged) {
+        sigHandler.reset(new DTun::SignalHandler(&signalHandler));
+    }
 
     UDT::startup();
 

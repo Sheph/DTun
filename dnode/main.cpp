@@ -2,12 +2,13 @@
 #include "Logger.h"
 #include "DTun/SignalBlocker.h"
 #include "DTun/UDTReactor.h"
+#include "DTun/Utils.h"
 #include <boost/thread.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <log4cplus/configurator.h>
 #include <iostream>
 
-extern "C" int tun2socks_main(int argc, char **argv);
+extern "C" int tun2socks_main(int argc, char **argv, int is_debugged);
 
 static void udtReactorThreadFn(DTun::UDTReactor& reactor)
 {
@@ -28,8 +29,10 @@ int main(int argc, char* argv[])
 
     int res = 0;
 
+    bool isDebugged = DTun::isDebuggerPresent();
+
     {
-        DTun::SignalBlocker signalBlocker;
+        DTun::SignalBlocker signalBlocker(!isDebugged);
 
         UDT::startup();
 
@@ -57,7 +60,7 @@ int main(int argc, char* argv[])
 
             signalBlocker.unblock();
 
-            res = tun2socks_main(argc, argv);
+            res = tun2socks_main(argc, argv, isDebugged);
         }
 
         udtReactor.stop();

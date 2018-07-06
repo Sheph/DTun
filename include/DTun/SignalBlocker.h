@@ -10,7 +10,7 @@ namespace DTun
     class SignalBlocker : boost::noncopyable
     {
     public:
-        SignalBlocker();
+        explicit SignalBlocker(bool withSigInt);
         ~SignalBlocker();
 
         /*

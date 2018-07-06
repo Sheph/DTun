@@ -229,7 +229,7 @@ static int client_dtcp_recv_send_out (struct tcp_client *client);
 static err_t client_sent_func (void *arg, struct tcp_pcb *tpcb, u16_t len);
 static void udpgw_client_handler_received (void *unused, BAddr local_addr, BAddr remote_addr, const uint8_t *data, int data_len);
 
-int tun2socks_main (int argc, char **argv)
+int tun2socks_main (int argc, char **argv, int is_debugged)
 {
     if (argc <= 0) {
         return 1;
@@ -312,10 +312,12 @@ int tun2socks_main (int argc, char **argv)
     // set not quitting
     quitting = 0;
 
-    // setup signal handler
-    if (!BSignal_Init(&ss, signal_handler, NULL)) {
-        BLog(BLOG_ERROR, "BSignal_Init failed");
-        goto fail2;
+    if (!is_debugged) {
+        // setup signal handler
+        if (!BSignal_Init(&ss, signal_handler, NULL)) {
+            BLog(BLOG_ERROR, "BSignal_Init failed");
+            goto fail2;
+        }
     }
 
     // init TUN device

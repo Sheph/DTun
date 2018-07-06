@@ -6,6 +6,7 @@ set(SOURCES
     UDTConnection.cpp
     UDTAcceptor.cpp
     Logger.cpp
+    Utils.cpp
 )
 
 add_library(dutil STATIC ${SOURCES})
