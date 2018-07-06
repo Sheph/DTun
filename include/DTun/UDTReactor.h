@@ -19,6 +19,8 @@ namespace DTun
 
         void run();
 
+        void processUpdates();
+
         void stop();
 
         void add(UDTSocket* socket);
@@ -63,8 +65,6 @@ namespace DTun
 
         void signalWr();
         void signalRd();
-
-        void processUpdates();
 
         boost::thread::id runThreadId_;
 

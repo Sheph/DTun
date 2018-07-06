@@ -27,9 +27,9 @@ namespace DNode
         std::string address_;
         int port_;
         DTun::UInt32 nodeId_;
-        boost::shared_ptr<DTun::UDTConnector> connector_;
-        boost::shared_ptr<DTun::UDTConnection> conn_;
         std::vector<char> buff_;
+        boost::shared_ptr<DTun::UDTConnection> conn_;
+        boost::shared_ptr<DTun::UDTConnector> connector_;
     };
 }
 

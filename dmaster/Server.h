@@ -38,8 +38,8 @@ namespace DMaster
 
         int port_;
         DTun::UDTReactor reactor_;
-        boost::shared_ptr<DTun::UDTAcceptor> acceptor_;
         std::set<boost::shared_ptr<Session> > sessions_;
+        boost::shared_ptr<DTun::UDTAcceptor> acceptor_;
     };
 }
 

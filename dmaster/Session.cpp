@@ -5,9 +5,9 @@
 namespace DMaster
 {
     Session::Session(const boost::shared_ptr<DTun::UDTConnection>& conn)
-    : conn_(conn)
-    , type_(TypeUnknown)
+    : type_(TypeUnknown)
     , nodeId_(0)
+    , conn_(conn)
     {
     }
 

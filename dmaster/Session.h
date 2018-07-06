@@ -66,7 +66,6 @@ namespace DMaster
         void onRecvMsgHelloConn(int err, int numBytes);
         void onRecvMsgHelloAcc(int err, int numBytes);
 
-        boost::shared_ptr<DTun::UDTConnection> conn_;
         StartPersistentCallback startPersistentCallback_;
         StartConnectorCallback startConnectorCallback_;
         StartAcceptorCallback startAcceptorCallback_;
@@ -77,6 +76,8 @@ namespace DMaster
 
         ConnRequestMap connRequests_;
         std::vector<char> buff_;
+
+        boost::shared_ptr<DTun::UDTConnection> conn_;
     };
 }
 

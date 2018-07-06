@@ -75,12 +75,13 @@ namespace DMaster
     void Server::run()
     {
         reactor_.run();
+        acceptor_.reset();
+        sessions_.clear();
+        reactor_.processUpdates();
     }
 
     void Server::stop()
     {
-        acceptor_.reset();
-        sessions_.clear();
         reactor_.stop();
     }
 
