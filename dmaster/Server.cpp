@@ -112,6 +112,7 @@ namespace DMaster
 
     void Server::stop()
     {
+        acceptor_.reset();
         reactor_.stop();
     }
 

@@ -22,7 +22,7 @@ namespace DTun
         void stop();
 
         void add(UDTSocket* socket);
-        void remove(UDTSocket* socket);
+        UDTSOCKET remove(UDTSocket* socket);
         void update(UDTSocket* socket);
 
     private:
@@ -40,7 +40,22 @@ namespace DTun
             int pollEvents;
         };
 
-        typedef std::map<UDTSOCKET, SocketInfo> SocketMap;
+        struct PollSocketInfo
+        {
+            PollSocketInfo()
+            : cookie(0)
+            , pollEvents(0) {}
+
+            PollSocketInfo(uint64_t cookie, int pollEvents)
+            : cookie(cookie)
+            , pollEvents(pollEvents) {}
+
+            uint64_t cookie;
+            int pollEvents;
+        };
+
+        typedef std::map<uint64_t, SocketInfo> SocketMap;
+        typedef std::map<UDTSOCKET, PollSocketInfo> PollSocketMap;
 
         void reset();
 
@@ -54,16 +69,16 @@ namespace DTun
         boost::thread::id runThreadId_;
 
         boost::mutex m_;
+        boost::condition_variable c_;
         int eid_;
         bool stopping_;
+        uint64_t nextCookie_;
         UDTSOCKET signalWrSock_;
         UDTSOCKET signalRdSock_;
         SocketMap sockets_;
-
-        boost::condition_variable c_;
-        std::set<UDTSocket*> toAddSockets_;
-        std::set<UDTSocket*> toRemoveSockets_;
-        std::set<UDTSocket*> toUpdateSockets_;
+        PollSocketMap pollSockets_;
+        uint64_t pollIteration_;
+        UDTSocket* currentlyHandling_;
     };
 }
 

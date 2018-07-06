@@ -2,6 +2,7 @@
 #define _DTUN_UDTACCEPTOR_H_
 
 #include "DTun/UDTSocket.h"
+#include <boost/thread.hpp>
 
 namespace DTun
 {
@@ -21,7 +22,6 @@ namespace DTun
 
         virtual void handleRead();
         virtual void handleWrite();
-        virtual void handleClose();
 
     private:
         ListenCallback callback_;

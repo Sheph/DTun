@@ -26,7 +26,6 @@ namespace DTun
 
         virtual void handleRead();
         virtual void handleWrite();
-        virtual void handleClose();
 
     private:
         struct WriteReq
@@ -48,7 +47,6 @@ namespace DTun
         mutable boost::mutex m_;
         std::list<WriteReq> writeQueue_;
         std::list<ReadReq> readQueue_;
-        bool closed_;
     };
 }
 

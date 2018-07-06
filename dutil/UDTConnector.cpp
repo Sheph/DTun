@@ -10,14 +10,13 @@ namespace DTun
 {
     UDTConnector::UDTConnector(UDTReactor& reactor, UDTSOCKET sock)
     : UDTSocket(reactor, sock)
-    , closed_(false)
+    , handedOut_(false)
     {
         reactor.add(this);
     }
 
     UDTConnector::~UDTConnector()
     {
-        setInDestructor();
         close();
     }
 
@@ -66,19 +65,15 @@ namespace DTun
 
     void UDTConnector::close()
     {
-        if (closed_) {
-            return;
-        }
-        closed_ = true;
-        if (sock() != UDT::INVALID_SOCK) {
-            reactor().remove(this);
-            resetSock();
+        UDTSOCKET s = reactor().remove(this);
+        if (!handedOut_ && (s != UDT::INVALID_SOCK)) {
+            UDT::close(s);
         }
     }
 
     int UDTConnector::getPollEvents() const
     {
-        return callback_ ? (UDT_EPOLL_OUT | UDT_EPOLL_ERR) : 0;
+        return callback_ ? UDT_EPOLL_OUT : 0;
     }
 
     void UDTConnector::handleRead()
@@ -99,19 +94,7 @@ namespace DTun
             state = BROKEN;
         }
 
+        handedOut_ = true;
         cb((state == CONNECTED) ? 0 : CUDTException::ECONNFAIL);
-    }
-
-    void UDTConnector::handleClose()
-    {
-        if (callback_) {
-            ConnectCallback cb = callback_;
-            callback_ = ConnectCallback();
-            if (inDestructor()) {
-                UDT::close(sock());
-            } else {
-                cb(CUDTException::ENOCONN);
-            }
-        }
     }
 }

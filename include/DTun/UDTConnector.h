@@ -21,11 +21,10 @@ namespace DTun
 
         virtual void handleRead();
         virtual void handleWrite();
-        virtual void handleClose();
 
     private:
         ConnectCallback callback_;
-        bool closed_;
+        bool handedOut_;
     };
 }
 

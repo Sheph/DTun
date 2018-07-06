@@ -12,7 +12,6 @@ namespace DTun
 
     UDTAcceptor::~UDTAcceptor()
     {
-        setInDestructor();
         close();
     }
 
@@ -32,15 +31,15 @@ namespace DTun
 
     void UDTAcceptor::close()
     {
-        if (sock() != UDT::INVALID_SOCK) {
-            reactor().remove(this);
-            resetSock();
+        UDTSOCKET s = reactor().remove(this);
+        if (s != UDT::INVALID_SOCK) {
+            UDT::close(s);
         }
     }
 
     int UDTAcceptor::getPollEvents() const
     {
-        return callback_ ? (UDT_EPOLL_IN | UDT_EPOLL_ERR) : 0;
+        return callback_ ? UDT_EPOLL_IN : 0;
     }
 
     void UDTAcceptor::handleRead()
@@ -73,10 +72,5 @@ namespace DTun
 
     void UDTAcceptor::handleWrite()
     {
-    }
-
-    void UDTAcceptor::handleClose()
-    {
-        UDT::close(sock());
     }
 }

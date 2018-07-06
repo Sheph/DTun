@@ -6,8 +6,11 @@ namespace DTun
     UDTReactor::UDTReactor()
     : eid_(UDT::ERROR)
     , stopping_(false)
+    , nextCookie_(0)
     , signalWrSock_(UDT::INVALID_SOCK)
     , signalRdSock_(UDT::INVALID_SOCK)
+    , pollIteration_(0)
+    , currentlyHandling_(NULL)
     {
     }
 
@@ -153,50 +156,62 @@ namespace DTun
             readfds.clear();
             writefds.clear();
 
-            if (UDT::epoll_wait(eid_, &readfds, &writefds, -1) == UDT::ERROR) {
-                LOG4CPLUS_ERROR(logger(), "epoll_wait error: " << UDT::getlasterror().getErrorMessage());
-                break;
+            int err = UDT::epoll_wait(eid_, &readfds, &writefds, 1000);
+
+            {
+                boost::mutex::scoped_lock lock(m_);
+                ++pollIteration_;
+                c_.notify_all();
             }
-            bool processUpdatesCalled = false;
+
+            if (err == UDT::ERROR) {
+                if (UDT::getlasterror().getErrorCode() != CUDTException::ETIMEOUT) {
+                    LOG4CPLUS_ERROR(logger(), "epoll_wait error: " << UDT::getlasterror().getErrorMessage());
+                    break;
+                }
+            }
+
             for (std::set<UDTSOCKET>::const_iterator it = readfds.begin(); it != readfds.end(); ++it) {
                 if (*it == signalRdSock_) {
                     LOG4CPLUS_TRACE(logger(), "epoll rd: signal");
                     signalRd();
-                    processUpdates();
-                    processUpdatesCalled = true;
                 } else {
                     LOG4CPLUS_TRACE(logger(), "epoll rd: " << *it);
-                    boost::mutex::scoped_lock lock(m_);
-                    SocketMap::iterator sIt = sockets_.find(*it);
-                    if (sIt != sockets_.end()) {
-                        UDTSocket* s = sIt->second.socket;
-                        lock.unlock();
-                        s->handleRead();
-                        processUpdates();
-                        processUpdatesCalled = true;
+                    PollSocketMap::iterator psIt = pollSockets_.find(*it);
+                    if ((psIt != pollSockets_.end()) && ((psIt->second.pollEvents & UDT_EPOLL_IN) != 0)) {
+                        boost::mutex::scoped_lock lock(m_);
+                        SocketMap::iterator sIt = sockets_.find(psIt->second.cookie);
+                        if (sIt != sockets_.end()) {
+                            currentlyHandling_ = sIt->second.socket;
+                            lock.unlock();
+                            currentlyHandling_->handleRead();
+                            lock.lock();
+                            currentlyHandling_ = NULL;
+                            c_.notify_all();
+                        }
                     }
                 }
             }
             for (std::set<UDTSOCKET>::const_iterator it = writefds.begin(); it != writefds.end(); ++it) {
                 LOG4CPLUS_TRACE(logger(), "epoll wr: " << *it);
-                boost::mutex::scoped_lock lock(m_);
-                SocketMap::iterator sIt = sockets_.find(*it);
-                if (sIt != sockets_.end()) {
-                    UDTSocket* s = sIt->second.socket;
-                    lock.unlock();
-                    s->handleWrite();
-                    processUpdates();
-                    processUpdatesCalled = true;
+                PollSocketMap::iterator psIt = pollSockets_.find(*it);
+                if ((psIt != pollSockets_.end()) && ((psIt->second.pollEvents & UDT_EPOLL_OUT) != 0)) {
+                    boost::mutex::scoped_lock lock(m_);
+                    SocketMap::iterator sIt = sockets_.find(psIt->second.cookie);
+                    if (sIt != sockets_.end()) {
+                        currentlyHandling_ = sIt->second.socket;
+                        lock.unlock();
+                        currentlyHandling_->handleWrite();
+                        lock.lock();
+                        currentlyHandling_ = NULL;
+                        c_.notify_all();
+                    }
                 }
             }
-            if (!processUpdatesCalled) {
-                processUpdates();
-            }
-            if (readfds.empty() && writefds.empty()) {
-                LOG4CPLUS_TRACE(logger(), "epoll empty run");
-            } else {
-                LOG4CPLUS_TRACE(logger(), "epoll run done");
-            }
+
+            processUpdates();
+
+            LOG4CPLUS_TRACE(logger(), "epoll run done");
         }
 
         processUpdates();
@@ -215,49 +230,40 @@ namespace DTun
         int evts = socket->getPollEvents();
 
         boost::mutex::scoped_lock lock(m_);
-        if (sockets_.count(socket->sock()) > 0) {
-            LOG4CPLUS_ERROR(logger(), "socket is already in UDTReactor");
-            return;
-        }
 
-        sockets_[socket->sock()] = SocketInfo(socket, evts);
+        socket->setCookie(nextCookie_++);
+        sockets_[socket->cookie()] = SocketInfo(socket, evts);
 
-        if (isSameThread()) {
-            if (UDT::epoll_add_usock(eid_, socket->sock(), &evts) == UDT::ERROR) {
-                LOG4CPLUS_ERROR(logger(), "epoll_add_usock: " << UDT::getlasterror().getErrorMessage());
-            }
-        } else {
-            toAddSockets_.insert(socket);
+        if (!isSameThread()) {
             signalWr();
-            while (toAddSockets_.count(socket) > 0) {
-                c_.wait(lock);
-            }
         }
     }
 
-    void UDTReactor::remove(UDTSocket* socket)
+    UDTSOCKET UDTReactor::remove(UDTSocket* socket)
     {
         boost::mutex::scoped_lock lock(m_);
-        if (sockets_.count(socket->sock()) == 0) {
-            LOG4CPLUS_ERROR(logger(), "socket is not in UDTReactor");
-            return;
+
+        if (sockets_.count(socket->cookie()) == 0) {
+            return UDT::INVALID_SOCK;
         }
 
-        sockets_.erase(socket->sock());
+        sockets_.erase(socket->cookie());
 
-        if (isSameThread()) {
-            if (UDT::epoll_remove_usock(eid_, socket->sock()) == UDT::ERROR) {
-                LOG4CPLUS_ERROR(logger(), "epoll_remove_usock: " << UDT::getlasterror().getErrorMessage());
-            }
-            lock.unlock();
-            socket->handleClose();
-        } else {
-            toRemoveSockets_.insert(socket);
+        if (!isSameThread()) {
             signalWr();
-            while (toRemoveSockets_.count(socket) > 0) {
+            uint64_t pollIteration = pollIteration_;
+            while ((pollIteration_ <= pollIteration) &&
+                (currentlyHandling_ == socket)) {
                 c_.wait(lock);
             }
         }
+
+        UDTSOCKET sock = socket->sock();
+        assert(sock != UDT::INVALID_SOCK);
+
+        socket->resetSock();
+
+        return sock;
     }
 
     void UDTReactor::update(UDTSocket* socket)
@@ -266,9 +272,8 @@ namespace DTun
 
         boost::mutex::scoped_lock lock(m_);
 
-        SocketMap::iterator it = sockets_.find(socket->sock());
+        SocketMap::iterator it = sockets_.find(socket->cookie());
         if (it == sockets_.end()) {
-            LOG4CPLUS_TRACE(logger(), "socket is not in UDTReactor");
             return;
         }
 
@@ -278,28 +283,15 @@ namespace DTun
 
         it->second.pollEvents = evts;
 
-        if (isSameThread()) {
-            if (UDT::epoll_remove_usock(eid_, socket->sock()) == UDT::ERROR) {
-                LOG4CPLUS_ERROR(logger(), "epoll_remove_usock: " << UDT::getlasterror().getErrorMessage());
-            }
-            if (UDT::epoll_add_usock(eid_, socket->sock(), &evts) == UDT::ERROR) {
-                LOG4CPLUS_ERROR(logger(), "epoll_add_usock: " << UDT::getlasterror().getErrorMessage());
-            }
-        } else {
-            toUpdateSockets_.insert(socket);
+        if (!isSameThread()) {
             signalWr();
-            while (toUpdateSockets_.count(socket) > 0) {
-                c_.wait(lock);
-            }
         }
     }
 
     void UDTReactor::reset()
     {
         assert(sockets_.empty());
-        assert(toAddSockets_.empty());
-        assert(toRemoveSockets_.empty());
-        assert(toUpdateSockets_.empty());
+        assert(pollSockets_.empty());
         if (eid_ != UDT::ERROR) {
             UDT::epoll_release(eid_);
             eid_ = UDT::ERROR;
@@ -339,59 +331,48 @@ namespace DTun
 
     void UDTReactor::processUpdates()
     {
-        std::set<UDTSocket*> toRemoveSockets;
-
         boost::mutex::scoped_lock lock(m_);
 
-        bool haveSome = !toUpdateSockets_.empty() || !toAddSockets_.empty() || !toRemoveSockets_.empty();
-
-        for (std::set<UDTSocket*>::iterator it = toUpdateSockets_.begin(); it != toUpdateSockets_.end(); ++it) {
-            SocketMap::iterator sIt = sockets_.find((*it)->sock());
+        for (PollSocketMap::iterator it = pollSockets_.begin(); it != pollSockets_.end();) {
+            SocketMap::iterator sIt = sockets_.find(it->second.cookie);
             if (sIt == sockets_.end()) {
-                continue;
-            }
-            if (UDT::epoll_remove_usock(eid_, (*it)->sock()) == UDT::ERROR) {
-                LOG4CPLUS_ERROR(logger(), "epoll_remove_usock: " << UDT::getlasterror().getErrorMessage());
-            }
-            if (UDT::epoll_add_usock(eid_, (*it)->sock(), &sIt->second.pollEvents) == UDT::ERROR) {
-                LOG4CPLUS_ERROR(logger(), "epoll_add_usock: " << UDT::getlasterror().getErrorMessage());
-            }
-        }
-
-        for (std::set<UDTSocket*>::iterator it = toAddSockets_.begin(); it != toAddSockets_.end(); ++it) {
-            SocketMap::iterator sIt = sockets_.find((*it)->sock());
-            if (sIt == sockets_.end()) {
-                continue;
-            }
-            if (UDT::epoll_add_usock(eid_, (*it)->sock(), &sIt->second.pollEvents) == UDT::ERROR) {
-                LOG4CPLUS_ERROR(logger(), "epoll_add_usock: " << UDT::getlasterror().getErrorMessage());
-            }
-        }
-
-        for (std::set<UDTSocket*>::iterator it = toRemoveSockets_.begin(); it != toRemoveSockets_.end(); ++it) {
-            if (UDT::epoll_remove_usock(eid_, (*it)->sock()) == UDT::ERROR) {
-                LOG4CPLUS_ERROR(logger(), "epoll_remove_usock: " << UDT::getlasterror().getErrorMessage());
+                if (UDT::epoll_remove_usock(eid_, it->first) == UDT::ERROR) {
+                    LOG4CPLUS_ERROR(logger(), "epoll_remove_usock: " << UDT::getlasterror().getErrorMessage());
+                }
+                pollSockets_.erase(it++);
+            } else if (it->second.pollEvents != sIt->second.pollEvents) {
+                it->second.pollEvents = sIt->second.pollEvents;
+                int pollEvents = it->second.pollEvents;
+                if (pollEvents != 0) {
+                    pollEvents |= UDT_EPOLL_ERR;
+                }
+                if (UDT::epoll_remove_usock(eid_, it->first) == UDT::ERROR) {
+                    LOG4CPLUS_ERROR(logger(), "epoll_remove_usock: " << UDT::getlasterror().getErrorMessage());
+                }
+                if (UDT::epoll_add_usock(eid_, it->first, &pollEvents) == UDT::ERROR) {
+                    LOG4CPLUS_ERROR(logger(), "epoll_add_usock: " << UDT::getlasterror().getErrorMessage());
+                }
+                ++it;
+            } else {
+                ++it;
             }
         }
 
-        toUpdateSockets_.clear();
-        toAddSockets_.clear();
-        toRemoveSockets = toRemoveSockets_;
-
-        lock.unlock();
-
-        for (std::set<UDTSocket*>::iterator it = toRemoveSockets.begin(); it != toRemoveSockets.end(); ++it) {
-            (*it)->handleClose();
-        }
-
-        lock.lock();
-        for (std::set<UDTSocket*>::iterator it = toRemoveSockets.begin(); it != toRemoveSockets.end(); ++it) {
-            toRemoveSockets_.erase(*it);
-        }
-        lock.unlock();
-
-        if (haveSome) {
-            c_.notify_all();
+        for (SocketMap::iterator it = sockets_.begin(); it != sockets_.end(); ++it) {
+            PollSocketMap::iterator psIt = pollSockets_.find(it->second.socket->sock());
+            if (psIt == pollSockets_.end()) {
+                pollSockets_.insert(std::make_pair(it->second.socket->sock(),
+                    PollSocketInfo(it->second.socket->cookie(), it->second.pollEvents)));
+                int pollEvents = it->second.pollEvents;
+                if (pollEvents != 0) {
+                    pollEvents |= UDT_EPOLL_ERR;
+                }
+                if (UDT::epoll_add_usock(eid_, it->second.socket->sock(), &pollEvents) == UDT::ERROR) {
+                    LOG4CPLUS_ERROR(logger(), "epoll_add_usock: " << UDT::getlasterror().getErrorMessage());
+                }
+            } else {
+                assert(psIt->second.cookie == it->second.socket->cookie());
+            }
         }
     }
 }

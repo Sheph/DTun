@@ -10,14 +10,12 @@ namespace DTun
 {
     UDTConnection::UDTConnection(UDTReactor& reactor, UDTSOCKET sock)
     : UDTSocket(reactor, sock)
-    , closed_(false)
     {
         reactor.add(this);
     }
 
     UDTConnection::~UDTConnection()
     {
-        setInDestructor();
         close();
     }
 
@@ -31,9 +29,6 @@ namespace DTun
 
         {
             boost::mutex::scoped_lock lock(m_);
-            if (closed_) {
-                return false;
-            }
             writeQueue_.push_back(req);
         }
 
@@ -54,9 +49,6 @@ namespace DTun
 
         {
             boost::mutex::scoped_lock lock(m_);
-            if (closed_) {
-                return false;
-            }
             readQueue_.push_back(req);
         }
 
@@ -67,17 +59,9 @@ namespace DTun
 
     void UDTConnection::close()
     {
-        {
-            boost::mutex::scoped_lock lock(m_);
-            if (closed_) {
-                return;
-            }
-            closed_ = true;
-        }
-
-        if (sock() != UDT::INVALID_SOCK) {
-            reactor().remove(this);
-            resetSock();
+        UDTSOCKET s = reactor().remove(this);
+        if (s != UDT::INVALID_SOCK) {
+            UDT::close(s);
         }
     }
 
@@ -91,9 +75,6 @@ namespace DTun
         }
         if (!readQueue_.empty()) {
             res |= UDT_EPOLL_IN;
-        }
-        if (res != 0) {
-            res |= UDT_EPOLL_ERR;
         }
 
         return res;
@@ -200,25 +181,5 @@ namespace DTun
 
             cb(0);
         }
-    }
-
-    void UDTConnection::handleClose()
-    {
-        // handleClose will not execute concurrently with read/write, can
-        // do stuff without mutex here.
-
-        if (!inDestructor()) {
-            for (std::list<WriteReq>::iterator it = writeQueue_.begin(); it != writeQueue_.end(); ++it) {
-                it->callback(CUDTException::ENOCONN);
-            }
-            for (std::list<ReadReq>::iterator it = readQueue_.begin(); it != readQueue_.end(); ++it) {
-                it->callback(CUDTException::ENOCONN, it->total_read);
-            }
-        }
-
-        writeQueue_.clear();
-        readQueue_.clear();
-
-        UDT::close(sock());
     }
 }

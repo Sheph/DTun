@@ -17,7 +17,7 @@ namespace DTun
         UDTSocket(UDTReactor& reactor, UDTSOCKET sock)
         : reactor_(reactor)
         , sock_(sock)
-        , inDestructor_(false)
+        , cookie_(0)
         {
         }
 
@@ -29,7 +29,10 @@ namespace DTun
 
         inline UDTSOCKET sock() const { return sock_; }
 
-        inline bool inDestructor() const { return inDestructor_; }
+        inline void setCookie(uint64_t cookie) { cookie_ = cookie; }
+        inline uint64_t cookie() const { return cookie_; }
+
+        void resetSock() { sock_ = UDT::INVALID_SOCK; }
 
         virtual void close() = 0;
 
@@ -37,16 +40,11 @@ namespace DTun
 
         virtual void handleRead() = 0;
         virtual void handleWrite() = 0;
-        virtual void handleClose() = 0;
-
-    protected:
-        void resetSock() { sock_ = UDT::INVALID_SOCK; }
-        void setInDestructor() { inDestructor_ = true; }
 
     private:
         UDTReactor& reactor_;
         UDTSOCKET sock_;
-        bool inDestructor_;
+        uint64_t cookie_;
     };
 }
 
