@@ -17,7 +17,6 @@ namespace DMaster
 
     void Session::start()
     {
-        conn_->watch(boost::bind(&Session::onWatch, this, _1));
         buff_.resize(sizeof(DTun::DProtocolHeader));
         conn_->read(&buff_[0], &buff_[0] + buff_.size(),
             boost::bind(&Session::onRecvHeader, this, _1, _2),
@@ -118,6 +117,8 @@ namespace DMaster
         type_ = TypePersistent;
         nodeId_ = msg.nodeId;
 
+        startRecvAny();
+
         if (startPersistentCallback_) {
             startPersistentCallback_();
         }
@@ -133,6 +134,8 @@ namespace DMaster
             }
             return;
         }
+
+        startRecvAny();
     }
 
     void Session::onRecvMsgHelloAcc(int err, int numBytes)
@@ -145,14 +148,24 @@ namespace DMaster
             }
             return;
         }
+
+        startRecvAny();
     }
 
-    void Session::onWatch(int err)
+    void Session::onRecvAny(int err, int numBytes)
     {
-        LOG4CPLUS_TRACE(logger(), "onWatch(" << err << ")");
+        LOG4CPLUS_TRACE(logger(), "onRecvAny(" << err << ", " << numBytes << ")");
 
-        if (err && errorCallback_) {
-            errorCallback_(err);
+        if (errorCallback_) {
+            errorCallback_(err ? err : CUDTException::EUNKNOWN);
         }
+    }
+
+    void Session::startRecvAny()
+    {
+        buff_.resize(1);
+        conn_->read(&buff_[0], &buff_[0] + buff_.size(),
+            boost::bind(&Session::onRecvAny, this, _1, _2),
+            false);
     }
 }

@@ -73,8 +73,4 @@ namespace DTun
     void UDTAcceptor::handleWrite()
     {
     }
-
-    void UDTAcceptor::handleBroken(int err)
-    {
-    }
 }

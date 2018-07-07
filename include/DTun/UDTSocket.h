@@ -40,7 +40,6 @@ namespace DTun
 
         virtual void handleRead() = 0;
         virtual void handleWrite() = 0;
-        virtual void handleBroken(int err) = 0;
 
     private:
         UDTReactor& reactor_;

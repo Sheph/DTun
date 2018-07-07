@@ -231,22 +231,14 @@ namespace DTun
                 }
 
                 currentlyHandling_ = sIt->second.socket;
-                bool handled = false;
                 if ((it->second.pollEvents & UDT_EPOLL_OUT) != 0) {
                     lock.unlock();
                     currentlyHandling_->handleWrite();
                     lock.lock();
-                    handled = true;
                 }
                 if (((it->second.pollEvents & UDT_EPOLL_IN) != 0) && (sockets_.count(it->second.cookie) > 0)) {
                     lock.unlock();
                     currentlyHandling_->handleRead();
-                    lock.lock();
-                    handled = true;
-                }
-                if (!handled && (sockets_.count(it->second.cookie) > 0)) {
-                    lock.unlock();
-                    currentlyHandling_->handleBroken(CUDTException::ECONNLOST);
                     lock.lock();
                 }
                 currentlyHandling_ = NULL;

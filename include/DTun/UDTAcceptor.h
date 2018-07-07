@@ -22,7 +22,6 @@ namespace DTun
 
         virtual void handleRead();
         virtual void handleWrite();
-        virtual void handleBroken(int err);
 
     private:
         ListenCallback callback_;

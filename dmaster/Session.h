@@ -65,7 +65,9 @@ namespace DMaster
         void onRecvMsgHello(int err, int numBytes);
         void onRecvMsgHelloConn(int err, int numBytes);
         void onRecvMsgHelloAcc(int err, int numBytes);
-        void onWatch(int err);
+        void onRecvAny(int err, int numBytes);
+
+        void startRecvAny();
 
         StartPersistentCallback startPersistentCallback_;
         StartConnectorCallback startConnectorCallback_;
