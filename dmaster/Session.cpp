@@ -78,7 +78,7 @@ namespace DMaster
                 boost::bind(&Session::onRecvMsgHello, this, _1, _2),
                 true);
             break;
-        case DPROTOCOL_MSG_HELLO_CON:
+        case DPROTOCOL_MSG_HELLO_CONN:
             buff_.resize(sizeof(DTun::DProtocolMsgHelloConn));
             conn_->read(&buff_[0], &buff_[0] + buff_.size(),
                 boost::bind(&Session::onRecvMsgHelloConn, this, _1, _2),

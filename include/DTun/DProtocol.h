@@ -6,7 +6,7 @@
 namespace DTun
 {
     #define DPROTOCOL_MSG_HELLO 0x0
-    #define DPROTOCOL_MSG_HELLO_CON 0x1
+    #define DPROTOCOL_MSG_HELLO_CONN 0x1
     #define DPROTOCOL_MSG_HELLO_ACC 0x2
     #define DPROTOCOL_MSG_CONN 0x3
     #define DPROTOCOL_MSG_CONN_ERR 0x4

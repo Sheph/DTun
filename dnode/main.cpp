@@ -60,7 +60,11 @@ int main(int argc, char* argv[])
 
             signalBlocker.unblock();
 
+            DNode::theMasterClient = &masterClient;
+
             res = tun2socks_main(argc, argv, isDebugged);
+
+            DNode::theMasterClient = NULL;
         }
 
         udtReactor.stop();

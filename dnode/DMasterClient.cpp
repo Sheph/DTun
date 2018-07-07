@@ -4,11 +4,14 @@
 
 namespace DNode
 {
+    DMasterClient* theMasterClient = NULL;
+
     DMasterClient::DMasterClient(DTun::UDTReactor& reactor, const std::string& address, int port, DTun::UInt32 nodeId)
     : reactor_(reactor)
     , address_(address)
     , port_(port)
     , nodeId_(nodeId)
+    , nextConnId_(0)
     {
     }
 
@@ -37,9 +40,54 @@ namespace DNode
         return true;
     }
 
+    DTun::UInt32 DMasterClient::registerConnection(SYSSOCKET s,
+        DTun::UInt32 remoteIp,
+        DTun::UInt16 remotePort,
+        const RegisterConnectionCallback& callback)
+    {
+        boost::mutex::scoped_lock lock(m_);
+
+        if (!conn_) {
+            return 0;
+        }
+
+        boost::shared_ptr<DMasterSession> sess =
+            boost::make_shared<DMasterSession>(boost::ref(reactor_), address_, port_);
+
+        DTun::UInt32 connId = nextConnId_++;
+
+        if (!sess->startConnector(s, nodeId_, nodeId_, connId, remoteIp, remotePort,
+            boost::bind(&DMasterClient::onRegisterConnection, this, _1, connId))) {
+            return false;
+        }
+
+        connMasterSessions_[connId].sess = sess;
+        connMasterSessions_[connId].callback = callback;
+
+        return true;
+    }
+
+    void DMasterClient::cancelConnection(DTun::UInt32 connId)
+    {
+        boost::mutex::scoped_lock lock(m_);
+
+        MasterSessionMap::iterator it = connMasterSessions_.find(connId);
+        if (it == connMasterSessions_.end()) {
+            return;
+        }
+
+        ConnMasterSession tmp = it->second;
+
+        connMasterSessions_.erase(it);
+
+        lock.unlock();
+    }
+
     void DMasterClient::onConnect(int err)
     {
         LOG4CPLUS_INFO(logger(), "onConnect(" << err << ")");
+
+        boost::mutex::scoped_lock lock(m_);
 
         UDTSOCKET sock = connector_->sock();
 
@@ -69,7 +117,12 @@ namespace DNode
     {
         LOG4CPLUS_INFO(logger(), "onSend(" << err << ")");
 
+        boost::mutex::scoped_lock lock(m_);
+
         if (err) {
+            boost::shared_ptr<DTun::UDTConnection> tmp = conn_;
+            conn_.reset();
+            lock.unlock();
             return;
         }
 
@@ -83,7 +136,12 @@ namespace DNode
     {
         LOG4CPLUS_INFO(logger(), "onRecvHeader(" << err << ", " << numBytes << ")");
 
+        boost::mutex::scoped_lock lock(m_);
+
         if (err) {
+            boost::shared_ptr<DTun::UDTConnection> tmp = conn_;
+            conn_.reset();
+            lock.unlock();
             return;
         }
 
@@ -97,7 +155,12 @@ namespace DNode
     {
         LOG4CPLUS_INFO(logger(), "onRecvMsg(" << err << ", " << numBytes << ")");
 
+        boost::mutex::scoped_lock lock(m_);
+
         if (err) {
+            boost::shared_ptr<DTun::UDTConnection> tmp = conn_;
+            conn_.reset();
+            lock.unlock();
             return;
         }
 
@@ -105,5 +168,30 @@ namespace DNode
         conn_->read(&buff_[0], &buff_[0] + buff_.size(),
             boost::bind(&DMasterClient::onRecvHeader, this, _1, _2),
             true);
+    }
+
+    void DMasterClient::onRegisterConnection(int err, DTun::UInt32 connId)
+    {
+        boost::mutex::scoped_lock lock(m_);
+
+        MasterSessionMap::iterator it = connMasterSessions_.find(connId);
+        if (it == connMasterSessions_.end()) {
+            return;
+        }
+
+        ConnMasterSession tmp = it->second;
+
+        it->second.sess.reset();
+
+        if (err) {
+            connMasterSessions_.erase(it);
+        }
+
+        lock.unlock();
+
+        if (err) {
+            tmp.sess.reset();
+            tmp.callback(err, 0, 0);
+        }
     }
 }
