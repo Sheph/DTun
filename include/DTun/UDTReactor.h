@@ -46,14 +46,17 @@ namespace DTun
         {
             PollSocketInfo()
             : cookie(0)
-            , pollEvents(0) {}
+            , pollEvents(0)
+            , notInEpoll(false) {}
 
             PollSocketInfo(uint64_t cookie, int pollEvents)
             : cookie(cookie)
-            , pollEvents(pollEvents) {}
+            , pollEvents(pollEvents)
+            , notInEpoll(false) {}
 
             uint64_t cookie;
             int pollEvents;
+            bool notInEpoll;
         };
 
         typedef std::map<uint64_t, SocketInfo> SocketMap;

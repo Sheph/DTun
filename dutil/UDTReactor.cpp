@@ -297,6 +297,16 @@ namespace DTun
         UDTSOCKET sock = socket->sock();
         assert(sock != UDT::INVALID_SOCK);
 
+        PollSocketMap::iterator it = pollSockets_.find(sock);
+        if (it != pollSockets_.end()) {
+            if (it->second.pollEvents != 0) {
+                if (UDT::epoll_remove_usock(eid_, sock) == UDT::ERROR) {
+                    LOG4CPLUS_ERROR(logger(), "epoll_remove_usock: " << UDT::getlasterror().getErrorMessage());
+                }
+            }
+            it->second.notInEpoll = true;
+        }
+
         socket->resetSock();
 
         return sock;
@@ -372,7 +382,7 @@ namespace DTun
         for (PollSocketMap::iterator it = pollSockets_.begin(); it != pollSockets_.end();) {
             SocketMap::iterator sIt = sockets_.find(it->second.cookie);
             if (sIt == sockets_.end()) {
-                if (it->second.pollEvents != 0) {
+                if ((it->second.pollEvents != 0) && !it->second.notInEpoll) {
                     if (UDT::epoll_remove_usock(eid_, it->first) == UDT::ERROR) {
                         LOG4CPLUS_ERROR(logger(), "epoll_remove_usock: " << UDT::getlasterror().getErrorMessage());
                     }
