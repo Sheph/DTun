@@ -54,7 +54,7 @@
 #include <system/BAddr.h>
 #include <system/BNetwork.h>
 #include <flow/SinglePacketBuffer.h>
-#include <DNodeTCPClient.h>
+#include <DNodeDirectTCPClient.h>
 #include <tuntap/BTap.h>
 #include <lwip/init.h>
 #include <lwip/ip_addr.h>
@@ -124,7 +124,7 @@ struct tcp_client {
     int client_closed;
     uint8_t buf[TCP_WND];
     int buf_used;
-    DNodeTCPClient dtcp_client;
+    struct DNodeTCPClient* dtcp_client;
     int dtcp_up;
     int dtcp_closed;
     StreamPassInterface *dtcp_send_if;
@@ -1187,7 +1187,9 @@ err_t listener_accept_func (void *arg, struct tcp_pcb *newpcb, err_t err)
     ASSERT_FORCE(BAddr_Parse2(&addr, OVERRIDE_DEST_ADDR, NULL, 0, 1))
 #endif
 
-    if (!DNodeTCPClient_Init(&client->dtcp_client, addr, (DNodeTCPClient_handler)client_dtcp_handler, client, &ss)) {
+    client->dtcp_client = DNodeDirectTCPClient_Create(addr, (DNodeTCPClient_handler)client_dtcp_handler, client, &ss);
+
+    if (!client->dtcp_client) {
         BLog(BLOG_ERROR, "listener accept: DNodeTCPClient_Init failed");
         goto fail1;
     }
@@ -1323,7 +1325,8 @@ void client_free_dtcp (struct tcp_client *client)
     }
 
     // free DTCP
-    DNodeTCPClient_Free(&client->dtcp_client);
+    DNodeTCPClient_Free(client->dtcp_client);
+    client->dtcp_client = NULL;
 
     // set DTCP closed
     client->dtcp_closed = 1;
@@ -1359,7 +1362,8 @@ void client_murder (struct tcp_client *client)
     // free DTCP
     if (!client->dtcp_closed) {
         // free DTCP
-        DNodeTCPClient_Free(&client->dtcp_client);
+        DNodeTCPClient_Free(client->dtcp_client);
+        client->dtcp_client = NULL;
 
         // set DTCP closed
         client->dtcp_closed = 1;
@@ -1465,11 +1469,11 @@ void client_dtcp_handler (struct tcp_client *client, int event)
             client_log(client, BLOG_INFO, "DTCP up");
 
             // init sending
-            client->dtcp_send_if = DNodeTCPClient_GetSendInterface(&client->dtcp_client);
+            client->dtcp_send_if = DNodeTCPClient_GetSendInterface(client->dtcp_client);
             StreamPassInterface_Sender_Init(client->dtcp_send_if, (StreamPassInterface_handler_done)client_dtcp_send_handler_done, client);
 
             // init receiving
-            client->dtcp_recv_if = DNodeTCPClient_GetRecvInterface(&client->dtcp_client);
+            client->dtcp_recv_if = DNodeTCPClient_GetRecvInterface(client->dtcp_client);
             StreamRecvInterface_Receiver_Init(client->dtcp_recv_if, (StreamRecvInterface_handler_done)client_dtcp_recv_handler_done, client);
             client->dtcp_recv_buf_used = -1;
             client->dtcp_recv_tcp_pending = 0;

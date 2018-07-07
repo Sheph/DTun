@@ -17,24 +17,22 @@
 
 typedef void (*DNodeTCPClient_handler) (void* handler_data, int event);
 
-typedef struct {
-    BAddr dest_addr;
+struct DNodeTCPClient
+{
+    StreamPassInterface* (*get_sender_interface)(struct DNodeTCPClient */*dtcp_client*/);
+
+    StreamRecvInterface* (*get_recv_interface)(struct DNodeTCPClient */*dtcp_client*/);
+
+    void (*destroy)(struct DNodeTCPClient */*dtcp_client*/);
+
     DNodeTCPClient_handler handler;
     void* handler_data;
-    BReactor* reactor;
-    int state;
-    BConnector connector;
-    BConnection con;
-    DebugError d_err;
-    DebugObject d_obj;
-} DNodeTCPClient;
+};
 
-int DNodeTCPClient_Init(DNodeTCPClient* dtcp_client, BAddr dest_addr, DNodeTCPClient_handler handler, void* handler_data, BReactor* reactor);
+void DNodeTCPClient_Free(struct DNodeTCPClient* dtcp_client);
 
-void DNodeTCPClient_Free(DNodeTCPClient* dtcp_client);
+StreamPassInterface* DNodeTCPClient_GetSendInterface(struct DNodeTCPClient* dtcp_client);
 
-StreamPassInterface* DNodeTCPClient_GetSendInterface(DNodeTCPClient* dtcp_client);
-
-StreamRecvInterface* DNodeTCPClient_GetRecvInterface(DNodeTCPClient* dtcp_client);
+StreamRecvInterface* DNodeTCPClient_GetRecvInterface(struct DNodeTCPClient* dtcp_client);
 
 #endif
