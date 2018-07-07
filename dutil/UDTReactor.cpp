@@ -298,7 +298,7 @@ namespace DTun
         assert(sock != UDT::INVALID_SOCK);
 
         PollSocketMap::iterator it = pollSockets_.find(sock);
-        if (it != pollSockets_.end()) {
+        if ((it != pollSockets_.end()) && (it->second.cookie == socket->cookie())) {
             if (it->second.pollEvents != 0) {
                 if (UDT::epoll_remove_usock(eid_, sock) == UDT::ERROR) {
                     LOG4CPLUS_ERROR(logger(), "epoll_remove_usock: " << UDT::getlasterror().getErrorMessage());
