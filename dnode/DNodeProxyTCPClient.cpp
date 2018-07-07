@@ -15,26 +15,59 @@ namespace DNode
         explicit ProxyTCPClient(DNodeTCPClient* base)
         : base_(base)
         , state_(STATE_CONNECTING)
+        , connId_(0)
         {
         }
 
         ~ProxyTCPClient()
         {
+            if (connId_) {
+                theMasterClient->cancelConnection(connId_);
+            }
         }
 
         bool start(DTun::UInt32 remoteIp, DTun::UInt16 remotePort)
         {
-            return false;
+            SYSSOCKET s = ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+            if (s == SYS_INVALID_SOCKET) {
+                LOG4CPLUS_ERROR(logger(), "Cannot create UDP socket");
+                return false;
+            }
+
+            struct sockaddr_in addr;
+
+            memset(&addr, 0, sizeof(addr));
+            addr.sin_family = AF_INET;
+            addr.sin_addr.s_addr = htonl(INADDR_ANY);
+
+            int res = ::bind(s, (const struct sockaddr*)&addr, sizeof(addr));
+
+            if (res == SYS_SOCKET_ERROR) {
+                LOG4CPLUS_ERROR(logger(), "Cannot bind UDP socket");
+                SYS_CLOSE_SOCKET(s);
+                return false;
+            }
+
+            connId_ = theMasterClient->registerConnection(s, remoteIp, remotePort,
+                boost::bind(&ProxyTCPClient::onConnect, this, _1, _2, _3));
+            if (!connId_) {
+                SYS_CLOSE_SOCKET(s);
+                return false;
+            }
+
+            return true;
         }
 
     private:
         void onConnect(int err, DTun::UInt32 remoteIp, DTun::UInt16 remotePort)
         {
+            LOG4CPLUS_INFO(logger(), "onConnect(" << err << ", " << remoteIp << "," << remotePort << ")");
+            connId_ = 0;
         }
 
         DNodeTCPClient* base_;
         int state_;
-        SYSSOCKET s_;
+        DTun::UInt32 connId_;
     };
 }
 

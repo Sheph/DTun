@@ -55,6 +55,7 @@
 #include <system/BNetwork.h>
 #include <flow/SinglePacketBuffer.h>
 #include <DNodeDirectTCPClient.h>
+#include <DNodeProxyTCPClient.h>
 #include <tuntap/BTap.h>
 #include <lwip/init.h>
 #include <lwip/ip_addr.h>
@@ -1187,7 +1188,7 @@ err_t listener_accept_func (void *arg, struct tcp_pcb *newpcb, err_t err)
     ASSERT_FORCE(BAddr_Parse2(&addr, OVERRIDE_DEST_ADDR, NULL, 0, 1))
 #endif
 
-    client->dtcp_client = DNodeDirectTCPClient_Create(addr, (DNodeTCPClient_handler)client_dtcp_handler, client, &ss);
+    client->dtcp_client = DNodeProxyTCPClient_Create(addr, (DNodeTCPClient_handler)client_dtcp_handler, client, &ss);
 
     if (!client->dtcp_client) {
         BLog(BLOG_ERROR, "listener accept: DNodeTCPClient_Init failed");

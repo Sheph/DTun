@@ -2,14 +2,8 @@
 #define DNODE_TCPCLIENT_H
 
 #include <stdint.h>
-
-#include <misc/debug.h>
-#include <misc/debugerror.h>
-#include <misc/socks_proto.h>
-#include <misc/packed.h>
-#include <base/DebugObject.h>
-#include <system/BConnection.h>
 #include <flow/PacketStreamSender.h>
+#include <flow/StreamRecvInterface.h>
 
 #define DNODE_TCPCLIENT_EVENT_ERROR 1
 #define DNODE_TCPCLIENT_EVENT_UP 2

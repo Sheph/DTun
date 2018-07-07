@@ -55,6 +55,9 @@ namespace DNode
             boost::make_shared<DMasterSession>(boost::ref(reactor_), address_, port_);
 
         DTun::UInt32 connId = nextConnId_++;
+        if (connId == 0) {
+            connId = nextConnId_++;
+        }
 
         if (!sess->startConnector(s, nodeId_, nodeId_, connId, remoteIp, remotePort,
             boost::bind(&DMasterClient::onRegisterConnection, this, _1, connId))) {

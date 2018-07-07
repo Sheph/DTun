@@ -288,7 +288,7 @@ namespace DTun
         if (!isSameThread()) {
             signalWr();
             uint64_t pollIteration = pollIteration_;
-            while ((pollIteration_ <= pollIteration) &&
+            while ((pollIteration_ <= pollIteration) ||
                 (currentlyHandling_ == socket)) {
                 c_.wait(lock);
             }

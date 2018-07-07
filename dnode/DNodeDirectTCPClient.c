@@ -1,4 +1,10 @@
 #include "DNodeDirectTCPClient.h"
+#include <misc/debug.h>
+#include <misc/debugerror.h>
+#include <misc/socks_proto.h>
+#include <misc/packed.h>
+#include <base/DebugObject.h>
+#include <system/BConnection.h>
 
 #define STATE_CONNECTING 1
 #define STATE_UP 2

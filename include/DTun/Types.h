@@ -3,6 +3,29 @@
 
 #include <string>
 
+#ifdef _WIN32
+#include <winsock2.h>
+#include <Ws2tcpip.h>
+#include <errno.h>
+#define SYS_INVALID_SOCKET INVALID_SOCKET
+#define SYS_SOCKET_ERROR SOCKET_ERROR
+#define SYS_CLOSE_SOCKET(s) closesocket(s)
+#else
+#include <unistd.h>
+#include <errno.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+#include <netdb.h>
+#include <arpa/inet.h>
+#include <sys/types.h>
+#include <sys/ioctl.h>
+#include <net/if.h>
+
+#define SYS_INVALID_SOCKET -1
+#define SYS_SOCKET_ERROR -1
+#define SYS_CLOSE_SOCKET(s) close(s)
+#endif
+
 namespace DTun
 {
     typedef unsigned char UInt8;
