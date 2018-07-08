@@ -39,7 +39,7 @@ namespace DNode
         void onConnect(int err);
         void onSend(int err);
         void onRecvHeader(int err, int numBytes);
-        void onRecvMsg(int err, int numBytes);
+        void onRecvMsgConn(int err, int numBytes);
         void onRegisterConnection(int err, DTun::UInt32 connId);
 
         DTun::UDTReactor& reactor_;

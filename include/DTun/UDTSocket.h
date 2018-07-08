@@ -14,16 +14,11 @@ namespace DTun
     class UDTSocket : boost::noncopyable
     {
     public:
-        UDTSocket(UDTReactor& reactor, UDTSOCKET sock)
-        : reactor_(reactor)
-        , sock_(sock)
-        , cookie_(0)
-        {
-        }
+        UDTSocket(UDTReactor& reactor, UDTSOCKET sock);
+        virtual ~UDTSocket();
 
-        virtual ~UDTSocket()
-        {
-        }
+        bool getSockName(UInt32& ip, UInt16& port);
+        bool getPeerName(UInt32& ip, UInt16& port);
 
         inline UDTReactor& reactor() { return reactor_; }
 

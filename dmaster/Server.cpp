@@ -1,5 +1,6 @@
 #include "Server.h"
 #include "Logger.h"
+#include "DTun/Utils.h"
 #include <boost/make_shared.hpp>
 #include <sstream>
 #include <unistd.h>
@@ -123,7 +124,35 @@ namespace DMaster
             return;
         }
 
-        LOG4CPLUS_TRACE(logger(), "onSessionStartConnector(" << sess_shared->nodeId() << ")");
+        LOG4CPLUS_TRACE(logger(), "onSessionStartConnector(" << sess_shared->nodeId() << ", "
+            << dstNodeId << ", " << connId << ", " << DTun::ipPortToString(remoteIp, remotePort) << ")");
+
+        boost::shared_ptr<Session> srcSess = findPersistentSession(sess_shared->nodeId());
+
+        if (!srcSess) {
+            LOG4CPLUS_ERROR(logger(), "persistent source session not found for connector");
+            return;
+        }
+
+        srcSess->registerConnRequest(connId, dstNodeId);
+
+        boost::shared_ptr<Session> dstSess = findPersistentSession(dstNodeId);
+
+        if (!dstSess) {
+            LOG4CPLUS_ERROR(logger(), "persistent dest session not found for connector");
+            srcSess->setConnRequestErr(connId, DPROTOCOL_ERR_NOTFOUND);
+            return;
+        }
+
+        DTun::UInt32 srcIp = 0;
+        DTun::UInt16 srcPort = 0;
+
+        if (!sess_shared->conn()->getPeerName(srcIp, srcPort)) {
+            srcSess->setConnRequestErr(connId, DPROTOCOL_ERR_UNKNOWN);
+            return;
+        }
+
+        dstSess->sendConnRequest(sess_shared->nodeId(), srcIp, srcPort, connId, remoteIp, remotePort);
     }
 
     void Server::onSessionStartAcceptor(const boost::weak_ptr<Session>& sess, DTun::UInt32 connId)
@@ -146,5 +175,17 @@ namespace DMaster
         LOG4CPLUS_TRACE(logger(), "onSessionError(" << sess_shared->nodeId() << ", " << errCode << ")");
 
         sessions_.erase(sess_shared);
+    }
+
+    boost::shared_ptr<Session> Server::findPersistentSession(DTun::UInt32 nodeId) const
+    {
+        for (Sessions::const_iterator it = sessions_.begin(); it != sessions_.end(); ++it) {
+            boost::shared_ptr<Session> other = *it;
+            if ((other->nodeId() == nodeId) &&
+                (other->type() == Session::TypePersistent)) {
+                return other;
+            }
+        }
+        return boost::shared_ptr<Session>();
     }
 }

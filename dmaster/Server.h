@@ -22,6 +22,8 @@ namespace DMaster
         void stop();
 
     private:
+        typedef std::set<boost::shared_ptr<Session> > Sessions;
+
         void onAccept(UDTSOCKET sock);
 
         void onSessionStartPersistent(const boost::weak_ptr<Session>& sess);
@@ -36,9 +38,11 @@ namespace DMaster
 
         void onSessionError(const boost::weak_ptr<Session>& sess, int errCode);
 
+        boost::shared_ptr<Session> findPersistentSession(DTun::UInt32 nodeId) const;
+
         int port_;
         DTun::UDTReactor reactor_;
-        std::set<boost::shared_ptr<Session> > sessions_;
+        Sessions sessions_;
         boost::shared_ptr<DTun::UDTAcceptor> acceptor_;
     };
 }

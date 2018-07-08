@@ -39,7 +39,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${DTUN_OUT_DIR}/bin)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${DTUN_OUT_DIR}/lib)
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wno-deprecated-declarations -Wno-unused-function -D_REENTRANT -fPIC -DPIC -std=gnu99")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-deprecated-declarations -D_REENTRANT -fPIC -DPIC")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-deprecated-declarations -Wno-unused-function -D_REENTRANT -fPIC -DPIC")
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fvisibility=hidden -fvisibility-inlines-hidden")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fvisibility=hidden")

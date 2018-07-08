@@ -32,6 +32,8 @@ namespace DMaster
         inline void setStartAcceptorCallback(const StartAcceptorCallback& cb) { startAcceptorCallback_ = cb; }
         inline void setErrorCallback(const ErrorCallback& cb) { errorCallback_ = cb; }
 
+        inline const boost::shared_ptr<DTun::UDTConnection>& conn() const { return conn_; }
+
         inline Type type() const { return type_; }
 
         inline DTun::UInt32 nodeId() const { return nodeId_; }
@@ -60,7 +62,7 @@ namespace DMaster
     private:
         typedef std::map<DTun::UInt32, DTun::UInt32> ConnRequestMap;
 
-        void onSend(int err);
+        void onSend(int err, const boost::shared_ptr<std::vector<char> >& sndBuff);
         void onRecvHeader(int err, int numBytes);
         void onRecvMsgHello(int err, int numBytes);
         void onRecvMsgHelloConn(int err, int numBytes);
@@ -68,6 +70,8 @@ namespace DMaster
         void onRecvAny(int err, int numBytes);
 
         void startRecvAny();
+
+        void sendMsg(DTun::UInt8 msgCode, const void* msg, int msgSize);
 
         StartPersistentCallback startPersistentCallback_;
         StartConnectorCallback startConnectorCallback_;

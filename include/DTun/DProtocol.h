@@ -12,6 +12,10 @@ namespace DTun
     #define DPROTOCOL_MSG_CONN_ERR 0x4
     #define DPROTOCOL_MSG_CONN_OK 0x5
 
+    #define DPROTOCOL_ERR_NONE 0x0
+    #define DPROTOCOL_ERR_UNKNOWN 0x1
+    #define DPROTOCOL_ERR_NOTFOUND 0x2
+
     #pragma pack(1)
     struct DProtocolHeader
     {

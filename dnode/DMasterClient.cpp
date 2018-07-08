@@ -1,5 +1,6 @@
 #include "DMasterClient.h"
 #include "Logger.h"
+#include "DTun/Utils.h"
 #include <boost/make_shared.hpp>
 
 namespace DNode
@@ -148,15 +149,29 @@ namespace DNode
             return;
         }
 
-        buff_.resize(100);
-        conn_->read(&buff_[0], &buff_[0] + buff_.size(),
-            boost::bind(&DMasterClient::onRecvMsg, this, _1, _2),
-            true);
+        DTun::DProtocolHeader header;
+        assert(numBytes == sizeof(header));
+        memcpy(&header, &buff_[0], numBytes);
+
+        switch (header.msgCode) {
+        case DPROTOCOL_MSG_CONN:
+            buff_.resize(sizeof(DTun::DProtocolMsgConn));
+            conn_->read(&buff_[0], &buff_[0] + buff_.size(),
+                boost::bind(&DMasterClient::onRecvMsgConn, this, _1, _2),
+                true);
+            break;
+        default:
+            LOG4CPLUS_ERROR(logger(), "bad msg code: " << header.msgCode);
+            boost::shared_ptr<DTun::UDTConnection> tmp = conn_;
+            conn_.reset();
+            lock.unlock();
+            break;
+        }
     }
 
-    void DMasterClient::onRecvMsg(int err, int numBytes)
+    void DMasterClient::onRecvMsgConn(int err, int numBytes)
     {
-        LOG4CPLUS_INFO(logger(), "onRecvMsg(" << err << ", " << numBytes << ")");
+        LOG4CPLUS_INFO(logger(), "onRecvMsgConn(" << err << ", " << numBytes << ")");
 
         boost::mutex::scoped_lock lock(m_);
 
@@ -166,6 +181,14 @@ namespace DNode
             lock.unlock();
             return;
         }
+
+        DTun::DProtocolMsgConn msg;
+        assert(numBytes == sizeof(msg));
+        memcpy(&msg, &buff_[0], numBytes);
+
+        LOG4CPLUS_TRACE(logger(), "Proxy request: src = " << msg.srcNodeId
+            << ", src_addr = " << DTun::ipPortToString(msg.srcNodeIp, msg.srcNodePort)
+            << ", connId = " << msg.connId << ", remote_addr = " << DTun::ipPortToString(msg.ip, msg.port) << ")");
 
         buff_.resize(sizeof(DTun::DProtocolHeader));
         conn_->read(&buff_[0], &buff_[0] + buff_.size(),

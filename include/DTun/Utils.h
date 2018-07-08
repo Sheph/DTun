@@ -6,6 +6,10 @@
 namespace DTun
 {
     bool isDebuggerPresent();
+
+    std::string ipToString(UInt32 ipAddress);
+
+    std::string ipPortToString(UInt32 ipAddress, UInt16 port);
 }
 
 #endif

@@ -5,6 +5,7 @@ set(SOURCES
     UDTConnector.cpp
     UDTConnection.cpp
     UDTAcceptor.cpp
+    UDTSocket.cpp
     Logger.cpp
     Utils.cpp
 )

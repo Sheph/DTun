@@ -1,4 +1,5 @@
 #include "DTun/Utils.h"
+#include <sstream>
 #include <sys/stat.h>
 #include <string.h>
 #include <stdlib.h>
@@ -31,5 +32,32 @@ namespace DTun
         }
 
         return debuggerPresent;
+    }
+
+    std::string ipToString(UInt32 ipAddress)
+    {
+        ipAddress = ntohl(ipAddress);
+
+        std::ostringstream os;
+
+        for (int i = 0; i < 3; ++i)
+        {
+            os << ((ipAddress >> 24) & 0xFF) << ".";
+
+            ipAddress <<= 8;
+        }
+
+        os << ((ipAddress >> 24) & 0xFF);
+
+        return os.str();
+    }
+
+    std::string ipPortToString(UInt32 ipAddress, UInt16 port)
+    {
+        std::ostringstream os;
+
+        os << ipToString(ipAddress) << ":" << ntohs(port);
+
+        return os.str();
     }
 }

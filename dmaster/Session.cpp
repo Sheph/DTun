@@ -1,6 +1,7 @@
 #include "Session.h"
 #include "Logger.h"
 #include <boost/bind.hpp>
+#include <boost/make_shared.hpp>
 
 namespace DMaster
 {
@@ -25,11 +26,31 @@ namespace DMaster
 
     void Session::registerConnRequest(DTun::UInt32 connId, DTun::UInt32 dstNodeId)
     {
+        if (connRequests_.count(connId) > 0) {
+            LOG4CPLUS_ERROR(logger(), "connId " << connId << " already exists");
+            return;
+        }
+
+        connRequests_[connId] = dstNodeId;
     }
 
     void Session::setConnRequestErr(DTun::UInt32 connId,
         DTun::UInt32 errCode)
     {
+        ConnRequestMap::iterator it = connRequests_.find(connId);
+        if (it == connRequests_.end()) {
+            LOG4CPLUS_ERROR(logger(), "connId " << connId << " not found");
+            return;
+        }
+
+        connRequests_.erase(it);
+
+        DTun::DProtocolMsgConnErr msg;
+
+        msg.connId = connId;
+        msg.errCode = errCode;
+
+        sendMsg(DPROTOCOL_MSG_CONN_ERR, &msg, sizeof(msg));
     }
 
     void Session::setAllConnRequestsErr(DTun::UInt32 dstNodeId,
@@ -50,10 +71,21 @@ namespace DMaster
         DTun::UInt32 ip,
         DTun::UInt16 port)
     {
+        DTun::DProtocolMsgConn msg;
+
+        msg.srcNodeId = srcNodeId;
+        msg.srcNodeIp = srcNodeIp;
+        msg.srcNodePort= srcNodePort;
+        msg.connId = connId;
+        msg.ip = ip;
+        msg.port = port;
+
+        sendMsg(DPROTOCOL_MSG_CONN, &msg, sizeof(msg));
     }
 
-    void Session::onSend(int err)
+    void Session::onSend(int err, const boost::shared_ptr<std::vector<char> >& sndBuff)
     {
+        LOG4CPLUS_TRACE(logger(), "onSend(" << err << ")");
     }
 
     void Session::onRecvHeader(int err, int numBytes)
@@ -135,7 +167,18 @@ namespace DMaster
             return;
         }
 
+        DTun::DProtocolMsgHelloConn msg;
+        assert(numBytes == sizeof(msg));
+        memcpy(&msg, &buff_[0], numBytes);
+
+        type_ = TypeConnector;
+        nodeId_ = msg.srcNodeId;
+
         startRecvAny();
+
+        if (startConnectorCallback_) {
+            startConnectorCallback_(msg.dstNodeId, msg.connId, msg.remoteIp, msg.remotePort);
+        }
     }
 
     void Session::onRecvMsgHelloAcc(int err, int numBytes)
@@ -167,5 +210,21 @@ namespace DMaster
         conn_->read(&buff_[0], &buff_[0] + buff_.size(),
             boost::bind(&Session::onRecvAny, this, _1, _2),
             false);
+    }
+
+    void Session::sendMsg(DTun::UInt8 msgCode, const void* msg, int msgSize)
+    {
+        DTun::DProtocolHeader header;
+
+        header.msgCode = msgCode;
+
+        boost::shared_ptr<std::vector<char> > sndBuff =
+            boost::make_shared<std::vector<char> >(sizeof(header) + msgSize);
+
+        memcpy(&(*sndBuff)[0], &header, sizeof(header));
+        memcpy(&(*sndBuff)[0] + sizeof(header), msg, msgSize);
+
+        conn_->write(&(*sndBuff)[0], &(*sndBuff)[0] + sndBuff->size(),
+            boost::bind(&Session::onSend, this, _1, sndBuff));
     }
 }
