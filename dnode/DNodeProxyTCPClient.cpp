@@ -51,7 +51,6 @@ namespace DNode
             connId_ = theMasterClient->registerConnection(s, remoteIp, remotePort,
                 boost::bind(&ProxyTCPClient::onConnect, this, _1, _2, _3));
             if (!connId_) {
-                SYS_CLOSE_SOCKET(s);
                 return false;
             }
 

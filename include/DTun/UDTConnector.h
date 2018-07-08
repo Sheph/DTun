@@ -24,7 +24,7 @@ namespace DTun
 
     private:
         ConnectCallback callback_;
-        bool handedOut_;
+        bool noCloseSock_;
     };
 }
 

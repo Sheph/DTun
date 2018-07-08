@@ -10,7 +10,7 @@ namespace DTun
 {
     UDTConnector::UDTConnector(UDTReactor& reactor, UDTSOCKET sock)
     : UDTSocket(reactor, sock)
-    , handedOut_(false)
+    , noCloseSock_(false)
     {
         reactor.add(this);
     }
@@ -66,7 +66,7 @@ namespace DTun
     void UDTConnector::close()
     {
         UDTSOCKET s = reactor().remove(this);
-        if (!handedOut_ && (s != UDT::INVALID_SOCK)) {
+        if (!noCloseSock_ && (s != UDT::INVALID_SOCK)) {
             UDT::close(s);
         }
     }
@@ -87,7 +87,7 @@ namespace DTun
         reactor().update(this);
 
         int state = UDT::getsockstate(sock());
-        handedOut_ = true;
+        noCloseSock_ = true;
         cb((state == CONNECTED) ? 0 : CUDTException::ECONNFAIL);
     }
 }

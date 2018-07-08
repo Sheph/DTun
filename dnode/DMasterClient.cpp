@@ -35,7 +35,6 @@ namespace DNode
         os << port_;
 
         if (!connector_->connect(address_, os.str(), boost::bind(&DMasterClient::onConnect, this, _1))) {
-            UDT::close(sock);
             return false;
         }
 
@@ -50,6 +49,7 @@ namespace DNode
         boost::mutex::scoped_lock lock(m_);
 
         if (!conn_) {
+            SYS_CLOSE_SOCKET(s);
             return 0;
         }
 
@@ -76,7 +76,7 @@ namespace DNode
     {
         boost::mutex::scoped_lock lock(m_);
 
-        MasterSessionMap::iterator it = connMasterSessions_.find(connId);
+        ConnMasterSessionMap::iterator it = connMasterSessions_.find(connId);
         if (it == connMasterSessions_.end()) {
             return;
         }
@@ -191,6 +191,8 @@ namespace DNode
             << ", src_addr = " << DTun::ipPortToString(msg.srcNodeIp, msg.srcNodePort)
             << ", connId = " << msg.connId << ", remote_addr = " << DTun::ipPortToString(msg.ip, msg.port) << ")");
 
+        startAccMasterSession(msg.srcNodeId, msg.connId, msg.ip, msg.port, msg.srcNodeIp, msg.srcNodePort);
+
         buff_.resize(sizeof(DTun::DProtocolHeader));
         conn_->read(&buff_[0], &buff_[0] + buff_.size(),
             boost::bind(&DMasterClient::onRecvHeader, this, _1, _2),
@@ -201,7 +203,7 @@ namespace DNode
     {
         boost::mutex::scoped_lock lock(m_);
 
-        MasterSessionMap::iterator it = connMasterSessions_.find(connId);
+        ConnMasterSessionMap::iterator it = connMasterSessions_.find(connId);
         if (it == connMasterSessions_.end()) {
             return;
         }
@@ -220,5 +222,90 @@ namespace DNode
             tmp.sess.reset();
             tmp.callback(err, 0, 0);
         }
+    }
+
+    void DMasterClient::onAcceptConnection(int err, const boost::weak_ptr<DMasterSession>& sess,
+        DTun::UInt32 localIp,
+        DTun::UInt16 localPort,
+        DTun::UInt32 remoteIp,
+        DTun::UInt16 remotePort)
+    {
+        LOG4CPLUS_INFO(logger(), "onAcceptConnection(" << err << ")");
+
+        boost::shared_ptr<DMasterSession> sess_shared = sess.lock();
+        if (!sess_shared) {
+            return;
+        }
+
+        boost::mutex::scoped_lock lock(m_);
+
+        accMasterSessions_.erase(sess_shared);
+
+        if (!err) {
+            boost::shared_ptr<ProxySession> proxySess =
+                boost::make_shared<ProxySession>(boost::ref(udtReactor_), boost::ref(tcpReactor_));
+
+            if (proxySess->start(localIp, localPort, remoteIp, remotePort,
+                boost::bind(&DMasterClient::onProxyDone, this, boost::weak_ptr<ProxySession>(proxySess)))) {
+                proxySessions_.insert(proxySess);
+            }
+        }
+
+        lock.unlock();
+    }
+
+    void DMasterClient::onProxyDone(const boost::weak_ptr<ProxySession>& sess)
+    {
+        LOG4CPLUS_INFO(logger(), "onProxyDone()");
+
+        boost::shared_ptr<ProxySession> sess_shared = sess.lock();
+        if (!sess_shared) {
+            return;
+        }
+
+        boost::mutex::scoped_lock lock(m_);
+
+        proxySessions_.erase(sess_shared);
+
+        lock.unlock();
+    }
+
+    void DMasterClient::startAccMasterSession(DTun::UInt32 srcNodeId,
+        DTun::UInt32 srcConnId,
+        DTun::UInt32 localIp,
+        DTun::UInt16 localPort,
+        DTun::UInt32 remoteIp,
+        DTun::UInt16 remotePort)
+    {
+        SYSSOCKET s = ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+        if (s == SYS_INVALID_SOCKET) {
+            LOG4CPLUS_ERROR(logger(), "Cannot create UDP socket");
+            return;
+        }
+
+        struct sockaddr_in addr;
+
+        memset(&addr, 0, sizeof(addr));
+        addr.sin_family = AF_INET;
+        addr.sin_addr.s_addr = htonl(INADDR_ANY);
+
+        int res = ::bind(s, (const struct sockaddr*)&addr, sizeof(addr));
+
+        if (res == SYS_SOCKET_ERROR) {
+            LOG4CPLUS_ERROR(logger(), "Cannot bind UDP socket");
+            SYS_CLOSE_SOCKET(s);
+            return;
+        }
+
+        boost::shared_ptr<DMasterSession> sess =
+            boost::make_shared<DMasterSession>(boost::ref(udtReactor_), address_, port_);
+
+        if (!sess->startAcceptor(s, srcNodeId, srcConnId,
+            boost::bind(&DMasterClient::onAcceptConnection, this, _1, boost::weak_ptr<DMasterSession>(sess),
+                localIp, localPort, remoteIp, remotePort))) {
+            return;
+        }
+
+        accMasterSessions_.insert(sess);
     }
 }

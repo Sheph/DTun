@@ -52,6 +52,15 @@ namespace DTun
         return os.str();
     }
 
+    std::string portToString(UInt16 port)
+    {
+        std::ostringstream os;
+
+        os << ntohs(port);
+
+        return os.str();
+    }
+
     std::string ipPortToString(UInt32 ipAddress, UInt16 port)
     {
         std::ostringstream os;

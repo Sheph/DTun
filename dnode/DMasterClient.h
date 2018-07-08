@@ -8,6 +8,7 @@
 #include "DTun/UDTConnection.h"
 #include "DTun/TCPReactor.h"
 #include "DMasterSession.h"
+#include "ProxySession.h"
 
 namespace DNode
 {
@@ -21,6 +22,7 @@ namespace DNode
 
         bool start();
 
+        // 's' will be closed even in case of failure!
         DTun::UInt32 registerConnection(SYSSOCKET s,
             DTun::UInt32 remoteIp,
             DTun::UInt16 remotePort,
@@ -35,13 +37,28 @@ namespace DNode
             RegisterConnectionCallback callback;
         };
 
-        typedef std::map<DTun::UInt32, ConnMasterSession> MasterSessionMap;
+        typedef std::map<DTun::UInt32, ConnMasterSession> ConnMasterSessionMap;
+        typedef std::set<boost::shared_ptr<DMasterSession> > AccMasterSessions;
+        typedef std::set<boost::shared_ptr<ProxySession> > ProxySessions;
 
         void onConnect(int err);
         void onSend(int err);
         void onRecvHeader(int err, int numBytes);
         void onRecvMsgConn(int err, int numBytes);
         void onRegisterConnection(int err, DTun::UInt32 connId);
+        void onAcceptConnection(int err, const boost::weak_ptr<DMasterSession>& sess,
+            DTun::UInt32 localIp,
+            DTun::UInt16 localPort,
+            DTun::UInt32 remoteIp,
+            DTun::UInt16 remotePort);
+        void onProxyDone(const boost::weak_ptr<ProxySession>& sess);
+
+        void startAccMasterSession(DTun::UInt32 srcNodeId,
+            DTun::UInt32 srcConnId,
+            DTun::UInt32 localIp,
+            DTun::UInt16 localPort,
+            DTun::UInt32 remoteIp,
+            DTun::UInt16 remotePort);
 
         DTun::UDTReactor& udtReactor_;
         DTun::TCPReactor& tcpReactor_;
@@ -52,7 +69,9 @@ namespace DNode
         boost::mutex m_;
         DTun::UInt32 nextConnId_;
         std::vector<char> buff_;
-        MasterSessionMap connMasterSessions_;
+        ConnMasterSessionMap connMasterSessions_;
+        AccMasterSessions accMasterSessions_;
+        ProxySessions proxySessions_;
         boost::shared_ptr<DTun::UDTConnection> conn_;
         boost::shared_ptr<DTun::UDTConnector> connector_;
     };
