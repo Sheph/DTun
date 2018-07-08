@@ -23,7 +23,7 @@
 
 #define SYS_INVALID_SOCKET -1
 #define SYS_SOCKET_ERROR -1
-#define SYS_CLOSE_SOCKET(s) close(s)
+#define SYS_CLOSE_SOCKET(s) ::close(s)
 #endif
 
 namespace DTun

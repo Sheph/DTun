@@ -6,6 +6,10 @@ set(SOURCES
     UDTConnection.cpp
     UDTAcceptor.cpp
     UDTSocket.cpp
+    TCPReactor.cpp
+    TCPConnector.cpp
+    TCPConnection.cpp
+    TCPSocket.cpp
     Logger.cpp
     Utils.cpp
 )

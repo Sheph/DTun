@@ -2,6 +2,7 @@
 #include "Logger.h"
 #include "DTun/SignalBlocker.h"
 #include "DTun/UDTReactor.h"
+#include "DTun/TCPReactor.h"
 #include "DTun/Utils.h"
 #include <boost/thread.hpp>
 #include <boost/scoped_ptr.hpp>
@@ -11,6 +12,11 @@
 extern "C" int tun2socks_main(int argc, char **argv, int is_debugged);
 
 static void udtReactorThreadFn(DTun::UDTReactor& reactor)
+{
+    reactor.run();
+}
+
+static void tcpReactorThreadFn(DTun::TCPReactor& reactor)
 {
     reactor.run();
 }
@@ -43,7 +49,15 @@ int main(int argc, char* argv[])
             return 1;
         }
 
+        DTun::TCPReactor tcpReactor;
+
+        if (!tcpReactor.start()) {
+            UDT::cleanup();
+            return 1;
+        }
+
         boost::scoped_ptr<boost::thread> udtReactorThread;
+        boost::scoped_ptr<boost::thread> tcpReactorThread;
 
         {
             DNode::DMasterClient masterClient(udtReactor, "127.0.0.1", 2345, 1);
@@ -55,6 +69,8 @@ int main(int argc, char* argv[])
 
             udtReactorThread.reset(new boost::thread(
                 boost::bind(&udtReactorThreadFn, boost::ref(udtReactor))));
+            tcpReactorThread.reset(new boost::thread(
+                boost::bind(&tcpReactorThreadFn, boost::ref(tcpReactor))));
 
             LOG4CPLUS_INFO(DNode::logger(), "Started");
 
@@ -68,7 +84,9 @@ int main(int argc, char* argv[])
         }
 
         udtReactor.stop();
+        tcpReactor.stop();
         udtReactorThread->join();
+        tcpReactorThread->join();
     }
 
     UDT::cleanup();
