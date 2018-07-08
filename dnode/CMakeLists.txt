@@ -9,8 +9,6 @@ set(SOURCES
     DNodeDirectTCPClient.c
     DNodeProxyTCPClient.cpp
     ProxySession.cpp
-    ProxyLocalConnection.cpp
-    ProxyRemoteConnection.cpp
     base/DebugObject.c
     base/BLog.c
     base/BPending.c

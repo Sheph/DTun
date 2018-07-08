@@ -6,6 +6,7 @@
 #include "DTun/UDTReactor.h"
 #include "DTun/UDTConnector.h"
 #include "DTun/UDTConnection.h"
+#include "DTun/TCPReactor.h"
 #include "DMasterSession.h"
 
 namespace DNode
@@ -15,7 +16,7 @@ namespace DNode
     public:
         typedef boost::function<void (int, DTun::UInt32, DTun::UInt16)> RegisterConnectionCallback;
 
-        DMasterClient(DTun::UDTReactor& reactor, const std::string& address, int port, DTun::UInt32 nodeId);
+        DMasterClient(DTun::UDTReactor& udtReactor, DTun::TCPReactor& tcpReactor, const std::string& address, int port, DTun::UInt32 nodeId);
         ~DMasterClient();
 
         bool start();
@@ -42,7 +43,8 @@ namespace DNode
         void onRecvMsgConn(int err, int numBytes);
         void onRegisterConnection(int err, DTun::UInt32 connId);
 
-        DTun::UDTReactor& reactor_;
+        DTun::UDTReactor& udtReactor_;
+        DTun::TCPReactor& tcpReactor_;
         std::string address_;
         int port_;
         DTun::UInt32 nodeId_;

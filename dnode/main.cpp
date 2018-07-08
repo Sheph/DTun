@@ -60,7 +60,7 @@ int main(int argc, char* argv[])
         boost::scoped_ptr<boost::thread> tcpReactorThread;
 
         {
-            DNode::DMasterClient masterClient(udtReactor, "127.0.0.1", 2345, 1);
+            DNode::DMasterClient masterClient(udtReactor, tcpReactor, "127.0.0.1", 2345, 1);
 
             if (!masterClient.start()) {
                 UDT::cleanup();

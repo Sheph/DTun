@@ -7,8 +7,9 @@ namespace DNode
 {
     DMasterClient* theMasterClient = NULL;
 
-    DMasterClient::DMasterClient(DTun::UDTReactor& reactor, const std::string& address, int port, DTun::UInt32 nodeId)
-    : reactor_(reactor)
+    DMasterClient::DMasterClient(DTun::UDTReactor& udtReactor, DTun::TCPReactor& tcpReactor, const std::string& address, int port, DTun::UInt32 nodeId)
+    : udtReactor_(udtReactor)
+    , tcpReactor_(tcpReactor)
     , address_(address)
     , port_(port)
     , nodeId_(nodeId)
@@ -28,7 +29,7 @@ namespace DNode
             return false;
         }
 
-        connector_ = boost::make_shared<DTun::UDTConnector>(boost::ref(reactor_), sock);
+        connector_ = boost::make_shared<DTun::UDTConnector>(boost::ref(udtReactor_), sock);
 
         std::ostringstream os;
         os << port_;
@@ -53,7 +54,7 @@ namespace DNode
         }
 
         boost::shared_ptr<DMasterSession> sess =
-            boost::make_shared<DMasterSession>(boost::ref(reactor_), address_, port_);
+            boost::make_shared<DMasterSession>(boost::ref(udtReactor_), address_, port_);
 
         DTun::UInt32 connId = nextConnId_++;
         if (connId == 0) {
@@ -100,7 +101,7 @@ namespace DNode
         if (err) {
             UDT::close(sock);
         } else {
-            conn_ = boost::make_shared<DTun::UDTConnection>(boost::ref(reactor_), sock);
+            conn_ = boost::make_shared<DTun::UDTConnection>(boost::ref(udtReactor_), sock);
 
             DTun::DProtocolHeader header;
             DTun::DProtocolMsgHello msg;
