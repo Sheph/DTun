@@ -78,6 +78,7 @@ namespace DNode
         DTun::UInt32 nodeId_;
 
         boost::mutex m_;
+        bool closing_;
         DTun::UInt32 nextConnId_;
         std::vector<char> buff_;
         ConnMasterSessionMap connMasterSessions_;

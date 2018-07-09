@@ -75,6 +75,33 @@ namespace DNode
     void ProxySession::onLocalConnect(int err)
     {
         LOG4CPLUS_INFO(logger(), "ProxySession::onLocalConnect(" << err << ")");
+
+        SYSSOCKET sock = localConnector_->sock();
+        localConnector_->close();
+
+        boost::mutex::scoped_lock lock(m_);
+
+        if (done_ || err) {
+            DTun::closeSysSocketChecked(sock);
+        }
+
+        if (done_) {
+            return;
+        }
+
+        if (err) {
+            done_ = true;
+            lock.unlock();
+            callback_();
+            return;
+        }
+
+        localConn_ = boost::make_shared<DTun::TCPConnection>(boost::ref(tcpReactor_), sock);
+
+        if (remoteConn_ && !connected_) {
+            connected_ = true;
+            onBothConnected();
+        }
     }
 
     void ProxySession::onLocalSend(int err, int numBytes)
@@ -88,6 +115,33 @@ namespace DNode
     void ProxySession::onRemoteConnect(int err)
     {
         LOG4CPLUS_INFO(logger(), "ProxySession::onRemoteConnect(" << err << ")");
+
+        UDTSOCKET sock = remoteConnector_->sock();
+        remoteConnector_->close();
+
+        boost::mutex::scoped_lock lock(m_);
+
+        if (done_ || err) {
+            DTun::closeUDTSocketChecked(sock);
+        }
+
+        if (done_) {
+            return;
+        }
+
+        if (err) {
+            done_ = true;
+            lock.unlock();
+            callback_();
+            return;
+        }
+
+        remoteConn_ = boost::make_shared<DTun::UDTConnection>(boost::ref(udtReactor_), sock);
+
+        if (localConn_ && !connected_) {
+            connected_ = true;
+            onBothConnected();
+        }
     }
 
     void ProxySession::onRemoteSend(int err, int numBytes)
@@ -96,5 +150,10 @@ namespace DNode
 
     void ProxySession::onRemoteRecv(int err, int numBytes)
     {
+    }
+
+    void ProxySession::onBothConnected()
+    {
+        LOG4CPLUS_TRACE(logger(), "ProxySession::onBothConnected()");
     }
 }

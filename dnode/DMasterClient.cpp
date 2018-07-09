@@ -31,12 +31,15 @@ namespace DNode
     , address_(address)
     , port_(port)
     , nodeId_(nodeId)
+    , closing_(false)
     , nextConnId_(0)
     {
     }
 
     DMasterClient::~DMasterClient()
     {
+        boost::mutex::scoped_lock lock(m_);
+        closing_ = true;
     }
 
     bool DMasterClient::start()
@@ -66,7 +69,7 @@ namespace DNode
     {
         boost::mutex::scoped_lock lock(m_);
 
-        if (!conn_) {
+        if (!conn_ || closing_) {
             DTun::closeSysSocketChecked(s);
             return 0;
         }
@@ -93,6 +96,10 @@ namespace DNode
     void DMasterClient::cancelConnection(DTun::UInt32 connId)
     {
         boost::mutex::scoped_lock lock(m_);
+
+        if (closing_) {
+            return;
+        }
 
         ConnMasterSessionMap::iterator it = connMasterSessions_.find(connId);
         if (it == connMasterSessions_.end()) {
@@ -379,6 +386,10 @@ namespace DNode
         }
 
         boost::mutex::scoped_lock lock(m_);
+
+        if (closing_) {
+            return;
+        }
 
         proxySessions_.erase(sess_shared);
 
