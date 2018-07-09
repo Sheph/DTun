@@ -7,6 +7,24 @@ namespace DNode
 {
     DMasterClient* theMasterClient = NULL;
 
+    DMasterClient::SysSocketHolder::SysSocketHolder()
+    : sock(SYS_INVALID_SOCKET)
+    {
+    }
+
+    DMasterClient::SysSocketHolder::SysSocketHolder(SYSSOCKET sock)
+    : sock(sock)
+    {
+    }
+
+    DMasterClient::SysSocketHolder::~SysSocketHolder()
+    {
+        if (sock != SYS_INVALID_SOCKET) {
+            SYS_CLOSE_SOCKET(sock);
+            sock = SYS_INVALID_SOCKET;
+        }
+    }
+
     DMasterClient::DMasterClient(DTun::UDTReactor& udtReactor, DTun::TCPReactor& tcpReactor, const std::string& address, int port, DTun::UInt32 nodeId)
     : udtReactor_(udtReactor)
     , tcpReactor_(tcpReactor)
@@ -327,13 +345,22 @@ namespace DNode
 
         boost::mutex::scoped_lock lock(m_);
 
-        accMasterSessions_.erase(sess_shared);
+        AccMasterSessions::iterator it = accMasterSessions_.find(sess_shared);
+        if (it == accMasterSessions_.end()) {
+            assert(false);
+            return;
+        }
+
+        SYSSOCKET boundSock = it->second->sock;
+        it->second->sock = SYS_INVALID_SOCKET;
+
+        accMasterSessions_.erase(it);
 
         if (!err) {
             boost::shared_ptr<ProxySession> proxySess =
                 boost::make_shared<ProxySession>(boost::ref(udtReactor_), boost::ref(tcpReactor_));
 
-            if (proxySess->start(localIp, localPort, remoteIp, remotePort,
+            if (proxySess->start(boundSock, localIp, localPort, remoteIp, remotePort,
                 boost::bind(&DMasterClient::onProxyDone, this, boost::weak_ptr<ProxySession>(proxySess)))) {
                 proxySessions_.insert(proxySess);
             }
@@ -371,6 +398,13 @@ namespace DNode
             return;
         }
 
+        SYSSOCKET boundSock = dup(s);
+        if (boundSock == -1) {
+            LOG4CPLUS_ERROR(logger(), "Cannot dup UDP socket");
+            SYS_CLOSE_SOCKET(s);
+            return;
+        }
+
         struct sockaddr_in addr;
 
         memset(&addr, 0, sizeof(addr));
@@ -382,6 +416,7 @@ namespace DNode
         if (res == SYS_SOCKET_ERROR) {
             LOG4CPLUS_ERROR(logger(), "Cannot bind UDP socket");
             SYS_CLOSE_SOCKET(s);
+            SYS_CLOSE_SOCKET(boundSock);
             return;
         }
 
@@ -394,6 +429,6 @@ namespace DNode
             return;
         }
 
-        accMasterSessions_.insert(sess);
+        accMasterSessions_.insert(std::make_pair(sess, boost::make_shared<SysSocketHolder>(boundSock)));
     }
 }

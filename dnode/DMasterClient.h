@@ -37,8 +37,17 @@ namespace DNode
             RegisterConnectionCallback callback;
         };
 
+        struct SysSocketHolder : boost::noncopyable
+        {
+            SysSocketHolder();
+            explicit SysSocketHolder(SYSSOCKET sock);
+            ~SysSocketHolder();
+
+            SYSSOCKET sock;
+        };
+
         typedef std::map<DTun::UInt32, ConnMasterSession> ConnMasterSessionMap;
-        typedef std::set<boost::shared_ptr<DMasterSession> > AccMasterSessions;
+        typedef std::map<boost::shared_ptr<DMasterSession>, boost::shared_ptr<SysSocketHolder> > AccMasterSessions;
         typedef std::set<boost::shared_ptr<ProxySession> > ProxySessions;
 
         void onConnect(int err);

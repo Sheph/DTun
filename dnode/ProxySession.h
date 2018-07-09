@@ -20,7 +20,8 @@ namespace DNode
         ProxySession(DTun::UDTReactor& udtReactor, DTun::TCPReactor& tcpReactor);
         ~ProxySession();
 
-        bool start(DTun::UInt32 localIp, DTun::UInt16 localPort,
+        // 's' will be closed even in case of failure!
+        bool start(SYSSOCKET s, DTun::UInt32 localIp, DTun::UInt16 localPort,
             DTun::UInt32 remoteIp, DTun::UInt16 remotePort, const DoneCallback& callback);
 
     private:

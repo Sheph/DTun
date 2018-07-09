@@ -21,14 +21,22 @@ namespace DNode
     {
     }
 
-    bool ProxySession::start(DTun::UInt32 localIp, DTun::UInt16 localPort,
+    bool ProxySession::start(SYSSOCKET s, DTun::UInt32 localIp, DTun::UInt16 localPort,
         DTun::UInt32 remoteIp, DTun::UInt16 remotePort, const DoneCallback& callback)
     {
         boost::mutex::scoped_lock lock(m_);
 
-        UDPSOCKET remoteSock = UDT::socket(AF_INET, SOCK_STREAM, 0);
+        UDTSOCKET remoteSock = UDT::socket(AF_INET, SOCK_STREAM, 0);
         if (remoteSock == UDT::INVALID_SOCK) {
             LOG4CPLUS_ERROR(logger(), "Cannot create UDT socket: " << UDT::getlasterror().getErrorMessage());
+            SYS_CLOSE_SOCKET(s);
+            return false;
+        }
+
+        if (UDT::bind2(remoteSock, s) == UDT::ERROR) {
+            LOG4CPLUS_ERROR(logger(), "Cannot bind UDT socket: " << UDT::getlasterror().getErrorMessage());
+            UDT::close(remoteSock);
+            SYS_CLOSE_SOCKET(s);
             return false;
         }
 
