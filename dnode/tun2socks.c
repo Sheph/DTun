@@ -426,7 +426,9 @@ fail4:
     PacketPassInterface_Free(&device_read_interface);
     BTap_Free(&device);
 fail3:
-    BSignal_Finish();
+    if (!is_debugged) {
+        BSignal_Finish();
+    }
 fail2:
     BReactor_Free(&ss);
 fail1:

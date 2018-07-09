@@ -43,7 +43,7 @@ int main(int argc, char* argv[])
     bool isDebugged = DTun::isDebuggerPresent();
 
     {
-        DTun::SignalBlocker signalBlocker(!isDebugged);
+        DTun::SignalBlocker signalBlocker(true);
 
         UDT::startup();
 

@@ -98,6 +98,7 @@ namespace DTun
             ev.resize(pollSockets_.size() + 1);
 
             int numReady = ::epoll_wait(eid_, &ev[0], ev.size(), -1);
+            int epollErr = errno;
 
             {
                 boost::mutex::scoped_lock lock(m_);
@@ -106,6 +107,10 @@ namespace DTun
             }
 
             if (numReady <= 0) {
+                if (epollErr == EINTR) {
+                    // In order to satisfy gdb...
+                    continue;
+                }
                 LOG4CPLUS_ERROR(logger(), "epoll_wait error: " << strerror(errno));
                 break;
             }

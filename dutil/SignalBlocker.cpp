@@ -18,6 +18,7 @@ namespace DTun
         sigaddset(&signals, SIGUSR1);
         sigaddset(&signals, SIGUSR2);
         sigaddset(&signals, SIGPIPE);
+        sigaddset(&signals, SIGCHLD);
 
         int rc = ::pthread_sigmask(SIG_SETMASK, &signals, &oldMask_);
         assert(rc == 0);
