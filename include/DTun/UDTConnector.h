@@ -13,7 +13,7 @@ namespace DTun
         UDTConnector(UDTReactor& reactor, UDTSOCKET sock);
         ~UDTConnector();
 
-        bool connect(const std::string& address, const std::string& port, const ConnectCallback& callback);
+        bool connect(const std::string& address, const std::string& port, const ConnectCallback& callback, bool rendezvous = false);
 
         virtual void close();
 

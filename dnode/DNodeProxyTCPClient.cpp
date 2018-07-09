@@ -145,7 +145,7 @@ namespace DNode
             connector_ = boost::make_shared<DTun::UDTConnector>(boost::ref(*theUdtReactor), sock);
 
             if (!connector_->connect(DTun::ipToString(remoteIp), DTun::portToString(remotePort),
-                boost::bind(&ProxyTCPClient::onConnect, this, _1))) {
+                boost::bind(&ProxyTCPClient::onConnect, this, _1), true)) {
                 state_ = STATE_ERR;
                 signalReactor();
                 return;

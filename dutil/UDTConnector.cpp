@@ -20,7 +20,7 @@ namespace DTun
         close();
     }
 
-    bool UDTConnector::connect(const std::string& address, const std::string& port, const ConnectCallback& callback)
+    bool UDTConnector::connect(const std::string& address, const std::string& port, const ConnectCallback& callback, bool rendezvous)
     {
         bool optval = false;
         if (UDT::setsockopt(sock(), 0, UDT_RCVSYN, &optval, sizeof(optval)) == UDT::ERROR) {
@@ -31,6 +31,14 @@ namespace DTun
         if (UDT::setsockopt(sock(), 0, UDT_SNDSYN, &optval, sizeof(optval)) == UDT::ERROR) {
             LOG4CPLUS_ERROR(logger(), "Cannot setsockopt on UDT socket: " << UDT::getlasterror().getErrorMessage());
             return false;
+        }
+
+        if (rendezvous) {
+            optval = true;
+            if (UDT::setsockopt(sock(), 0, UDT_RENDEZVOUS, &optval, sizeof(optval)) == UDT::ERROR) {
+                LOG4CPLUS_ERROR(logger(), "Cannot set rendezvous mode on UDT socket: " << UDT::getlasterror().getErrorMessage());
+                return false;
+            }
         }
 
         addrinfo hints;

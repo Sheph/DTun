@@ -43,7 +43,7 @@ namespace DNode
         remoteConnector_ = boost::make_shared<DTun::UDTConnector>(boost::ref(udtReactor_), remoteSock);
 
         if (!remoteConnector_->connect(DTun::ipToString(remoteIp), DTun::portToString(remotePort),
-            boost::bind(&ProxySession::onRemoteConnect, this, _1))) {
+            boost::bind(&ProxySession::onRemoteConnect, this, _1), true)) {
             lock.unlock();
             remoteConnector_.reset();
             return false;
