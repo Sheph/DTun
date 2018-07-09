@@ -1,5 +1,6 @@
 #include "DTun/UDTAcceptor.h"
 #include "DTun/UDTReactor.h"
+#include "DTun/Utils.h"
 #include "Logger.h"
 
 namespace DTun
@@ -33,7 +34,7 @@ namespace DTun
     {
         UDTSOCKET s = reactor().remove(this);
         if (s != UDT::INVALID_SOCK) {
-            UDT::close(s);
+            DTun::closeUDTSocketChecked(s);
         }
     }
 
@@ -57,13 +58,13 @@ namespace DTun
         bool optval = false;
         if (UDT::setsockopt(client, 0, UDT_RCVSYN, &optval, sizeof(optval)) == UDT::ERROR) {
             LOG4CPLUS_ERROR(logger(), "Cannot setsockopt on UDT socket: " << UDT::getlasterror().getErrorMessage());
-            UDT::close(client);
+            DTun::closeUDTSocketChecked(client);
             return;
         }
 
         if (UDT::setsockopt(client, 0, UDT_SNDSYN, &optval, sizeof(optval)) == UDT::ERROR) {
             LOG4CPLUS_ERROR(logger(), "Cannot setsockopt on UDT socket: " << UDT::getlasterror().getErrorMessage());
-            UDT::close(client);
+            DTun::closeUDTSocketChecked(client);
             return;
         }
 

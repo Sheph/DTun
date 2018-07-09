@@ -1,5 +1,6 @@
 #include "DTun/UDTConnection.h"
 #include "DTun/UDTReactor.h"
+#include "DTun/Utils.h"
 #include "Logger.h"
 #include <unistd.h>
 #include <cstdlib>
@@ -57,7 +58,7 @@ namespace DTun
     {
         UDTSOCKET s = reactor().remove(this);
         if (s != UDT::INVALID_SOCK) {
-            UDT::close(s);
+            DTun::closeUDTSocketChecked(s);
         }
     }
 

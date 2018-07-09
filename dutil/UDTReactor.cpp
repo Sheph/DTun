@@ -1,4 +1,5 @@
 #include "DTun/UDTReactor.h"
+#include "DTun/Utils.h"
 #include "Logger.h"
 
 namespace DTun
@@ -102,7 +103,7 @@ namespace DTun
             return false;
         }
 
-        UDT::close(signalRdSock_);
+        DTun::closeUDTSocketChecked(signalRdSock_);
         signalRdSock_ = client;
 
         std::set<UDTSOCKET> readfds, writefds;
@@ -344,11 +345,11 @@ namespace DTun
         }
         stopping_ = false;
         if (signalWrSock_ != UDT::INVALID_SOCK) {
-            UDT::close(signalWrSock_);
+            DTun::closeUDTSocketChecked(signalWrSock_);
             signalWrSock_ = UDT::INVALID_SOCK;
         }
         if (signalRdSock_ != UDT::INVALID_SOCK) {
-            UDT::close(signalRdSock_);
+            DTun::closeUDTSocketChecked(signalRdSock_);
             signalRdSock_ = UDT::INVALID_SOCK;
         }
     }

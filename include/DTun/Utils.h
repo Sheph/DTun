@@ -2,6 +2,7 @@
 #define _DTUN_UTILS_H_
 
 #include "DTun/Types.h"
+#include "udt.h"
 
 namespace DTun
 {
@@ -12,6 +13,9 @@ namespace DTun
     std::string portToString(UInt16 port);
 
     std::string ipPortToString(UInt32 ipAddress, UInt16 port);
+
+    void closeSysSocketChecked(SYSSOCKET sock);
+    void closeUDTSocketChecked(UDTSOCKET sock);
 }
 
 #endif

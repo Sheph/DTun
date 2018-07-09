@@ -54,7 +54,7 @@ namespace DMaster
         if (UDT::bind(serverSocket, res->ai_addr, res->ai_addrlen) == UDT::ERROR) {
             LOG4CPLUS_ERROR(logger(), "Cannot bind UDT socket: " << UDT::getlasterror().getErrorMessage());
             freeaddrinfo(res);
-            UDT::close(serverSocket);
+            DTun::closeUDTSocketChecked(serverSocket);
             return false;
         }
 
@@ -63,7 +63,7 @@ namespace DMaster
         acceptor_ = boost::make_shared<DTun::UDTAcceptor>(boost::ref(reactor_), serverSocket);
 
         if (!acceptor_->listen(10, boost::bind(&Server::onAccept, this, _1))) {
-           UDT::close(serverSocket);
+           DTun::closeUDTSocketChecked(serverSocket);
            acceptor_.reset();
            return false;
         }

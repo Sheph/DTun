@@ -1,5 +1,6 @@
 #include "DTun/TCPConnection.h"
 #include "DTun/TCPReactor.h"
+#include "DTun/Utils.h"
 #include "Logger.h"
 #include <unistd.h>
 #include <cstdlib>
@@ -56,7 +57,7 @@ namespace DTun
     {
         SYSSOCKET s = reactor().remove(this);
         if (s != SYS_INVALID_SOCKET) {
-            SYS_CLOSE_SOCKET(s);
+            DTun::closeSysSocketChecked(s);
         }
     }
 

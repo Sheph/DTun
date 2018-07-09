@@ -20,7 +20,7 @@ namespace DNode
     DMasterClient::SysSocketHolder::~SysSocketHolder()
     {
         if (sock != SYS_INVALID_SOCKET) {
-            SYS_CLOSE_SOCKET(sock);
+            DTun::closeSysSocketChecked(sock);
             sock = SYS_INVALID_SOCKET;
         }
     }
@@ -67,7 +67,7 @@ namespace DNode
         boost::mutex::scoped_lock lock(m_);
 
         if (!conn_) {
-            SYS_CLOSE_SOCKET(s);
+            DTun::closeSysSocketChecked(s);
             return 0;
         }
 
@@ -117,7 +117,7 @@ namespace DNode
         connector_->close();
 
         if (err) {
-            UDT::close(sock);
+            DTun::closeUDTSocketChecked(sock);
         } else {
             conn_ = boost::make_shared<DTun::UDTConnection>(boost::ref(udtReactor_), sock);
 
@@ -401,7 +401,7 @@ namespace DNode
         SYSSOCKET boundSock = dup(s);
         if (boundSock == -1) {
             LOG4CPLUS_ERROR(logger(), "Cannot dup UDP socket");
-            SYS_CLOSE_SOCKET(s);
+            DTun::closeSysSocketChecked(s);
             return;
         }
 
@@ -415,8 +415,8 @@ namespace DNode
 
         if (res == SYS_SOCKET_ERROR) {
             LOG4CPLUS_ERROR(logger(), "Cannot bind UDP socket");
-            SYS_CLOSE_SOCKET(s);
-            SYS_CLOSE_SOCKET(boundSock);
+            DTun::closeSysSocketChecked(s);
+            DTun::closeSysSocketChecked(boundSock);
             return;
         }
 

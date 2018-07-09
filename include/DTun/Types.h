@@ -9,7 +9,6 @@
 #include <errno.h>
 #define SYS_INVALID_SOCKET INVALID_SOCKET
 #define SYS_SOCKET_ERROR SOCKET_ERROR
-#define SYS_CLOSE_SOCKET(s) closesocket(s)
 #else
 #include <unistd.h>
 #include <errno.h>
@@ -23,7 +22,6 @@
 
 #define SYS_INVALID_SOCKET -1
 #define SYS_SOCKET_ERROR -1
-#define SYS_CLOSE_SOCKET(s) ::close(s)
 #endif
 
 namespace DTun

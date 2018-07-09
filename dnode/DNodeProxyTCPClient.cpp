@@ -51,7 +51,7 @@ namespace DNode
             }
 
             if (boundSock_ != SYS_INVALID_SOCKET) {
-                SYS_CLOSE_SOCKET(boundSock_);
+                DTun::closeSysSocketChecked(boundSock_);
                 boundSock_ = SYS_INVALID_SOCKET;
             }
         }
@@ -67,7 +67,7 @@ namespace DNode
             SYSSOCKET boundSock = dup(s);
             if (boundSock == -1) {
                 LOG4CPLUS_ERROR(logger(), "Cannot dup UDP socket");
-                SYS_CLOSE_SOCKET(s);
+                DTun::closeSysSocketChecked(s);
                 return false;
             }
 
@@ -81,8 +81,8 @@ namespace DNode
 
             if (res == SYS_SOCKET_ERROR) {
                 LOG4CPLUS_ERROR(logger(), "Cannot bind UDP socket");
-                SYS_CLOSE_SOCKET(s);
-                SYS_CLOSE_SOCKET(boundSock);
+                DTun::closeSysSocketChecked(s);
+                DTun::closeSysSocketChecked(boundSock);
                 return false;
             }
 
@@ -91,7 +91,7 @@ namespace DNode
             connId_ = theMasterClient->registerConnection(s, remoteIp, remotePort,
                 boost::bind(&ProxyTCPClient::onConnectionRegister, this, _1, _2, _3));
             if (!connId_) {
-                SYS_CLOSE_SOCKET(boundSock);
+                DTun::closeSysSocketChecked(boundSock);
                 return false;
             }
 
@@ -134,7 +134,7 @@ namespace DNode
 
             if (UDT::bind2(sock, boundSock_) == UDT::ERROR) {
                 LOG4CPLUS_ERROR(logger(), "Cannot bind UDT socket: " << UDT::getlasterror().getErrorMessage());
-                UDT::close(sock);
+                DTun::closeUDTSocketChecked(sock);
                 state_ = STATE_ERR;
                 signalReactor();
                 return;
@@ -165,7 +165,7 @@ namespace DNode
 
             connector_->close();
 
-            UDT::close(sock);
+            DTun::closeUDTSocketChecked(sock);
         }
 
         void signalReactor()

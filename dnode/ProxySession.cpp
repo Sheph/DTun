@@ -29,14 +29,14 @@ namespace DNode
         UDTSOCKET remoteSock = UDT::socket(AF_INET, SOCK_STREAM, 0);
         if (remoteSock == UDT::INVALID_SOCK) {
             LOG4CPLUS_ERROR(logger(), "Cannot create UDT socket: " << UDT::getlasterror().getErrorMessage());
-            SYS_CLOSE_SOCKET(s);
+            DTun::closeSysSocketChecked(s);
             return false;
         }
 
         if (UDT::bind2(remoteSock, s) == UDT::ERROR) {
             LOG4CPLUS_ERROR(logger(), "Cannot bind UDT socket: " << UDT::getlasterror().getErrorMessage());
-            UDT::close(remoteSock);
-            SYS_CLOSE_SOCKET(s);
+            DTun::closeUDTSocketChecked(remoteSock);
+            DTun::closeSysSocketChecked(s);
             return false;
         }
 

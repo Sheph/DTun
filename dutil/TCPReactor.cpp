@@ -1,4 +1,5 @@
 #include "DTun/TCPReactor.h"
+#include "DTun/Utils.h"
 #include "Logger.h"
 #include <sys/epoll.h>
 
@@ -250,11 +251,11 @@ namespace DTun
         }
         stopping_ = false;
         if (signalWrSock_ != SYS_INVALID_SOCKET) {
-            SYS_CLOSE_SOCKET(signalWrSock_);
+            DTun::closeSysSocketChecked(signalWrSock_);
             signalWrSock_ = SYS_INVALID_SOCKET;
         }
         if (signalRdSock_ != SYS_INVALID_SOCKET) {
-            SYS_CLOSE_SOCKET(signalRdSock_);
+            DTun::closeSysSocketChecked(signalRdSock_);
             signalRdSock_ = SYS_INVALID_SOCKET;
         }
     }

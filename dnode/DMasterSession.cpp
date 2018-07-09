@@ -1,5 +1,6 @@
 #include "DMasterSession.h"
 #include "Logger.h"
+#include "DTun/Utils.h"
 #include <boost/make_shared.hpp>
 #include <boost/bind.hpp>
 
@@ -65,14 +66,14 @@ namespace DNode
         UDPSOCKET sock = UDT::socket(AF_INET, SOCK_STREAM, 0);
         if (sock == UDT::INVALID_SOCK) {
             LOG4CPLUS_ERROR(logger(), "Cannot create UDT socket: " << UDT::getlasterror().getErrorMessage());
-            SYS_CLOSE_SOCKET(s);
+            DTun::closeSysSocketChecked(s);
             return false;
         }
 
         if (UDT::bind2(sock, s) == UDT::ERROR) {
             LOG4CPLUS_ERROR(logger(), "Cannot bind UDT socket: " << UDT::getlasterror().getErrorMessage());
-            UDT::close(sock);
-            SYS_CLOSE_SOCKET(s);
+            DTun::closeUDTSocketChecked(sock);
+            DTun::closeSysSocketChecked(s);
             return false;
         }
 
@@ -99,7 +100,7 @@ namespace DNode
         connector_->close();
 
         if (err) {
-            UDT::close(sock);
+            DTun::closeUDTSocketChecked(sock);
             callback_(err);
         } else {
             conn_ = boost::make_shared<DTun::UDTConnection>(boost::ref(reactor_), sock);
