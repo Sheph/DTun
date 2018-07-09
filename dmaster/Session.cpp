@@ -10,6 +10,13 @@ namespace DMaster
     , nodeId_(0)
     , conn_(conn)
     {
+        // Another UDT crap, if we do this later after receiving
+        // HELLO we might run into situation when UDT library implicitly closes
+        // our socket and doesn't allow us to query for peer address...
+        if (!conn->getPeerName(peerIp_, peerPort_)) {
+            peerIp_ = 0;
+            peerPort_ = 0;
+        }
     }
 
     Session::~Session()

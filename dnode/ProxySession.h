@@ -61,6 +61,7 @@ namespace DNode
 
         bool connected_;
         bool done_;
+        bool localShutdown_;
 
         boost::shared_ptr<DTun::TCPConnection> localConn_;
         boost::shared_ptr<DTun::UDTConnection> remoteConn_;

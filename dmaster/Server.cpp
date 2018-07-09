@@ -144,15 +144,13 @@ namespace DMaster
             return;
         }
 
-        DTun::UInt32 srcIp = 0;
-        DTun::UInt16 srcPort = 0;
-
-        if (!sess_shared->conn()->getPeerName(srcIp, srcPort)) {
+        if (sess_shared->peerIp() == 0) {
             srcSess->setConnRequestErr(connId, DPROTOCOL_ERR_UNKNOWN);
             return;
         }
 
-        dstSess->sendConnRequest(sess_shared->nodeId(), srcIp, srcPort, connId, remoteIp, remotePort);
+        dstSess->sendConnRequest(sess_shared->nodeId(), sess_shared->peerIp(), sess_shared->peerPort(),
+            connId, remoteIp, remotePort);
     }
 
     void Server::onSessionStartAcceptor(const boost::weak_ptr<Session>& sess, DTun::UInt32 srcNodeId, DTun::UInt32 connId)
@@ -171,15 +169,12 @@ namespace DMaster
             return;
         }
 
-        DTun::UInt32 dstIp = 0;
-        DTun::UInt16 dstPort = 0;
-
-        if (!sess_shared->conn()->getPeerName(dstIp, dstPort)) {
+        if (sess_shared->peerIp() == 0) {
             srcSess->setConnRequestErr(connId, DPROTOCOL_ERR_UNKNOWN);
             return;
         }
 
-        srcSess->setConnRequestOk(connId, dstIp, dstPort);
+        srcSess->setConnRequestOk(connId, sess_shared->peerIp(), sess_shared->peerPort());
     }
 
     void Server::onSessionError(const boost::weak_ptr<Session>& sess, int errCode)

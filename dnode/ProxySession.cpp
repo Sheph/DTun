@@ -14,6 +14,7 @@ namespace DNode
     , remoteSndBuffBytes_(0)
     , connected_(false)
     , done_(false)
+    , localShutdown_(false)
     {
     }
 
@@ -153,6 +154,8 @@ namespace DNode
         if (numBytes > 0) {
             sendRemote(numBytes);
             recvLocal();
+        } else {
+            localShutdown_ = true;
         }
     }
 
@@ -213,7 +216,15 @@ namespace DNode
 
         remoteSndBuffBytes_ -= numBytes;
 
-        if (fireRecv) {
+        if ((remoteSndBuffBytes_ <= 0) && localShutdown_) {
+            assert(remoteSndBuffBytes_ == 0);
+            done_ = true;
+            lock.unlock();
+            callback_();
+            return;
+        }
+
+        if (fireRecv && !localShutdown_) {
             recvLocal();
         }
     }

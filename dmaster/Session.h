@@ -32,11 +32,12 @@ namespace DMaster
         inline void setStartAcceptorCallback(const StartAcceptorCallback& cb) { startAcceptorCallback_ = cb; }
         inline void setErrorCallback(const ErrorCallback& cb) { errorCallback_ = cb; }
 
-        inline const boost::shared_ptr<DTun::UDTConnection>& conn() const { return conn_; }
-
         inline Type type() const { return type_; }
 
         inline DTun::UInt32 nodeId() const { return nodeId_; }
+
+        inline DTun::UInt32 peerIp() const { return peerIp_; }
+        inline DTun::UInt16 peerPort() const { return peerPort_; }
 
         void start();
 
@@ -83,6 +84,9 @@ namespace DMaster
 
         ConnRequestMap connRequests_;
         std::vector<char> buff_;
+
+        DTun::UInt32 peerIp_;
+        DTun::UInt16 peerPort_;
 
         boost::shared_ptr<DTun::UDTConnection> conn_;
     };
