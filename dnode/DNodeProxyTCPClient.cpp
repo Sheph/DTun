@@ -22,6 +22,10 @@ namespace DNode
         explicit ProxyTCPClient(BThreadSignal* reactorSignal)
         : reactorSignal_(reactorSignal)
         , state_(STATE_CONNECTING)
+        , sending_(0)
+        , receiving_(0)
+        , bytesSent_(0)
+        , bytesReceived_(0)
         , connId_(0)
         , boundSock_(SYS_INVALID_SOCKET)
         {
@@ -106,6 +110,44 @@ namespace DNode
             return state_;
         }
 
+        void send(const uint8_t* data, int dataLen)
+        {
+            boost::mutex::scoped_lock lock(m_);
+            assert(conn_);
+            assert(!sending_);
+
+            sending_ = 1;
+
+            conn_->write((const char*)data, (const char*)(data + dataLen),
+                boost::bind(&ProxyTCPClient::onSend, this, _1, dataLen));
+        }
+
+        bool isSending(int& bytesSent) const
+        {
+            boost::mutex::scoped_lock lock(m_);
+            bytesSent = bytesSent_;
+            return sending_;
+        }
+
+        void receive(uint8_t* data, int dataAvail)
+        {
+            boost::mutex::scoped_lock lock(m_);
+            assert(conn_);
+            assert(!receiving_);
+
+            receiving_ = 1;
+
+            conn_->read((char*)data, (char*)(data + dataAvail),
+                boost::bind(&ProxyTCPClient::onRecv, this, _1, _2), false);
+        }
+
+        bool isReceiving(int& bytesReceived) const
+        {
+            boost::mutex::scoped_lock lock(m_);
+            bytesReceived = bytesReceived_;
+            return receiving_;
+        }
+
     private:
         void onConnectionRegister(int err, DTun::UInt32 remoteIp, DTun::UInt16 remotePort)
         {
@@ -165,7 +207,47 @@ namespace DNode
 
             connector_->close();
 
-            DTun::closeUDTSocketChecked(sock);
+            if (err) {
+                DTun::closeUDTSocketChecked(sock);
+                state_ = STATE_ERR;
+            } else {
+                state_ = STATE_UP;
+                conn_ = boost::make_shared<DTun::UDTConnection>(boost::ref(*theUdtReactor), sock);
+            }
+
+            signalReactor();
+        }
+
+        void onSend(int err, int numBytes)
+        {
+            LOG4CPLUS_TRACE(logger(), "ProxyTCPClient::onSend(" << err << ", " << numBytes << ")");
+
+            boost::mutex::scoped_lock lock(m_);
+
+            sending_ = 0;
+            bytesSent_ = numBytes;
+
+            if (err) {
+                state_ = STATE_ERR;
+            }
+
+            signalReactor();
+        }
+
+        void onRecv(int err, int numBytes)
+        {
+            LOG4CPLUS_TRACE(logger(), "ProxyTCPClient::onRecv(" << err << ", " << numBytes << ")");
+
+            boost::mutex::scoped_lock lock(m_);
+
+            receiving_ = 0;
+            bytesReceived_ = numBytes;
+
+            if (err) {
+                state_ = STATE_ERR;
+            }
+
+            signalReactor();
         }
 
         void signalReactor()
@@ -181,6 +263,10 @@ namespace DNode
         mutable boost::mutex m_;
         BThreadSignal* reactorSignal_;
         int state_;
+        int sending_;
+        int receiving_;
+        int bytesSent_;
+        int bytesReceived_;
         DTun::UInt32 connId_;
         SYSSOCKET boundSock_;
         boost::shared_ptr<DTun::UDTConnection> conn_;
@@ -190,40 +276,92 @@ namespace DNode
 
 typedef struct {
     struct DNodeTCPClient base;
-    BThreadSignal reactorSignal;
+    BThreadSignal reactor_signal;
     int state;
+    int was_connected;
+    int sending;
+    int receiving;
+    int bytes_sent;
+    int bytes_received;
     DNode::ProxyTCPClient* client;
+    StreamPassInterface send_iface;
+    StreamRecvInterface recv_iface;
 } DNodeProxyTCPClient;
 
 extern "C" StreamPassInterface* DNodeProxyTCPClient_GetSendInterface(struct DNodeTCPClient* dtcp_client_)
 {
     DNodeProxyTCPClient* dtcp_client = (DNodeProxyTCPClient*)dtcp_client_;
 
-    return NULL;
+    ASSERT(dtcp_client->state == STATE_UP)
+
+    return &dtcp_client->send_iface;
 }
 
 extern "C" StreamRecvInterface* DNodeProxyTCPClient_GetRecvInterface(struct DNodeTCPClient* dtcp_client_)
 {
     DNodeProxyTCPClient* dtcp_client = (DNodeProxyTCPClient*)dtcp_client_;
 
-    return NULL;
+    ASSERT(dtcp_client->state == STATE_UP)
+
+    return &dtcp_client->recv_iface;
 }
 
-extern "C" void DNodeProxyTCPClient_SignalHandler(BThreadSignal* reactorSignal)
+extern "C" void DNodeProxyTCPClient_RecvHandler(DNodeProxyTCPClient* dtcp_client, uint8_t* data, int data_avail)
 {
-    DNodeProxyTCPClient* dtcp_client = UPPER_OBJECT(reactorSignal, DNodeProxyTCPClient, reactorSignal);
+    LOG4CPLUS_TRACE(DNode::logger(), "ProxyTCPClient_RecvHandler(" << data_avail << ")");
 
-    LOG4CPLUS_TRACE(DNode::logger(), "wakeup");
+    ASSERT(!dtcp_client->receiving)
+
+    dtcp_client->receiving = 1;
+    dtcp_client->client->receive(data, data_avail);
+}
+
+extern "C" void DNodeProxyTCPClient_SendHandler(DNodeProxyTCPClient* dtcp_client, uint8_t* data, int data_len)
+{
+    LOG4CPLUS_TRACE(DNode::logger(), "ProxyTCPClient_SendHandler(" << data_len << ")");
+
+    ASSERT(!dtcp_client->sending)
+
+    dtcp_client->sending = 1;
+    dtcp_client->client->send(data, data_len);
+}
+
+extern "C" void DNodeProxyTCPClient_SignalHandler(BThreadSignal* reactor_signal)
+{
+    DNodeProxyTCPClient* dtcp_client = UPPER_OBJECT(reactor_signal, DNodeProxyTCPClient, reactor_signal);
+
+    LOG4CPLUS_TRACE(DNode::logger(), "ProxyTCPClient_SignalHandler");
 
     int new_state = dtcp_client->client->getState();
 
     if (dtcp_client->state != new_state) {
         dtcp_client->state = new_state;
         if (dtcp_client->state == STATE_UP) {
+            dtcp_client->was_connected = 1;
+            StreamPassInterface_Init(&dtcp_client->send_iface,
+                (StreamPassInterface_handler_send)DNodeProxyTCPClient_SendHandler, dtcp_client,
+                BReactor_PendingGroup(reactor_signal->reactor));
+            StreamRecvInterface_Init(&dtcp_client->recv_iface,
+                (StreamRecvInterface_handler_recv)DNodeProxyTCPClient_RecvHandler, dtcp_client,
+                BReactor_PendingGroup(reactor_signal->reactor));
             dtcp_client->base.handler(dtcp_client->base.handler_data, DNODE_TCPCLIENT_EVENT_UP);
         } else if (dtcp_client->state == STATE_ERR) {
             dtcp_client->base.handler(dtcp_client->base.handler_data, DNODE_TCPCLIENT_EVENT_ERROR);
         }
+    }
+
+    if (new_state != STATE_UP) {
+        return;
+    }
+
+    int bytes = 0;
+    if (dtcp_client->receiving && !dtcp_client->client->isReceiving(bytes)) {
+        dtcp_client->receiving = 0;
+        StreamRecvInterface_Done(&dtcp_client->recv_iface, bytes);
+    }
+    if (dtcp_client->sending && !dtcp_client->client->isSending(bytes)) {
+        dtcp_client->sending = 0;
+        StreamPassInterface_Done(&dtcp_client->send_iface, bytes);
     }
 }
 
@@ -231,9 +369,14 @@ extern "C" void DNodeProxyTCPClient_Destroy(struct DNodeTCPClient* dtcp_client_)
 {
     DNodeProxyTCPClient* dtcp_client = (DNodeProxyTCPClient*)dtcp_client_;
 
+    if (dtcp_client->was_connected) {
+        StreamPassInterface_Free(&dtcp_client->send_iface);
+        StreamRecvInterface_Free(&dtcp_client->recv_iface);
+    }
+
     delete dtcp_client->client;
 
-    BThreadSignal_Free(&dtcp_client->reactorSignal);
+    BThreadSignal_Free(&dtcp_client->reactor_signal);
 
     free(dtcp_client);
 }
@@ -256,19 +399,24 @@ extern "C" struct DNodeTCPClient* DNodeProxyTCPClient_Create(BAddr dest_addr, DN
     dtcp_client->base.handler = handler;
     dtcp_client->base.handler_data = handler_data;
 
-    if (!BThreadSignal_Init(&dtcp_client->reactorSignal, reactor, DNodeProxyTCPClient_SignalHandler)) {
+    if (!BThreadSignal_Init(&dtcp_client->reactor_signal, reactor, DNodeProxyTCPClient_SignalHandler)) {
         LOG4CPLUS_ERROR(DNode::logger(), "BThreadSignal_Init");
         free(dtcp_client);
         return NULL;
     }
 
     dtcp_client->state = STATE_CONNECTING;
+    dtcp_client->was_connected = 0;
+    dtcp_client->sending = 0;
+    dtcp_client->receiving = 0;
+    dtcp_client->bytes_sent = 0;
+    dtcp_client->bytes_received = 0;
 
-    dtcp_client->client = new DNode::ProxyTCPClient(&dtcp_client->reactorSignal);
+    dtcp_client->client = new DNode::ProxyTCPClient(&dtcp_client->reactor_signal);
 
     if (!dtcp_client->client->start(dest_addr.ipv4.ip, dest_addr.ipv4.port)) {
         delete dtcp_client->client;
-        BThreadSignal_Free(&dtcp_client->reactorSignal);
+        BThreadSignal_Free(&dtcp_client->reactor_signal);
         free(dtcp_client);
         return NULL;
     }
