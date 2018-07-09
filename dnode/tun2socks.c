@@ -664,8 +664,8 @@ int parse_arguments (int argc, char *argv[])
             options.udpgw_transparent_dns = 1;
         }
         else {
-            fprintf(stderr, "unknown option: %s\n", arg);
-            return 0;
+            //fprintf(stderr, "unknown option: %s\n", arg);
+            //return 0;
         }
     }
 
