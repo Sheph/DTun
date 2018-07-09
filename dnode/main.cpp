@@ -21,6 +21,11 @@ static void tcpReactorThreadFn(DTun::TCPReactor& reactor)
     reactor.run();
 }
 
+namespace DNode
+{
+    DTun::UDTReactor* theUdtReactor = NULL;
+}
+
 int main(int argc, char* argv[])
 {
     log4cplus::helpers::Properties props;
@@ -77,10 +82,12 @@ int main(int argc, char* argv[])
             signalBlocker.unblock();
 
             DNode::theMasterClient = &masterClient;
+            DNode::theUdtReactor = &udtReactor;
 
             res = tun2socks_main(argc, argv, isDebugged);
 
             DNode::theMasterClient = NULL;
+            DNode::theUdtReactor = NULL;
         }
 
         udtReactor.stop();

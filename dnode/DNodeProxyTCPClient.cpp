@@ -6,6 +6,7 @@ extern "C" {
 #include "DMasterClient.h"
 #include "Logger.h"
 #include "DTun/Utils.h"
+#include <boost/make_shared.hpp>
 
 #define STATE_CONNECTING 1
 #define STATE_UP 2
@@ -13,6 +14,8 @@ extern "C" {
 
 namespace DNode
 {
+    extern DTun::UDTReactor* theUdtReactor;
+
     class ProxyTCPClient : boost::noncopyable
     {
     public:
@@ -64,7 +67,7 @@ namespace DNode
             boost::mutex::scoped_lock lock(m_);
 
             connId_ = theMasterClient->registerConnection(s, remoteIp, remotePort,
-                boost::bind(&ProxyTCPClient::onConnect, this, _1, _2, _3));
+                boost::bind(&ProxyTCPClient::onConnectionRegister, this, _1, _2, _3));
             if (!connId_) {
                 return false;
             }
@@ -79,9 +82,9 @@ namespace DNode
         }
 
     private:
-        void onConnect(int err, DTun::UInt32 remoteIp, DTun::UInt16 remotePort)
+        void onConnectionRegister(int err, DTun::UInt32 remoteIp, DTun::UInt16 remotePort)
         {
-            LOG4CPLUS_INFO(logger(), "onConnect(" << err << ", " << DTun::ipPortToString(remoteIp, remotePort) << ")");
+            LOG4CPLUS_INFO(logger(), "onConnectionRegister(" << err << ", " << DTun::ipPortToString(remoteIp, remotePort) << ")");
 
             boost::mutex::scoped_lock lock(m_);
             if (!reactorSignal_) {
@@ -95,6 +98,39 @@ namespace DNode
                 signalReactor();
                 return;
             }
+
+            UDPSOCKET sock = UDT::socket(AF_INET, SOCK_STREAM, 0);
+            if (sock == UDT::INVALID_SOCK) {
+                LOG4CPLUS_ERROR(logger(), "Cannot create UDT socket: " << UDT::getlasterror().getErrorMessage());
+                state_ = STATE_ERR;
+                signalReactor();
+                return;
+            }
+
+            connector_ = boost::make_shared<DTun::UDTConnector>(boost::ref(*theUdtReactor), sock);
+
+            if (!connector_->connect(DTun::ipToString(remoteIp), DTun::portToString(remotePort),
+                boost::bind(&ProxyTCPClient::onConnect, this, _1))) {
+                state_ = STATE_ERR;
+                signalReactor();
+                return;
+            }
+        }
+
+        void onConnect(int err)
+        {
+            LOG4CPLUS_INFO(logger(), "onConnect(" << err << ")");
+
+            boost::mutex::scoped_lock lock(m_);
+            if (!reactorSignal_) {
+                return;
+            }
+
+            UDTSOCKET sock = connector_->sock();
+
+            connector_->close();
+
+            UDT::close(sock);
         }
 
         void signalReactor()
@@ -111,6 +147,8 @@ namespace DNode
         BThreadSignal* reactorSignal_;
         int state_;
         DTun::UInt32 connId_;
+        boost::shared_ptr<DTun::UDTConnection> conn_;
+        boost::shared_ptr<DTun::UDTConnector> connector_;
     };
 }
 
