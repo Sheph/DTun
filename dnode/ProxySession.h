@@ -35,6 +35,11 @@ namespace DNode
 
         void onBothConnected();
 
+        void recvLocal();
+        void sendLocal(int numBytes);
+        void recvRemote();
+        void sendRemote(int numBytes);
+
         DTun::UDTReactor& udtReactor_;
         DTun::TCPReactor& tcpReactor_;
         DoneCallback callback_;
