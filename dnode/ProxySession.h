@@ -1,6 +1,12 @@
 #ifndef _PROXYSESSION_H_
 #define _PROXYSESSION_H_
 
+// We need this crap because debug mode circular_buffer
+// initializes erased values with 0 and that breaks 'erase_begin'.
+// we need to do 'erased_begin' after each insert, otherwise 'array_one' and 'array_two'
+// won't work for us... Boost's circular buffer is pretty crappy...
+#define BOOST_CB_DISABLE_DEBUG
+
 #include "DTun/Types.h"
 #include "DTun/UDTReactor.h"
 #include "DTun/UDTConnector.h"
@@ -62,5 +68,7 @@ namespace DNode
         boost::shared_ptr<DTun::UDTConnector> remoteConnector_;
     };
 }
+
+#undef BOOST_CB_DISABLE_DEBUG
 
 #endif
