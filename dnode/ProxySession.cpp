@@ -1,6 +1,7 @@
 #include "ProxySession.h"
 #include "DTun/Utils.h"
 #include "Logger.h"
+#include <boost/make_shared.hpp>
 
 namespace DNode
 {
