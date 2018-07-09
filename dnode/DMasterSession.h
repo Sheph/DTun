@@ -26,6 +26,7 @@ namespace DNode
             const Callback& callback);
         // 's' will be closed even in case of failure!
         bool startAcceptor(SYSSOCKET s, DTun::UInt32 srcNodeId,
+            DTun::UInt32 dstNodeId,
             DTun::UInt32 connId,
             const Callback& callback);
 

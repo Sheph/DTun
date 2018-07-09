@@ -161,8 +161,20 @@ namespace DNode
                 boost::bind(&DMasterClient::onRecvMsgConn, this, _1, _2),
                 true);
             break;
+        case DPROTOCOL_MSG_CONN_OK:
+            buff_.resize(sizeof(DTun::DProtocolMsgConnOK));
+            conn_->read(&buff_[0], &buff_[0] + buff_.size(),
+                boost::bind(&DMasterClient::onRecvMsgConnOK, this, _1, _2),
+                true);
+            break;
+        case DPROTOCOL_MSG_CONN_ERR:
+            buff_.resize(sizeof(DTun::DProtocolMsgConnErr));
+            conn_->read(&buff_[0], &buff_[0] + buff_.size(),
+                boost::bind(&DMasterClient::onRecvMsgConnErr, this, _1, _2),
+                true);
+            break;
         default:
-            LOG4CPLUS_ERROR(logger(), "bad msg code: " << header.msgCode);
+            LOG4CPLUS_ERROR(logger(), "bad msg code: " << static_cast<int>(header.msgCode));
             boost::shared_ptr<DTun::UDTConnection> tmp = conn_;
             conn_.reset();
             lock.unlock();
@@ -197,6 +209,82 @@ namespace DNode
         conn_->read(&buff_[0], &buff_[0] + buff_.size(),
             boost::bind(&DMasterClient::onRecvHeader, this, _1, _2),
             true);
+    }
+
+    void DMasterClient::onRecvMsgConnOK(int err, int numBytes)
+    {
+        LOG4CPLUS_INFO(logger(), "onRecvMsgConnOK(" << err << ", " << numBytes << ")");
+
+        boost::mutex::scoped_lock lock(m_);
+
+        if (err) {
+            boost::shared_ptr<DTun::UDTConnection> tmp = conn_;
+            conn_.reset();
+            lock.unlock();
+            return;
+        }
+
+        DTun::DProtocolMsgConnOK msg;
+        assert(numBytes == sizeof(msg));
+        memcpy(&msg, &buff_[0], numBytes);
+
+        ConnMasterSessionMap::iterator it = connMasterSessions_.find(msg.connId);
+        if (it == connMasterSessions_.end()) {
+            LOG4CPLUS_ERROR(logger(), "connId " << msg.connId << " not found");
+            return;
+        }
+
+        ConnMasterSession tmp = it->second;
+
+        connMasterSessions_.erase(it);
+
+        buff_.resize(sizeof(DTun::DProtocolHeader));
+        conn_->read(&buff_[0], &buff_[0] + buff_.size(),
+            boost::bind(&DMasterClient::onRecvHeader, this, _1, _2),
+            true);
+
+        lock.unlock();
+
+        tmp.sess.reset();
+        tmp.callback(0, msg.dstNodeIp, msg.dstNodePort);
+    }
+
+    void DMasterClient::onRecvMsgConnErr(int err, int numBytes)
+    {
+        LOG4CPLUS_INFO(logger(), "onRecvMsgConnErr(" << err << ", " << numBytes << ")");
+
+        boost::mutex::scoped_lock lock(m_);
+
+        if (err) {
+            boost::shared_ptr<DTun::UDTConnection> tmp = conn_;
+            conn_.reset();
+            lock.unlock();
+            return;
+        }
+
+        DTun::DProtocolMsgConnErr msg;
+        assert(numBytes == sizeof(msg));
+        memcpy(&msg, &buff_[0], numBytes);
+
+        ConnMasterSessionMap::iterator it = connMasterSessions_.find(msg.connId);
+        if (it == connMasterSessions_.end()) {
+            LOG4CPLUS_ERROR(logger(), "connId " << msg.connId << " not found");
+            return;
+        }
+
+        ConnMasterSession tmp = it->second;
+
+        connMasterSessions_.erase(it);
+
+        buff_.resize(sizeof(DTun::DProtocolHeader));
+        conn_->read(&buff_[0], &buff_[0] + buff_.size(),
+            boost::bind(&DMasterClient::onRecvHeader, this, _1, _2),
+            true);
+
+        lock.unlock();
+
+        tmp.sess.reset();
+        tmp.callback(msg.errCode, 0, 0);
     }
 
     void DMasterClient::onRegisterConnection(int err, DTun::UInt32 connId)
@@ -300,7 +388,7 @@ namespace DNode
         boost::shared_ptr<DMasterSession> sess =
             boost::make_shared<DMasterSession>(boost::ref(udtReactor_), address_, port_);
 
-        if (!sess->startAcceptor(s, srcNodeId, srcConnId,
+        if (!sess->startAcceptor(s, srcNodeId, nodeId_, srcConnId,
             boost::bind(&DMasterClient::onAcceptConnection, this, _1, boost::weak_ptr<DMasterSession>(sess),
                 localIp, localPort, remoteIp, remotePort))) {
             return;

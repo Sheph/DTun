@@ -41,6 +41,7 @@ namespace DTun
     struct DProtocolMsgHelloAcc
     {
         UInt32 srcNodeId;
+        UInt32 dstNodeId;
         UInt32 connId;
     };
 

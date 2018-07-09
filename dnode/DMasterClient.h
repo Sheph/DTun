@@ -45,6 +45,8 @@ namespace DNode
         void onSend(int err);
         void onRecvHeader(int err, int numBytes);
         void onRecvMsgConn(int err, int numBytes);
+        void onRecvMsgConnOK(int err, int numBytes);
+        void onRecvMsgConnErr(int err, int numBytes);
         void onRegisterConnection(int err, DTun::UInt32 connId);
         void onAcceptConnection(int err, const boost::weak_ptr<DMasterSession>& sess,
             DTun::UInt32 localIp,

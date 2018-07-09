@@ -21,7 +21,7 @@ namespace DMaster
 
         typedef boost::function<void ()> StartPersistentCallback;
         typedef boost::function<void (DTun::UInt32, DTun::UInt32, DTun::UInt32, DTun::UInt16)> StartConnectorCallback;
-        typedef boost::function<void (DTun::UInt32)> StartAcceptorCallback;
+        typedef boost::function<void (DTun::UInt32, DTun::UInt32)> StartAcceptorCallback;
         typedef boost::function<void (int)> ErrorCallback;
 
         explicit Session(const boost::shared_ptr<DTun::UDTConnection>& conn);

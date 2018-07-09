@@ -41,6 +41,7 @@ namespace DNode
     }
 
     bool DMasterSession::startAcceptor(SYSSOCKET s, DTun::UInt32 srcNodeId,
+        DTun::UInt32 dstNodeId,
         DTun::UInt32 connId,
         const Callback& callback)
     {
@@ -49,6 +50,7 @@ namespace DNode
 
         header.msgCode = DPROTOCOL_MSG_HELLO_ACC;
         msg.srcNodeId = srcNodeId;
+        msg.dstNodeId = dstNodeId;
         msg.connId = connId;
 
         buff_.resize(sizeof(header) + sizeof(msg));

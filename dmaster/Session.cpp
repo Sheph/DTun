@@ -62,6 +62,21 @@ namespace DMaster
         DTun::UInt32 dstNodeIp,
         DTun::UInt16 dstNodePort)
     {
+        ConnRequestMap::iterator it = connRequests_.find(connId);
+        if (it == connRequests_.end()) {
+            LOG4CPLUS_ERROR(logger(), "connId " << connId << " not found");
+            return;
+        }
+
+        connRequests_.erase(it);
+
+        DTun::DProtocolMsgConnOK msg;
+
+        msg.connId = connId;
+        msg.dstNodeIp = dstNodeIp;
+        msg.dstNodePort = dstNodePort;
+
+        sendMsg(DPROTOCOL_MSG_CONN_OK, &msg, sizeof(msg));
     }
 
     void Session::sendConnRequest(DTun::UInt32 srcNodeId,
@@ -86,6 +101,13 @@ namespace DMaster
     void Session::onSend(int err, const boost::shared_ptr<std::vector<char> >& sndBuff)
     {
         LOG4CPLUS_TRACE(logger(), "onSend(" << err << ")");
+
+        if (err) {
+            if (errorCallback_) {
+                errorCallback_(err);
+            }
+            return;
+        }
     }
 
     void Session::onRecvHeader(int err, int numBytes)
@@ -192,7 +214,18 @@ namespace DMaster
             return;
         }
 
+        DTun::DProtocolMsgHelloAcc msg;
+        assert(numBytes == sizeof(msg));
+        memcpy(&msg, &buff_[0], numBytes);
+
+        type_ = TypeAcceptor;
+        nodeId_ = msg.dstNodeId;
+
         startRecvAny();
+
+        if (startAcceptorCallback_) {
+            startAcceptorCallback_(msg.srcNodeId, msg.connId);
+        }
     }
 
     void Session::onRecvAny(int err, int numBytes)

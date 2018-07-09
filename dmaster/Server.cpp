@@ -97,7 +97,7 @@ namespace DMaster
 
         session->setStartPersistentCallback(boost::bind(&Server::onSessionStartPersistent, this, boost::weak_ptr<Session>(session)));
         session->setStartConnectorCallback(boost::bind(&Server::onSessionStartConnector, this, boost::weak_ptr<Session>(session), _1, _2, _3, _4));
-        session->setStartAcceptorCallback(boost::bind(&Server::onSessionStartAcceptor, this, boost::weak_ptr<Session>(session), _1));
+        session->setStartAcceptorCallback(boost::bind(&Server::onSessionStartAcceptor, this, boost::weak_ptr<Session>(session), _1, _2));
         session->setErrorCallback(boost::bind(&Server::onSessionError, this, boost::weak_ptr<Session>(session), _1));
 
         session->start();
@@ -155,14 +155,31 @@ namespace DMaster
         dstSess->sendConnRequest(sess_shared->nodeId(), srcIp, srcPort, connId, remoteIp, remotePort);
     }
 
-    void Server::onSessionStartAcceptor(const boost::weak_ptr<Session>& sess, DTun::UInt32 connId)
+    void Server::onSessionStartAcceptor(const boost::weak_ptr<Session>& sess, DTun::UInt32 srcNodeId, DTun::UInt32 connId)
     {
         boost::shared_ptr<Session> sess_shared = sess.lock();
         if (!sess_shared) {
             return;
         }
 
-        LOG4CPLUS_TRACE(logger(), "onSessionStartAcceptor(" << sess_shared->nodeId() << ")");
+        LOG4CPLUS_TRACE(logger(), "onSessionStartAcceptor(" << sess_shared->nodeId() << ", " << srcNodeId << ", " << connId << ")");
+
+        boost::shared_ptr<Session> srcSess = findPersistentSession(srcNodeId);
+
+        if (!srcSess) {
+            LOG4CPLUS_ERROR(logger(), "persistent source session not found for acceptor");
+            return;
+        }
+
+        DTun::UInt32 dstIp = 0;
+        DTun::UInt16 dstPort = 0;
+
+        if (!sess_shared->conn()->getPeerName(dstIp, dstPort)) {
+            srcSess->setConnRequestErr(connId, DPROTOCOL_ERR_UNKNOWN);
+            return;
+        }
+
+        srcSess->setConnRequestOk(connId, dstIp, dstPort);
     }
 
     void Server::onSessionError(const boost::weak_ptr<Session>& sess, int errCode)

@@ -34,7 +34,7 @@ namespace DMaster
             DTun::UInt32 remoteIp,
             DTun::UInt16 remotePort);
 
-        void onSessionStartAcceptor(const boost::weak_ptr<Session>& sess, DTun::UInt32 connId);
+        void onSessionStartAcceptor(const boost::weak_ptr<Session>& sess, DTun::UInt32 srcNodeId, DTun::UInt32 connId);
 
         void onSessionError(const boost::weak_ptr<Session>& sess, int errCode);
 
