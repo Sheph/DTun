@@ -108,7 +108,7 @@ namespace DNode
 
     void DMasterClient::onConnect(int err)
     {
-        LOG4CPLUS_INFO(logger(), "onConnect(" << err << ")");
+        LOG4CPLUS_INFO(logger(), "DMasterClient::onConnect(" << err << ")");
 
         boost::mutex::scoped_lock lock(m_);
 
@@ -138,7 +138,7 @@ namespace DNode
 
     void DMasterClient::onSend(int err)
     {
-        LOG4CPLUS_INFO(logger(), "onSend(" << err << ")");
+        LOG4CPLUS_INFO(logger(), "DMasterClient::onSend(" << err << ")");
 
         boost::mutex::scoped_lock lock(m_);
 
@@ -157,7 +157,7 @@ namespace DNode
 
     void DMasterClient::onRecvHeader(int err, int numBytes)
     {
-        LOG4CPLUS_INFO(logger(), "onRecvHeader(" << err << ", " << numBytes << ")");
+        LOG4CPLUS_INFO(logger(), "DMasterClient::onRecvHeader(" << err << ", " << numBytes << ")");
 
         boost::mutex::scoped_lock lock(m_);
 
@@ -202,7 +202,7 @@ namespace DNode
 
     void DMasterClient::onRecvMsgConn(int err, int numBytes)
     {
-        LOG4CPLUS_INFO(logger(), "onRecvMsgConn(" << err << ", " << numBytes << ")");
+        LOG4CPLUS_INFO(logger(), "DMasterClient::onRecvMsgConn(" << err << ", " << numBytes << ")");
 
         boost::mutex::scoped_lock lock(m_);
 
@@ -219,7 +219,7 @@ namespace DNode
 
         LOG4CPLUS_TRACE(logger(), "Proxy request: src = " << msg.srcNodeId
             << ", src_addr = " << DTun::ipPortToString(msg.srcNodeIp, msg.srcNodePort)
-            << ", connId = " << msg.connId << ", remote_addr = " << DTun::ipPortToString(msg.ip, msg.port) << ")");
+            << ", connId = " << msg.connId << ", remote_addr = " << DTun::ipPortToString(msg.ip, msg.port));
 
         startAccMasterSession(msg.srcNodeId, msg.connId, msg.ip, msg.port, msg.srcNodeIp, msg.srcNodePort);
 
@@ -231,7 +231,7 @@ namespace DNode
 
     void DMasterClient::onRecvMsgConnOK(int err, int numBytes)
     {
-        LOG4CPLUS_INFO(logger(), "onRecvMsgConnOK(" << err << ", " << numBytes << ")");
+        LOG4CPLUS_INFO(logger(), "DMasterClient::onRecvMsgConnOK(" << err << ", " << numBytes << ")");
 
         boost::mutex::scoped_lock lock(m_);
 
@@ -269,7 +269,7 @@ namespace DNode
 
     void DMasterClient::onRecvMsgConnErr(int err, int numBytes)
     {
-        LOG4CPLUS_INFO(logger(), "onRecvMsgConnErr(" << err << ", " << numBytes << ")");
+        LOG4CPLUS_INFO(logger(), "DMasterClient::onRecvMsgConnErr(" << err << ", " << numBytes << ")");
 
         boost::mutex::scoped_lock lock(m_);
 
@@ -336,7 +336,7 @@ namespace DNode
         DTun::UInt32 remoteIp,
         DTun::UInt16 remotePort)
     {
-        LOG4CPLUS_INFO(logger(), "onAcceptConnection(" << err << ")");
+        LOG4CPLUS_INFO(logger(), "DMasterClient::onAcceptConnection(" << err << ")");
 
         boost::shared_ptr<DMasterSession> sess_shared = sess.lock();
         if (!sess_shared) {
@@ -371,7 +371,7 @@ namespace DNode
 
     void DMasterClient::onProxyDone(const boost::weak_ptr<ProxySession>& sess)
     {
-        LOG4CPLUS_INFO(logger(), "onProxyDone()");
+        LOG4CPLUS_INFO(logger(), "DMasterClient::onProxyDone()");
 
         boost::shared_ptr<ProxySession> sess_shared = sess.lock();
         if (!sess_shared) {

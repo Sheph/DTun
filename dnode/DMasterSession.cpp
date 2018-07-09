@@ -92,7 +92,7 @@ namespace DNode
 
     void DMasterSession::onConnect(int err)
     {
-        LOG4CPLUS_INFO(logger(), "onConnect(" << err << ")");
+        LOG4CPLUS_INFO(logger(), "DMasterSession::onConnect(" << err << ")");
 
         UDTSOCKET sock = connector_->sock();
 
@@ -111,7 +111,7 @@ namespace DNode
 
     void DMasterSession::onSend(int err)
     {
-        LOG4CPLUS_INFO(logger(), "onSend(" << err << ")");
+        LOG4CPLUS_INFO(logger(), "DMasterSession::onSend(" << err << ")");
 
         callback_(err);
     }

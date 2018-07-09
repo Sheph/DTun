@@ -88,7 +88,7 @@ namespace DMaster
 
     void Server::onAccept(UDTSOCKET sock)
     {
-        LOG4CPLUS_INFO(logger(), "onAccept(" << sock << ")");
+        LOG4CPLUS_INFO(logger(), "Server::onAccept(" << sock << ")");
 
         boost::shared_ptr<Session> session = boost::make_shared<Session>(
             boost::make_shared<DTun::UDTConnection>(boost::ref(reactor_), sock));
@@ -110,7 +110,7 @@ namespace DMaster
             return;
         }
 
-        LOG4CPLUS_TRACE(logger(), "onSessionStartPersistent(" << sess_shared->nodeId() << ")");
+        LOG4CPLUS_TRACE(logger(), "Server::onSessionStartPersistent(" << sess_shared->nodeId() << ")");
     }
 
     void Server::onSessionStartConnector(const boost::weak_ptr<Session>& sess,
@@ -124,7 +124,7 @@ namespace DMaster
             return;
         }
 
-        LOG4CPLUS_TRACE(logger(), "onSessionStartConnector(" << sess_shared->nodeId() << ", "
+        LOG4CPLUS_TRACE(logger(), "Server::onSessionStartConnector(" << sess_shared->nodeId() << ", "
             << dstNodeId << ", " << connId << ", " << DTun::ipPortToString(remoteIp, remotePort) << ")");
 
         boost::shared_ptr<Session> srcSess = findPersistentSession(sess_shared->nodeId());
@@ -162,7 +162,7 @@ namespace DMaster
             return;
         }
 
-        LOG4CPLUS_TRACE(logger(), "onSessionStartAcceptor(" << sess_shared->nodeId() << ", " << srcNodeId << ", " << connId << ")");
+        LOG4CPLUS_TRACE(logger(), "Server::onSessionStartAcceptor(" << sess_shared->nodeId() << ", " << srcNodeId << ", " << connId << ")");
 
         boost::shared_ptr<Session> srcSess = findPersistentSession(srcNodeId);
 
@@ -189,7 +189,7 @@ namespace DMaster
             return;
         }
 
-        LOG4CPLUS_TRACE(logger(), "onSessionError(" << sess_shared->nodeId() << ", " << errCode << ")");
+        LOG4CPLUS_TRACE(logger(), "Server::onSessionError(" << sess_shared->nodeId() << ", " << errCode << ")");
 
         sessions_.erase(sess_shared);
     }

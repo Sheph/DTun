@@ -100,7 +100,7 @@ namespace DMaster
 
     void Session::onSend(int err, const boost::shared_ptr<std::vector<char> >& sndBuff)
     {
-        LOG4CPLUS_TRACE(logger(), "onSend(" << err << ")");
+        LOG4CPLUS_TRACE(logger(), "Session::onSend(" << err << ")");
 
         if (err) {
             if (errorCallback_) {
@@ -112,7 +112,7 @@ namespace DMaster
 
     void Session::onRecvHeader(int err, int numBytes)
     {
-        LOG4CPLUS_TRACE(logger(), "onRecvHeader(" << err << ", " << numBytes << ")");
+        LOG4CPLUS_TRACE(logger(), "Session::onRecvHeader(" << err << ", " << numBytes << ")");
 
         if (err) {
             if (errorCallback_) {
@@ -155,7 +155,7 @@ namespace DMaster
 
     void Session::onRecvMsgHello(int err, int numBytes)
     {
-        LOG4CPLUS_TRACE(logger(), "onRecvMsgHello(" << err << ", " << numBytes << ")");
+        LOG4CPLUS_TRACE(logger(), "Session::onRecvMsgHello(" << err << ", " << numBytes << ")");
 
         if (err) {
             if (errorCallback_) {
@@ -180,7 +180,7 @@ namespace DMaster
 
     void Session::onRecvMsgHelloConn(int err, int numBytes)
     {
-        LOG4CPLUS_TRACE(logger(), "onRecvMsgHelloConn(" << err << ", " << numBytes << ")");
+        LOG4CPLUS_TRACE(logger(), "Session::onRecvMsgHelloConn(" << err << ", " << numBytes << ")");
 
         if (err) {
             if (errorCallback_) {
@@ -205,7 +205,7 @@ namespace DMaster
 
     void Session::onRecvMsgHelloAcc(int err, int numBytes)
     {
-        LOG4CPLUS_TRACE(logger(), "onRecvMsgHelloAcc(" << err << ", " << numBytes << ")");
+        LOG4CPLUS_TRACE(logger(), "Session::onRecvMsgHelloAcc(" << err << ", " << numBytes << ")");
 
         if (err) {
             if (errorCallback_) {
@@ -230,7 +230,7 @@ namespace DMaster
 
     void Session::onRecvAny(int err, int numBytes)
     {
-        LOG4CPLUS_TRACE(logger(), "onRecvAny(" << err << ", " << numBytes << ")");
+        LOG4CPLUS_TRACE(logger(), "Session::onRecvAny(" << err << ", " << numBytes << ")");
 
         if (errorCallback_) {
             errorCallback_(err ? err : CUDTException::EUNKNOWN);

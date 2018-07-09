@@ -74,7 +74,7 @@ namespace DNode
 
     void ProxySession::onLocalConnect(int err)
     {
-        LOG4CPLUS_INFO(logger(), "onLocalConnect(" << err << ")");
+        LOG4CPLUS_INFO(logger(), "ProxySession::onLocalConnect(" << err << ")");
     }
 
     void ProxySession::onLocalSend(int err, int numBytes)
@@ -87,7 +87,7 @@ namespace DNode
 
     void ProxySession::onRemoteConnect(int err)
     {
-        LOG4CPLUS_INFO(logger(), "onRemoteConnect(" << err << ")");
+        LOG4CPLUS_INFO(logger(), "ProxySession::onRemoteConnect(" << err << ")");
     }
 
     void ProxySession::onRemoteSend(int err, int numBytes)

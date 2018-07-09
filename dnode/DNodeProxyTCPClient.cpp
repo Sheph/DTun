@@ -109,7 +109,7 @@ namespace DNode
     private:
         void onConnectionRegister(int err, DTun::UInt32 remoteIp, DTun::UInt16 remotePort)
         {
-            LOG4CPLUS_INFO(logger(), "onConnectionRegister(" << err << ", " << DTun::ipPortToString(remoteIp, remotePort) << ")");
+            LOG4CPLUS_INFO(logger(), "ProxyTCPClient::onConnectionRegister(" << err << ", " << DTun::ipPortToString(remoteIp, remotePort) << ")");
 
             boost::mutex::scoped_lock lock(m_);
             if (!reactorSignal_) {
@@ -154,7 +154,7 @@ namespace DNode
 
         void onConnect(int err)
         {
-            LOG4CPLUS_INFO(logger(), "onConnect(" << err << ")");
+            LOG4CPLUS_INFO(logger(), "ProxyTCPClient::onConnect(" << err << ")");
 
             boost::mutex::scoped_lock lock(m_);
             if (!reactorSignal_) {
