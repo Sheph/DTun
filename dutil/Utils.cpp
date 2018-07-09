@@ -47,10 +47,8 @@ namespace DTun
 
         std::ostringstream os;
 
-        for (int i = 0; i < 3; ++i)
-        {
+        for (int i = 0; i < 3; ++i) {
             os << ((ipAddress >> 24) & 0xFF) << ".";
-
             ipAddress <<= 8;
         }
 
