@@ -85,7 +85,8 @@ namespace DTun
     void closeUDTSocketChecked(UDTSOCKET sock)
     {
         if (UDT::close(sock) == UDT::ERROR) {
-            LOG4CPLUS_ERROR(logger(), "Error closing UDT socket: " << UDT::getlasterror().getErrorMessage());
+            // FIXME: use ERROR after UDT implicit socket close fix
+            LOG4CPLUS_TRACE(logger(), "Error closing UDT socket: " << UDT::getlasterror().getErrorMessage());
         }
     }
 }

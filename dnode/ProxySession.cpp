@@ -75,7 +75,7 @@ namespace DNode
 
     void ProxySession::onLocalConnect(int err)
     {
-        LOG4CPLUS_INFO(logger(), "ProxySession::onLocalConnect(" << err << ")");
+        LOG4CPLUS_TRACE(logger(), "ProxySession::onLocalConnect(" << err << ")");
 
         SYSSOCKET sock = localConnector_->sock();
         localConnector_->close();
@@ -161,7 +161,7 @@ namespace DNode
 
     void ProxySession::onRemoteConnect(int err)
     {
-        LOG4CPLUS_INFO(logger(), "ProxySession::onRemoteConnect(" << err << ")");
+        LOG4CPLUS_TRACE(logger(), "ProxySession::onRemoteConnect(" << err << ")");
 
         UDTSOCKET sock = remoteConnector_->sock();
         remoteConnector_->close();

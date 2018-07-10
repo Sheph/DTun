@@ -92,7 +92,7 @@ namespace DTun
 
         int res;
         if ((res = UDT::recv(sock(), req->first, req->last - req->first, 0)) == UDT::ERROR) {
-            LOG4CPLUS_ERROR(logger(), "Cannot read UDT socket: " << UDT::getlasterror().getErrorMessage());
+            LOG4CPLUS_TRACE(logger(), "Cannot read UDT socket: " << UDT::getlasterror().getErrorMessage());
 
             cb = req->callback;
             total_read = req->total_read;
@@ -142,7 +142,7 @@ namespace DTun
 
         int res;
         if ((res = UDT::send(sock(), req->first, req->last - req->first, 0)) == UDT::ERROR) {
-            LOG4CPLUS_ERROR(logger(), "Cannot write UDT socket: " << UDT::getlasterror().getErrorMessage());
+            LOG4CPLUS_TRACE(logger(), "Cannot write UDT socket: " << UDT::getlasterror().getErrorMessage());
 
             cb = req->callback;
 

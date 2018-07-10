@@ -88,7 +88,7 @@ namespace DMaster
 
     void Server::onAccept(UDTSOCKET sock)
     {
-        LOG4CPLUS_INFO(logger(), "Server::onAccept(" << sock << ")");
+        LOG4CPLUS_TRACE(logger(), "Server::onAccept(" << sock << ")");
 
         boost::shared_ptr<Session> session = boost::make_shared<Session>(
             boost::make_shared<DTun::UDTConnection>(boost::ref(reactor_), sock));
