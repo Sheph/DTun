@@ -46,7 +46,7 @@ namespace DNode
 
     bool DMasterClient::start()
     {
-        UDPSOCKET sock = UDT::socket(AF_INET, SOCK_STREAM, 0);
+        UDTSOCKET sock = UDT::socket(AF_INET, SOCK_STREAM, 0);
         if (sock == UDT::INVALID_SOCK) {
             LOG4CPLUS_ERROR(logger(), "Cannot create UDT socket: " << UDT::getlasterror().getErrorMessage());
             return false;
@@ -462,6 +462,7 @@ namespace DNode
         if (!sess->startAcceptor(s, srcNodeId, nodeId_, srcConnId,
             boost::bind(&DMasterClient::onAcceptConnection, this, _1, boost::weak_ptr<DMasterSession>(sess),
                 localIp, localPort, remoteIp, remotePort))) {
+            DTun::closeSysSocketChecked(boundSock);
             return;
         }
 

@@ -34,6 +34,14 @@ namespace DNode
             return false;
         }
 
+        bool optval = false;
+        if (UDT::setsockopt(remoteSock, 0, UDT_REUSEADDR, &optval, sizeof(optval)) == UDT::ERROR) {
+            LOG4CPLUS_ERROR(logger(), "Cannot set reuseaddr for UDT socket: " << UDT::getlasterror().getErrorMessage());
+            DTun::closeUDTSocketChecked(remoteSock);
+            DTun::closeSysSocketChecked(s);
+            return false;
+        }
+
         if (UDT::bind2(remoteSock, s) == UDT::ERROR) {
             LOG4CPLUS_ERROR(logger(), "Cannot bind UDT socket: " << UDT::getlasterror().getErrorMessage());
             DTun::closeUDTSocketChecked(remoteSock);

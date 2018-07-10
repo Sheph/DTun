@@ -177,9 +177,18 @@ namespace DNode
                 return;
             }
 
-            UDPSOCKET sock = UDT::socket(AF_INET, SOCK_STREAM, 0);
+            UDTSOCKET sock = UDT::socket(AF_INET, SOCK_STREAM, 0);
             if (sock == UDT::INVALID_SOCK) {
                 LOG4CPLUS_ERROR(logger(), "Cannot create UDT socket: " << UDT::getlasterror().getErrorMessage());
+                state_ = STATE_ERR;
+                signalReactor();
+                return;
+            }
+
+            bool optval = false;
+            if (UDT::setsockopt(sock, 0, UDT_REUSEADDR, &optval, sizeof(optval)) == UDT::ERROR) {
+                LOG4CPLUS_ERROR(logger(), "Cannot set reuseaddr for UDT socket: " << UDT::getlasterror().getErrorMessage());
+                DTun::closeUDTSocketChecked(sock);
                 state_ = STATE_ERR;
                 signalReactor();
                 return;
