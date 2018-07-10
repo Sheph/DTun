@@ -40,6 +40,8 @@ namespace DMaster
 
         boost::shared_ptr<Session> findPersistentSession(DTun::UInt32 nodeId) const;
 
+        void removeSession(const boost::shared_ptr<Session>& sess);
+
         int port_;
         DTun::UDTReactor reactor_;
         Sessions sessions_;

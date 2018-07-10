@@ -111,6 +111,17 @@ namespace DMaster
         }
 
         LOG4CPLUS_TRACE(logger(), "Server::onSessionStartPersistent(" << sess_shared->nodeId() << ")");
+
+        for (Sessions::const_iterator it = sessions_.begin(); it != sessions_.end(); ++it) {
+            boost::shared_ptr<Session> other = *it;
+            if ((other->nodeId() == sess_shared->nodeId()) &&
+                (other->type() == Session::TypePersistent) &&
+                (other != sess_shared)) {
+                LOG4CPLUS_WARN(logger(), "new persistent node " << sess_shared->nodeId() << ", overriding");
+                removeSession(other);
+                break;
+            }
+        }
     }
 
     void Server::onSessionStartConnector(const boost::weak_ptr<Session>& sess,
@@ -186,7 +197,7 @@ namespace DMaster
 
         LOG4CPLUS_TRACE(logger(), "Server::onSessionError(" << sess_shared->nodeId() << ", " << errCode << ")");
 
-        sessions_.erase(sess_shared);
+        removeSession(sess_shared);
     }
 
     boost::shared_ptr<Session> Server::findPersistentSession(DTun::UInt32 nodeId) const
@@ -199,5 +210,19 @@ namespace DMaster
             }
         }
         return boost::shared_ptr<Session>();
+    }
+
+    void Server::removeSession(const boost::shared_ptr<Session>& sess)
+    {
+        if (sess->type() == Session::TypePersistent) {
+            for (Sessions::const_iterator it = sessions_.begin(); it != sessions_.end(); ++it) {
+                boost::shared_ptr<Session> other = *it;
+                if (other->type() == Session::TypePersistent) {
+                    other->setAllConnRequestsErr(sess->nodeId(), DPROTOCOL_ERR_UNKNOWN);
+                }
+            }
+        }
+
+        sessions_.erase(sess);
     }
 }

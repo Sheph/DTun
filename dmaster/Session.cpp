@@ -63,6 +63,19 @@ namespace DMaster
     void Session::setAllConnRequestsErr(DTun::UInt32 dstNodeId,
         DTun::UInt32 errCode)
     {
+        DTun::DProtocolMsgConnErr msg;
+
+        for (ConnRequestMap::iterator it = connRequests_.begin(); it != connRequests_.end();) {
+            if (it->second == dstNodeId) {
+                msg.connId = it->first;
+                msg.errCode = errCode;
+
+                sendMsg(DPROTOCOL_MSG_CONN_ERR, &msg, sizeof(msg));
+                connRequests_.erase(it++);
+            } else {
+                ++it;
+            }
+        }
     }
 
     void Session::setConnRequestOk(DTun::UInt32 connId,
