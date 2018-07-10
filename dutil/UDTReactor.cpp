@@ -315,9 +315,9 @@ namespace DTun
 
     void UDTReactor::update(UDTSocket* socket)
     {
-        int evts = socket->getPollEvents();
-
         boost::mutex::scoped_lock lock(m_);
+
+        int evts = socket->getPollEvents();
 
         SocketMap::iterator it = sockets_.find(socket->cookie());
         if (it == sockets_.end()) {
