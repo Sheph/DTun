@@ -1345,6 +1345,15 @@ CUDTException* CUDTUnited::getError()
    #endif
 }
 
+CUDTStats CUDTUnited::getStats()
+{
+   CGuard cg(m_ControlLock);
+   CUDTStats stats;
+   stats.numSockets = m_Sockets.size();
+   stats.numClosedSockets = m_ClosedSockets.size();
+   return stats;
+}
+
 #ifdef WIN32
 void CUDTUnited::checkTLSValue()
 {
@@ -2152,6 +2161,11 @@ UDTSTATUS CUDT::getsockstate(UDTSOCKET u)
    }
 }
 
+CUDTStats CUDT::getstats()
+{
+   return s_UDTUnited.getStats();
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -2387,6 +2401,11 @@ int perfmon(UDTSOCKET u, TRACEINFO* perf, bool clear)
 UDTSTATUS getsockstate(UDTSOCKET u)
 {
    return CUDT::getsockstate(u);
+}
+
+UDT_API CUDTStats getstats()
+{
+   return CUDT::getstats();
 }
 
 }  // namespace UDT

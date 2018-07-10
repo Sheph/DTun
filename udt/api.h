@@ -199,6 +199,8 @@ public:
 
    CUDTException* getError();
 
+   CUDTStats getStats();
+
 private:
 //   void init();
 

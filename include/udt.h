@@ -196,6 +196,12 @@ struct CPerfMon
    int byteAvailRcvBuf;                 // available UDT receiver buffer size
 };
 
+struct CUDTStats
+{
+   int numSockets;
+   int numClosedSockets;
+};
+
 ////////////////////////////////////////////////////////////////////////////////
 
 class UDT_API CUDTException
@@ -351,6 +357,7 @@ UDT_API int getlasterror_code();
 UDT_API const char* getlasterror_desc();
 UDT_API int perfmon(UDTSOCKET u, TRACEINFO* perf, bool clear = true);
 UDT_API UDTSTATUS getsockstate(UDTSOCKET u);
+UDT_API CUDTStats getstats();
 
 }  // namespace UDT
 

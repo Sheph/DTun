@@ -122,9 +122,11 @@ namespace DNode
 
     void DMasterClient::dump()
     {
+        CUDTStats udtStats = UDT::getstats();
         boost::mutex::scoped_lock lock(m_);
         LOG4CPLUS_INFO(logger(), "connSess=" << connMasterSessions_.size()
-            << ", accSess=" << accMasterSessions_.size() << ", prx=" << proxySessions_.size() << ", numOut=" << numOutConnections_);
+            << ", accSess=" << accMasterSessions_.size() << ", prx=" << proxySessions_.size() << ", numOut=" << numOutConnections_
+            << ", udtSocks=" << udtStats.numSockets << ", udtCsocks=" << udtStats.numClosedSockets);
     }
 
     void DMasterClient::onConnect(int err)

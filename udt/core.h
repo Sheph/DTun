@@ -107,6 +107,7 @@ public: //API
    static CUDTException& getlasterror();
    static int perfmon(UDTSOCKET u, CPerfMon* perf, bool clear = true);
    static UDTSTATUS getsockstate(UDTSOCKET u);
+   static CUDTStats getstats();
 
 public: // internal API
    static CUDT* getUDTHandle(UDTSOCKET u);
