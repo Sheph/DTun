@@ -80,6 +80,7 @@ namespace DTun
         SYSSOCKET signalRdSock_;
         SocketMap sockets_;
         PollSocketMap pollSockets_;
+        bool inPoll_;
         uint64_t pollIteration_;
         TCPSocket* currentlyHandling_;
     };

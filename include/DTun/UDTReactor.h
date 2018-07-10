@@ -80,6 +80,7 @@ namespace DTun
         UDTSOCKET signalRdSock_;
         SocketMap sockets_;
         PollSocketMap pollSockets_;
+        bool inPoll_;
         uint64_t pollIteration_;
         UDTSocket* currentlyHandling_;
     };

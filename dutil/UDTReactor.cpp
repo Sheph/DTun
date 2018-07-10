@@ -10,6 +10,7 @@ namespace DTun
     , nextCookie_(0)
     , signalWrSock_(UDT::INVALID_SOCK)
     , signalRdSock_(UDT::INVALID_SOCK)
+    , inPoll_(false)
     , pollIteration_(0)
     , currentlyHandling_(NULL)
     {
@@ -157,10 +158,16 @@ namespace DTun
             readfds.clear();
             writefds.clear();
 
+            {
+                boost::mutex::scoped_lock lock(m_);
+                inPoll_ = true;
+            }
+
             int err = UDT::epoll_wait(eid_, &readfds, &writefds, 1000);
 
             {
                 boost::mutex::scoped_lock lock(m_);
+                inPoll_ = false;
                 ++pollIteration_;
                 c_.notify_all();
             }
@@ -289,7 +296,7 @@ namespace DTun
         if (!isSameThread()) {
             signalWr();
             uint64_t pollIteration = pollIteration_;
-            while ((pollIteration_ <= pollIteration) ||
+            while ((inPoll_ && (pollIteration_ <= pollIteration)) ||
                 (currentlyHandling_ == socket)) {
                 c_.wait(lock);
             }
