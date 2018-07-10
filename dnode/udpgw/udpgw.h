@@ -35,7 +35,7 @@
 #define CONNECTION_UDP_BUFFER_SIZE 1
 
 // maximum connections for client
-#define DEFAULT_MAX_CONNECTIONS_FOR_CLIENT 256
+#define DEFAULT_MAX_CONNECTIONS_FOR_CLIENT 35
 
 // SO_SNDBFUF socket option for clients, 0 to not set
 #define CLIENT_DEFAULT_SOCKET_SEND_BUFFER 1048576
