@@ -2,6 +2,7 @@
 #include "Logger.h"
 #include "DTun/Utils.h"
 #include <boost/make_shared.hpp>
+#include <fcntl.h>
 
 namespace DNode
 {
@@ -122,11 +123,19 @@ namespace DNode
 
     void DMasterClient::dump()
     {
+        int fdMax = static_cast<int>(::sysconf(_SC_OPEN_MAX));
+        int numFds = 0;
+        for (int i = 0; i < fdMax; ++i) {
+            if (::fcntl(i, F_GETFL) != -1) {
+                ++numFds;
+            }
+        }
         CUDTStats udtStats = UDT::getstats();
         boost::mutex::scoped_lock lock(m_);
         LOG4CPLUS_INFO(logger(), "connSess=" << connMasterSessions_.size()
             << ", accSess=" << accMasterSessions_.size() << ", prx=" << proxySessions_.size() << ", numOut=" << numOutConnections_
-            << ", udtSocks=" << udtStats.numSockets << ", udtCsocks=" << udtStats.numClosedSockets);
+            << ", udtSocks=" << udtStats.numSockets << ", udtCsocks=" << udtStats.numClosedSockets
+            << ", numFds=" << numFds << ", maxFds=" << fdMax);
     }
 
     void DMasterClient::onConnect(int err)
