@@ -192,6 +192,8 @@ LinkedList1 tcp_clients;
 // number of clients
 int num_clients;
 
+BTimer stats_timer;
+
 static void terminate (void);
 static void print_help (const char *name);
 static void print_version (void);
@@ -230,7 +232,14 @@ static int client_dtcp_recv_send_out (struct tcp_client *client);
 static err_t client_sent_func (void *arg, struct tcp_pcb *tpcb, u16_t len);
 static void udpgw_client_handler_received (void *unused, BAddr local_addr, BAddr remote_addr, const uint8_t *data, int data_len);
 
-int tun2socks_main (int argc, char **argv, int is_debugged)
+static void stats_handler_wrapper(void* tmp)
+{
+    void (*stats_handler)(void*) = tmp;
+    BReactor_SetTimer(&ss, &stats_timer);
+    stats_handler(NULL);
+}
+
+int tun2socks_main (int argc, char **argv, int is_debugged, void (*stats_handler)(void*))
 {
     if (argc <= 0) {
         return 1;
@@ -390,9 +399,14 @@ int tun2socks_main (int argc, char **argv, int is_debugged)
         goto fail4a;
     }
 
+    BTimer_Init(&stats_timer, 5000, &stats_handler_wrapper, stats_handler);
+    BReactor_SetTimer(&ss, &stats_timer);
+
     // enter event loop
     BLog(BLOG_NOTICE, "entering event loop");
     BReactor_Exec(&ss);
+
+    BReactor_RemoveTimer(&ss, &stats_timer);
 
     // free clients
     LinkedList1Node *node;

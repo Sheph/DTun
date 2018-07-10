@@ -10,7 +10,7 @@
 #include <log4cplus/configurator.h>
 #include <iostream>
 
-extern "C" int tun2socks_main(int argc, char **argv, int is_debugged);
+extern "C" int tun2socks_main(int argc, char **argv, int is_debugged, void (*stats_handler)(void*));
 
 static void udtReactorThreadFn(DTun::UDTReactor& reactor)
 {
@@ -20,6 +20,11 @@ static void udtReactorThreadFn(DTun::UDTReactor& reactor)
 static void tcpReactorThreadFn(DTun::TCPReactor& reactor)
 {
     reactor.run();
+}
+
+extern "C" void theStatsHandler(void*)
+{
+    DNode::theMasterClient->dump();
 }
 
 namespace DNode
@@ -106,7 +111,7 @@ int main(int argc, char* argv[])
             DNode::theMasterClient = &masterClient;
             DNode::theUdtReactor = &udtReactor;
 
-            res = tun2socks_main(argc, argv, isDebugged);
+            res = tun2socks_main(argc, argv, isDebugged, &theStatsHandler);
 
             DNode::theMasterClient = NULL;
             DNode::theUdtReactor = NULL;

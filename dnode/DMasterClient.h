@@ -22,6 +22,8 @@ namespace DNode
 
         bool start();
 
+        void changeNumOutConnections(int diff);
+
         // 's' will be closed even in case of failure!
         DTun::UInt32 registerConnection(SYSSOCKET s,
             DTun::UInt32 remoteIp,
@@ -29,6 +31,8 @@ namespace DNode
             const RegisterConnectionCallback& callback);
 
         void cancelConnection(DTun::UInt32 connId);
+
+        void dump();
 
     private:
         struct ConnMasterSession
@@ -80,6 +84,7 @@ namespace DNode
         boost::mutex m_;
         bool closing_;
         DTun::UInt32 nextConnId_;
+        int numOutConnections_;
         std::vector<char> buff_;
         ConnMasterSessionMap connMasterSessions_;
         AccMasterSessions accMasterSessions_;

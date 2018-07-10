@@ -33,6 +33,7 @@ namespace DNode
     , nodeId_(nodeId)
     , closing_(false)
     , nextConnId_(0)
+    , numOutConnections_(0)
     {
     }
 
@@ -62,6 +63,12 @@ namespace DNode
         return true;
     }
 
+    void DMasterClient::changeNumOutConnections(int diff)
+    {
+        boost::mutex::scoped_lock lock(m_);
+        numOutConnections_ += diff;
+    }
+
     DTun::UInt32 DMasterClient::registerConnection(SYSSOCKET s,
         DTun::UInt32 remoteIp,
         DTun::UInt16 remotePort,
@@ -84,13 +91,13 @@ namespace DNode
 
         if (!sess->startConnector(s, nodeId_, nodeId_, connId, remoteIp, remotePort,
             boost::bind(&DMasterClient::onRegisterConnection, this, _1, connId))) {
-            return false;
+            return 0;
         }
 
         connMasterSessions_[connId].sess = sess;
         connMasterSessions_[connId].callback = callback;
 
-        return true;
+        return connId;
     }
 
     void DMasterClient::cancelConnection(DTun::UInt32 connId)
@@ -111,6 +118,13 @@ namespace DNode
         connMasterSessions_.erase(it);
 
         lock.unlock();
+    }
+
+    void DMasterClient::dump()
+    {
+        boost::mutex::scoped_lock lock(m_);
+        LOG4CPLUS_INFO(logger(), "connSess=" << connMasterSessions_.size()
+            << ", accSess=" << accMasterSessions_.size() << ", prx=" << proxySessions_.size() << ", numOut=" << numOutConnections_);
     }
 
     void DMasterClient::onConnect(int err)

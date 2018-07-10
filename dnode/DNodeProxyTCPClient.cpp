@@ -29,6 +29,7 @@ namespace DNode
         , connId_(0)
         , boundSock_(SYS_INVALID_SOCKET)
         {
+            theMasterClient->changeNumOutConnections(1);
         }
 
         ~ProxyTCPClient()
@@ -58,6 +59,8 @@ namespace DNode
                 DTun::closeSysSocketChecked(boundSock_);
                 boundSock_ = SYS_INVALID_SOCKET;
             }
+
+            theMasterClient->changeNumOutConnections(-1);
         }
 
         bool start(DTun::UInt32 remoteIp, DTun::UInt16 remotePort)
@@ -148,6 +151,14 @@ namespace DNode
             return receiving_;
         }
 
+        void setErr()
+        {
+            boost::mutex::scoped_lock lock(m_);
+            state_ = STATE_ERR;
+            signalReactor();
+            reactorSignal_ = NULL;
+        }
+
     private:
         void onConnectionRegister(int err, DTun::UInt32 remoteIp, DTun::UInt16 remotePort)
         {
@@ -199,9 +210,6 @@ namespace DNode
             LOG4CPLUS_TRACE(logger(), "ProxyTCPClient::onConnect(" << err << ")");
 
             boost::mutex::scoped_lock lock(m_);
-            if (!reactorSignal_) {
-                return;
-            }
 
             UDTSOCKET sock = connector_->sock();
 
@@ -210,7 +218,16 @@ namespace DNode
             if (err) {
                 DTun::closeUDTSocketChecked(sock);
                 state_ = STATE_ERR;
-            } else {
+            }
+
+            if (!reactorSignal_) {
+                if (!err) {
+                    DTun::closeUDTSocketChecked(sock);
+                }
+                return;
+            }
+
+            if (!err) {
                 state_ = STATE_UP;
                 conn_ = boost::make_shared<DTun::UDTConnection>(boost::ref(*theUdtReactor), sock);
             }
@@ -283,6 +300,7 @@ typedef struct {
     int receiving;
     int bytes_sent;
     int bytes_received;
+    BTimer conn_timer;
     DNode::ProxyTCPClient* client;
     StreamPassInterface send_iface;
     StreamRecvInterface recv_iface;
@@ -338,6 +356,7 @@ extern "C" void DNodeProxyTCPClient_SignalHandler(BThreadSignal* reactor_signal)
         dtcp_client->state = new_state;
         if (dtcp_client->state == STATE_UP) {
             dtcp_client->was_connected = 1;
+            BReactor_RemoveTimer(dtcp_client->reactor_signal.reactor, &dtcp_client->conn_timer);
             StreamPassInterface_Init(&dtcp_client->send_iface,
                 (StreamPassInterface_handler_send)DNodeProxyTCPClient_SendHandler, dtcp_client,
                 BReactor_PendingGroup(reactor_signal->reactor));
@@ -365,6 +384,15 @@ extern "C" void DNodeProxyTCPClient_SignalHandler(BThreadSignal* reactor_signal)
     }
 }
 
+extern "C" void DNodeProxyTCPClient_ConnTimerHandler(DNodeProxyTCPClient* dtcp_client)
+{
+    ASSERT(!dtcp_client->was_connected)
+
+    LOG4CPLUS_TRACE(DNode::logger(), "DNodeProxyTCPClient_ConnTimerHandler");
+
+    dtcp_client->client->setErr();
+}
+
 extern "C" void DNodeProxyTCPClient_Destroy(struct DNodeTCPClient* dtcp_client_)
 {
     DNodeProxyTCPClient* dtcp_client = (DNodeProxyTCPClient*)dtcp_client_;
@@ -372,6 +400,8 @@ extern "C" void DNodeProxyTCPClient_Destroy(struct DNodeTCPClient* dtcp_client_)
     if (dtcp_client->was_connected) {
         StreamPassInterface_Free(&dtcp_client->send_iface);
         StreamRecvInterface_Free(&dtcp_client->recv_iface);
+    } else {
+        BReactor_RemoveTimer(dtcp_client->reactor_signal.reactor, &dtcp_client->conn_timer);
     }
 
     delete dtcp_client->client;
@@ -412,10 +442,14 @@ extern "C" struct DNodeTCPClient* DNodeProxyTCPClient_Create(BAddr dest_addr, DN
     dtcp_client->bytes_sent = 0;
     dtcp_client->bytes_received = 0;
 
+    BTimer_Init(&dtcp_client->conn_timer, 30000, (BTimer_handler)&DNodeProxyTCPClient_ConnTimerHandler, dtcp_client);
+    BReactor_SetTimer(reactor, &dtcp_client->conn_timer);
+
     dtcp_client->client = new DNode::ProxyTCPClient(&dtcp_client->reactor_signal);
 
     if (!dtcp_client->client->start(dest_addr.ipv4.ip, dest_addr.ipv4.port)) {
         delete dtcp_client->client;
+        BReactor_RemoveTimer(reactor, &dtcp_client->conn_timer);
         BThreadSignal_Free(&dtcp_client->reactor_signal);
         free(dtcp_client);
         return NULL;
