@@ -134,7 +134,7 @@ namespace DNode
         boost::mutex::scoped_lock lock(m_);
         LOG4CPLUS_INFO(logger(), "connSess=" << connMasterSessions_.size()
             << ", accSess=" << accMasterSessions_.size() << ", prx=" << proxySessions_.size() << ", numOut=" << numOutConnections_
-            << ", udtSocks=" << udtStats.numSockets << ", udtCsocks=" << udtStats.numClosedSockets
+            << ", udtSocks=" << udtStats.numSockets << ", udtCsocks=" << udtStats.numClosedSockets << ", udtMult=" << udtStats.numMultiplexers
             << ", numFds=" << numFds << ", maxFds=" << fdMax);
     }
 

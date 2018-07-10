@@ -1351,6 +1351,7 @@ CUDTStats CUDTUnited::getStats()
    CUDTStats stats;
    stats.numSockets = m_Sockets.size();
    stats.numClosedSockets = m_ClosedSockets.size();
+   stats.numMultiplexers = m_mMultiplexer.size();
    return stats;
 }
 
