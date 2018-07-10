@@ -53,9 +53,9 @@
  * Object used for detecting leaks.
  */
 typedef struct {
-    #ifndef NDEBUG
+//    #ifndef NDEBUG
     uint32_t c;
-    #endif
+//    #endif
 } DebugObject;
 
 /**
