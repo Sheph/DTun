@@ -63,6 +63,8 @@ set(SOURCES
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
+configure_file(config.ini ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/config.ini @ONLY)
+
 add_executable(dnode ${SOURCES})
 
 target_link_libraries(dnode dutil lwip udt ${Boost_SYSTEM_LIBRARY} ${Boost_THREAD_LIBRARY} rt dl)

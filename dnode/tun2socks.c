@@ -194,6 +194,8 @@ int num_clients;
 
 BTimer stats_timer;
 
+int tun2socks_needs_proxy(uint32_t ip);
+
 static void terminate (void);
 static void print_help (const char *name);
 static void print_version (void);
@@ -1204,7 +1206,11 @@ err_t listener_accept_func (void *arg, struct tcp_pcb *newpcb, err_t err)
     ASSERT_FORCE(BAddr_Parse2(&addr, OVERRIDE_DEST_ADDR, NULL, 0, 1))
 #endif
 
-    client->dtcp_client = DNodeProxyTCPClient_Create(addr, (DNodeTCPClient_handler)client_dtcp_handler, client, &ss);
+    if (tun2socks_needs_proxy(addr.ipv4.ip)) {
+        client->dtcp_client = DNodeProxyTCPClient_Create(addr, (DNodeTCPClient_handler)client_dtcp_handler, client, &ss);
+    } else {
+        client->dtcp_client = DNodeDirectTCPClient_Create(addr, (DNodeTCPClient_handler)client_dtcp_handler, client, &ss);
+    }
 
     if (!client->dtcp_client) {
         BLog(BLOG_ERROR, "listener accept: DNodeTCPClient_Init failed");

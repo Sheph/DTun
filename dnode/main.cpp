@@ -4,9 +4,11 @@
 #include "DTun/UDTReactor.h"
 #include "DTun/TCPReactor.h"
 #include "DTun/Utils.h"
+#include "DTun/StreamAppConfig.h"
 #include <boost/thread.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/program_options.hpp>
+#include <boost/make_shared.hpp>
 #include <log4cplus/configurator.h>
 #include <iostream>
 
@@ -27,6 +29,12 @@ extern "C" void theStatsHandler(void*)
     DNode::theMasterClient->dump();
 }
 
+extern "C" int tun2socks_needs_proxy(uint32_t ip)
+{
+    DTun::UInt32 tmp = 0;
+    return DNode::theMasterClient->getDstNodeId(ip, tmp);
+}
+
 namespace DNode
 {
     DTun::UDTReactor* theUdtReactor = NULL;
@@ -36,12 +44,14 @@ int main(int argc, char* argv[])
 {
     boost::program_options::variables_map vm;
     std::string logLevel = "TRACE";
+    std::string appConfigFile = "config.ini";
 
     try {
         boost::program_options::options_description desc("Options");
 
         desc.add_options()
-            ("log4cplus_level", boost::program_options::value<std::string>(&logLevel), "Log level");
+            ("log4cplus_level", boost::program_options::value<std::string>(&logLevel), "Log level")
+            ("app_config", boost::program_options::value<std::string>(&appConfigFile), "App config");
 
         boost::program_options::store(boost::program_options::command_line_parser(
             argc, argv).options(desc).allow_unregistered().run(), vm);
@@ -64,6 +74,21 @@ int main(int argc, char* argv[])
 
     log4cplus::PropertyConfigurator propConf(props);
     propConf.configure();
+
+    boost::shared_ptr<DTun::StreamAppConfig> appConfig =
+        boost::make_shared<DTun::StreamAppConfig>();
+
+    std::ifstream is(appConfigFile.c_str());
+
+    if (is) {
+        if (!appConfig->load(is)) {
+            LOG4CPLUS_WARN(DNode::logger(), "Cannot parse app config file " << appConfigFile);
+        }
+
+        is.close();
+    } else {
+        LOG4CPLUS_WARN(DNode::logger(), "App config file " << appConfigFile << " not found");
+    }
 
     int res = 0;
 
@@ -92,7 +117,7 @@ int main(int argc, char* argv[])
         boost::scoped_ptr<boost::thread> tcpReactorThread;
 
         {
-            DNode::DMasterClient masterClient(udtReactor, tcpReactor, "127.0.0.1", 2345, 1);
+            DNode::DMasterClient masterClient(udtReactor, tcpReactor, appConfig);
 
             if (!masterClient.start()) {
                 UDT::cleanup();

@@ -27,12 +27,14 @@ int main(int argc, char* argv[])
 {
     boost::program_options::variables_map vm;
     std::string logLevel = "TRACE";
+    int port = 2345;
 
     try {
         boost::program_options::options_description desc("Options");
 
         desc.add_options()
-            ("log4cplus_level", boost::program_options::value<std::string>(&logLevel), "Log level");
+            ("log4cplus_level", boost::program_options::value<std::string>(&logLevel), "Log level")
+            ("port", boost::program_options::value<int>(&port), "Port");
 
         boost::program_options::store(boost::program_options::command_line_parser(
             argc, argv).options(desc).allow_unregistered().run(), vm);
@@ -68,7 +70,7 @@ int main(int argc, char* argv[])
 
     UDT::startup();
 
-    boost::shared_ptr<Server> server_tmp = boost::make_shared<Server>(2345);
+    boost::shared_ptr<Server> server_tmp = boost::make_shared<Server>(port);
 
     if (!server_tmp->start()) {
         UDT::cleanup();

@@ -110,8 +110,6 @@ namespace DMaster
             return;
         }
 
-        LOG4CPLUS_TRACE(logger(), "Server::onSessionStartPersistent(" << sess_shared->nodeId() << ")");
-
         for (Sessions::const_iterator it = sessions_.begin(); it != sessions_.end(); ++it) {
             boost::shared_ptr<Session> other = *it;
             if ((other->nodeId() == sess_shared->nodeId()) &&
@@ -122,6 +120,9 @@ namespace DMaster
                 break;
             }
         }
+
+        LOG4CPLUS_INFO(logger(), "client " << DTun::ipPortToString(sess_shared->peerIp(), sess_shared->peerPort())
+            << ", nodeId = " << sess_shared->nodeId() << " connected");
     }
 
     void Server::onSessionStartConnector(const boost::weak_ptr<Session>& sess,
@@ -141,7 +142,8 @@ namespace DMaster
         boost::shared_ptr<Session> srcSess = findPersistentSession(sess_shared->nodeId());
 
         if (!srcSess) {
-            LOG4CPLUS_ERROR(logger(), "persistent source session not found for connector");
+            LOG4CPLUS_ERROR(logger(), "persistent source session not found for connector srcNodeId = "
+                << sess_shared->nodeId() << ", dstNodeId = " << dstNodeId << ", addr = " << DTun::ipPortToString(remoteIp, remotePort));
             return;
         }
 
@@ -150,12 +152,14 @@ namespace DMaster
         boost::shared_ptr<Session> dstSess = findPersistentSession(dstNodeId);
 
         if (!dstSess) {
-            LOG4CPLUS_ERROR(logger(), "persistent dest session not found for connector");
+            LOG4CPLUS_ERROR(logger(), "persistent dest session not found for connector srcNodeId = "
+                << sess_shared->nodeId() << ", dstNodeId = " << dstNodeId << ", addr = " << DTun::ipPortToString(remoteIp, remotePort));
             srcSess->setConnRequestErr(connId, DPROTOCOL_ERR_NOTFOUND);
             return;
         }
 
         if (sess_shared->peerIp() == 0) {
+            LOG4CPLUS_ERROR(logger(), "no src peer address, cannot proceed with connector");
             srcSess->setConnRequestErr(connId, DPROTOCOL_ERR_UNKNOWN);
             return;
         }
@@ -176,11 +180,13 @@ namespace DMaster
         boost::shared_ptr<Session> srcSess = findPersistentSession(srcNodeId);
 
         if (!srcSess) {
-            LOG4CPLUS_ERROR(logger(), "persistent source session not found for acceptor");
+            LOG4CPLUS_ERROR(logger(), "persistent source session not found for acceptor srcNodeId = "
+                << srcNodeId << ", dstNodeId = " << sess_shared->nodeId());
             return;
         }
 
         if (sess_shared->peerIp() == 0) {
+            LOG4CPLUS_ERROR(logger(), "no dst peer address, cannot proceed with acceptor");
             srcSess->setConnRequestErr(connId, DPROTOCOL_ERR_UNKNOWN);
             return;
         }
@@ -196,6 +202,11 @@ namespace DMaster
         }
 
         LOG4CPLUS_TRACE(logger(), "Server::onSessionError(" << sess_shared->nodeId() << ", " << errCode << ")");
+
+        if (sess_shared->type() == Session::TypePersistent) {
+            LOG4CPLUS_INFO(logger(), "client " << DTun::ipPortToString(sess_shared->peerIp(), sess_shared->peerPort())
+                << ", nodeId = " << sess_shared->nodeId() << " disconnected");
+        }
 
         removeSession(sess_shared);
     }

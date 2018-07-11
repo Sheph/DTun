@@ -12,6 +12,7 @@ set(SOURCES
     TCPSocket.cpp
     Logger.cpp
     Utils.cpp
+    StreamAppConfig.cpp
 )
 
 add_library(dutil STATIC ${SOURCES})

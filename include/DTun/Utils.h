@@ -10,6 +10,8 @@ namespace DTun
 
     std::string ipToString(UInt32 ipAddress);
 
+    bool stringToIp(const std::string& str, UInt32& ipAddress);
+
     std::string portToString(UInt16 port);
 
     std::string ipPortToString(UInt32 ipAddress, UInt16 port);

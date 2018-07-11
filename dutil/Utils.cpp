@@ -57,6 +57,19 @@ namespace DTun
         return os.str();
     }
 
+    bool stringToIp(const std::string& str, UInt32& ipAddress)
+    {
+        struct in_addr buff;
+
+        if (::inet_pton(AF_INET, str.c_str(), &buff) <= 0) {
+            return false;
+        }
+
+        ipAddress = buff.s_addr;
+
+        return true;
+    }
+
     std::string portToString(UInt16 port)
     {
         std::ostringstream os;

@@ -7,6 +7,7 @@
 #include "DTun/UDTConnector.h"
 #include "DTun/UDTConnection.h"
 #include "DTun/TCPReactor.h"
+#include "DTun/AppConfig.h"
 #include "DMasterSession.h"
 #include "ProxySession.h"
 
@@ -17,7 +18,8 @@ namespace DNode
     public:
         typedef boost::function<void (int, DTun::UInt32, DTun::UInt16)> RegisterConnectionCallback;
 
-        DMasterClient(DTun::UDTReactor& udtReactor, DTun::TCPReactor& tcpReactor, const std::string& address, int port, DTun::UInt32 nodeId);
+        DMasterClient(DTun::UDTReactor& udtReactor, DTun::TCPReactor& tcpReactor,
+            const boost::shared_ptr<DTun::AppConfig>& appConfig);
         ~DMasterClient();
 
         bool start();
@@ -34,7 +36,20 @@ namespace DNode
 
         void dump();
 
+        bool getDstNodeId(DTun::UInt32 remoteIp, DTun::UInt32& dstNodeId) const;
+
     private:
+        struct RouteEntry
+        {
+            RouteEntry()
+            : ip(0)
+            , mask(0) {}
+
+            DTun::UInt32 ip;
+            DTun::UInt32 mask;
+            boost::optional<DTun::UInt32> nodeId;
+        };
+
         struct ConnMasterSession
         {
             boost::shared_ptr<DMasterSession> sess;
@@ -50,6 +65,7 @@ namespace DNode
             SYSSOCKET sock;
         };
 
+        typedef std::vector<RouteEntry> Routes;
         typedef std::map<DTun::UInt32, ConnMasterSession> ConnMasterSessionMap;
         typedef std::map<boost::shared_ptr<DMasterSession>, boost::shared_ptr<SysSocketHolder> > AccMasterSessions;
         typedef std::set<boost::shared_ptr<ProxySession> > ProxySessions;
@@ -80,6 +96,7 @@ namespace DNode
         std::string address_;
         int port_;
         DTun::UInt32 nodeId_;
+        Routes routes_;
 
         boost::mutex m_;
         bool closing_;

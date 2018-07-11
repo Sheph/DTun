@@ -67,6 +67,8 @@ set (COMMON_HEADERS
     ${DTUN_INCLUDE_DIR}/DTun/UDTAcceptor.h
     ${DTUN_INCLUDE_DIR}/DTun/UDTConnector.h
     ${DTUN_INCLUDE_DIR}/DTun/UDTConnection.h
+    ${DTUN_INCLUDE_DIR}/DTun/AppConfig.h
+    ${DTUN_INCLUDE_DIR}/DTun/StreamAppConfig.h
     ${DTUN_INCLUDE_DIR}/udt.h
 )
 

@@ -26,16 +26,50 @@ namespace DNode
         }
     }
 
-    DMasterClient::DMasterClient(DTun::UDTReactor& udtReactor, DTun::TCPReactor& tcpReactor, const std::string& address, int port, DTun::UInt32 nodeId)
+    DMasterClient::DMasterClient(DTun::UDTReactor& udtReactor, DTun::TCPReactor& tcpReactor,
+        const boost::shared_ptr<DTun::AppConfig>& appConfig)
     : udtReactor_(udtReactor)
     , tcpReactor_(tcpReactor)
-    , address_(address)
-    , port_(port)
-    , nodeId_(nodeId)
     , closing_(false)
     , nextConnId_(0)
     , numOutConnections_(0)
     {
+        address_ = appConfig->getString("server.address");
+        port_ = appConfig->getUInt32("server.port");
+        nodeId_ = appConfig->getUInt32("node.id");
+
+        LOG4CPLUS_INFO(logger(), "Server used: " << address_ << ":" << port_ << ", this nodeId: " << nodeId_);
+
+        std::vector<std::string> routeKeys = appConfig->getSubKeys("node.route");
+
+        routes_.resize(routeKeys.size());
+
+        for (std::vector<std::string>::const_iterator it = routeKeys.begin();
+             it != routeKeys.end(); ++it) {
+            int i = ::atoi(it->c_str());
+            if ((i < 0) || (i >= (int)routes_.size())) {
+                LOG4CPLUS_WARN(logger(), "Bad route index: " << i);
+                continue;
+            }
+            std::string ipStr = appConfig->getString("node.route." + *it + ".ip");
+            if (!DTun::stringToIp(ipStr, routes_[i].ip)) {
+                LOG4CPLUS_WARN(logger(), "Cannot parse ip address: " << ipStr);
+            }
+            std::string maskStr = appConfig->getString("node.route." + *it + ".mask");
+            if (!DTun::stringToIp(maskStr, routes_[i].mask)) {
+                LOG4CPLUS_WARN(logger(), "Cannot parse ip address: " << ipStr);
+            }
+            int nodeId = appConfig->getSInt32("node.route." + *it + ".node");
+            if (nodeId >= 0) {
+                routes_[i].nodeId = nodeId;
+            }
+        }
+
+        LOG4CPLUS_INFO(logger(), "Routes:");
+        for (size_t i = 0; i < routes_.size(); ++i) {
+            LOG4CPLUS_INFO(logger(), "#" << i << ": " << DTun::ipToString(routes_[i].ip) << "/" << DTun::ipToString(routes_[i].mask)
+                << " -> " << (routes_[i].nodeId ? (int)*routes_[i].nodeId : -1));
+        }
     }
 
     DMasterClient::~DMasterClient()
@@ -75,6 +109,13 @@ namespace DNode
         DTun::UInt16 remotePort,
         const RegisterConnectionCallback& callback)
     {
+        DTun::UInt32 dstNodeId = 0;
+
+        if (!getDstNodeId(remoteIp, dstNodeId)) {
+            LOG4CPLUS_ERROR(logger(), "No route to " << DTun::ipToString(remoteIp));
+            return 0;
+        }
+
         boost::mutex::scoped_lock lock(m_);
 
         if (!conn_ || closing_) {
@@ -90,7 +131,7 @@ namespace DNode
             connId = nextConnId_++;
         }
 
-        if (!sess->startConnector(s, nodeId_, nodeId_, connId, remoteIp, remotePort,
+        if (!sess->startConnector(s, nodeId_, dstNodeId, connId, remoteIp, remotePort,
             boost::bind(&DMasterClient::onRegisterConnection, this, _1, connId))) {
             return 0;
         }
@@ -138,6 +179,21 @@ namespace DNode
             << ", numFds=" << numFds << ", maxFds=" << fdMax);
     }
 
+    bool DMasterClient::getDstNodeId(DTun::UInt32 remoteIp, DTun::UInt32& dstNodeId) const
+    {
+        for (size_t i = 0; i < routes_.size(); ++i) {
+            if ((remoteIp & routes_[i].mask) == (routes_[i].ip & routes_[i].mask)) {
+                if (routes_[i].nodeId) {
+                    dstNodeId = *routes_[i].nodeId;
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+        }
+        return false;
+    }
+
     void DMasterClient::onConnect(int err)
     {
         LOG4CPLUS_TRACE(logger(), "DMasterClient::onConnect(" << err << ")");
@@ -149,8 +205,12 @@ namespace DNode
         connector_->close();
 
         if (err) {
+            LOG4CPLUS_ERROR(logger(), "No connection to server");
+
             DTun::closeUDTSocketChecked(sock);
         } else {
+            LOG4CPLUS_INFO(logger(), "Connected to server");
+
             conn_ = boost::make_shared<DTun::UDTConnection>(boost::ref(udtReactor_), sock);
 
             DTun::DProtocolHeader header;
@@ -178,6 +238,7 @@ namespace DNode
             boost::shared_ptr<DTun::UDTConnection> tmp = conn_;
             conn_.reset();
             lock.unlock();
+            LOG4CPLUS_ERROR(logger(), "Connection to server lost");
             return;
         }
 
@@ -197,6 +258,7 @@ namespace DNode
             boost::shared_ptr<DTun::UDTConnection> tmp = conn_;
             conn_.reset();
             lock.unlock();
+            LOG4CPLUS_ERROR(logger(), "Connection to server lost");
             return;
         }
 
@@ -242,6 +304,7 @@ namespace DNode
             boost::shared_ptr<DTun::UDTConnection> tmp = conn_;
             conn_.reset();
             lock.unlock();
+            LOG4CPLUS_ERROR(logger(), "Connection to server lost");
             return;
         }
 
@@ -271,6 +334,7 @@ namespace DNode
             boost::shared_ptr<DTun::UDTConnection> tmp = conn_;
             conn_.reset();
             lock.unlock();
+            LOG4CPLUS_ERROR(logger(), "Connection to server lost");
             return;
         }
 
@@ -309,6 +373,7 @@ namespace DNode
             boost::shared_ptr<DTun::UDTConnection> tmp = conn_;
             conn_.reset();
             lock.unlock();
+            LOG4CPLUS_ERROR(logger(), "Connection to server lost");
             return;
         }
 
@@ -334,6 +399,7 @@ namespace DNode
         lock.unlock();
 
         tmp.sess.reset();
+        LOG4CPLUS_ERROR(logger(), "connId " << msg.connId << " failed with errCode " << msg.errCode);
         tmp.callback(msg.errCode, 0, 0);
     }
 
