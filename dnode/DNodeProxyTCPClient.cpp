@@ -27,6 +27,7 @@ namespace DNode
         , bytesSent_(0)
         , bytesReceived_(0)
         , connId_(0)
+        , debugConnId_(0)
         , boundSock_(SYS_INVALID_SOCKET)
         {
             theMasterClient->changeNumOutConnections(1);
@@ -61,6 +62,10 @@ namespace DNode
             }
 
             theMasterClient->changeNumOutConnections(-1);
+
+            if (debugConnId_) {
+                LOG4CPLUS_INFO(logger(), "conn done, id = " << debugConnId_);
+            }
         }
 
         bool start(DTun::UInt32 remoteIp, DTun::UInt16 remotePort)
@@ -101,6 +106,9 @@ namespace DNode
                 DTun::closeSysSocketChecked(boundSock);
                 return false;
             }
+
+            LOG4CPLUS_INFO(logger(), "new conn to " << DTun::ipPortToString(remoteIp, remotePort) << ", id = " << connId_);
+            debugConnId_ = connId_;
 
             boundSock_ = boundSock;
 
@@ -294,6 +302,7 @@ namespace DNode
         int bytesSent_;
         int bytesReceived_;
         DTun::UInt32 connId_;
+        DTun::UInt32 debugConnId_;
         SYSSOCKET boundSock_;
         boost::shared_ptr<DTun::UDTConnection> conn_;
         boost::shared_ptr<DTun::UDTConnector> connector_;
