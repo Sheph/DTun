@@ -419,8 +419,13 @@ namespace DTun
         for (SocketMap::iterator it = sockets_.begin(); it != sockets_.end(); ++it) {
             PollSocketMap::iterator psIt = pollSockets_.find(it->second.socket->sock());
             if (psIt == pollSockets_.end()) {
-                pollSockets_.insert(std::make_pair(it->second.socket->sock(),
-                    PollSocketInfo(it->second.socket->cookie(), it->second.pollEvents)));
+                std::pair<PollSocketMap::iterator, bool> res =
+                    pollSockets_.insert(std::make_pair(it->second.socket->sock(),
+                        PollSocketInfo(it->second.socket->cookie(), it->second.pollEvents)));
+                assert(res.second);
+                if (!res.second) {
+                    LOG4CPLUS_FATAL(logger(), "duplicate fd 1");
+                }
                 int pollEvents = it->second.pollEvents;
                 if (pollEvents != 0) {
                     pollEvents |= UDT_EPOLL_ERR;
@@ -430,6 +435,9 @@ namespace DTun
                 }
             } else {
                 assert(psIt->second.cookie == it->second.socket->cookie());
+                if (psIt->second.cookie != it->second.socket->cookie()) {
+                    LOG4CPLUS_FATAL(logger(), "duplicate fd 2");
+                }
             }
         }
     }
