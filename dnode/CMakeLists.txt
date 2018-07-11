@@ -63,7 +63,8 @@ set(SOURCES
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
-configure_file(config.ini ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/config.ini @ONLY)
+configure_file(config1.ini ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/config1.ini @ONLY)
+configure_file(config2.ini ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/config2.ini @ONLY)
 
 add_executable(dnode ${SOURCES})
 
