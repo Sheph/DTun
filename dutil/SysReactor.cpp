@@ -98,12 +98,26 @@ namespace DTun
         while (!stopping_) {
             ev.resize(pollHandlers_.size() + 1);
 
+            int timeout = -1;
+
             {
                 boost::mutex::scoped_lock lock(m_);
                 inPoll_ = true;
+                wakeupTime_.reset();
+                if (!tokens_.empty()) {
+                    wakeupTime_ = tokens_.begin()->scheduledTime;
+                    boost::chrono::steady_clock::time_point now =
+                        boost::chrono::steady_clock::now();
+                    if (*wakeupTime_ > now) {
+                        timeout = boost::chrono::duration_cast<boost::chrono::milliseconds>(
+                            *wakeupTime_ - now).count();
+                    } else {
+                        timeout = 0;
+                    }
+                }
             }
 
-            int numReady = ::epoll_wait(eid_, &ev[0], ev.size(), -1);
+            int numReady = ::epoll_wait(eid_, &ev[0], ev.size(), timeout);
             int epollErr = errno;
 
             {
@@ -113,7 +127,7 @@ namespace DTun
                 c_.notify_all();
             }
 
-            if (numReady <= 0) {
+            if (numReady < 0) {
                 if (epollErr == EINTR) {
                     // In order to satisfy gdb...
                     continue;
@@ -177,6 +191,22 @@ namespace DTun
     {
         stopping_ = true;
         signalWr();
+    }
+
+    void SysReactor::dispatch(const Callback& callback, UInt32 timeoutMs)
+    {
+        boost::chrono::steady_clock::time_point scheduledTime =
+            boost::chrono::steady_clock::now() + boost::chrono::microseconds(timeoutMs);
+
+        boost::mutex::scoped_lock lock(m_);
+
+        tokens_.insert(DispatchToken(scheduledTime, callback, nextTokenId_++));
+
+        if (!isSameThread()) {
+            if (!wakeupTime_ || (scheduledTime < *wakeupTime_)) {
+                signalWr();
+            }
+        }
     }
 
     void SysReactor::add(SysHandler* handler)
@@ -296,6 +326,8 @@ namespace DTun
 
     void SysReactor::processUpdates()
     {
+        processTokens();
+
         boost::mutex::scoped_lock lock(m_);
 
         for (PollHandlerMap::iterator it = pollHandlers_.begin(); it != pollHandlers_.end();) {
@@ -360,6 +392,29 @@ namespace DTun
                     LOG4CPLUS_FATAL(logger(), "duplicate fd 2");
                 }
             }
+        }
+    }
+
+    void SysReactor::processTokens()
+    {
+        boost::mutex::scoped_lock lock(m_);
+
+        while (!tokens_.empty()) {
+            boost::chrono::steady_clock::time_point now =
+                boost::chrono::steady_clock::now();
+
+            const DispatchToken& first = *(tokens_.begin());
+
+            if (first.scheduledTime > now) {
+                break;
+            }
+
+            Callback cb = first.callback;
+
+            tokens_.erase(tokens_.begin());
+
+            lock.unlock();
+            cb();
         }
     }
 }

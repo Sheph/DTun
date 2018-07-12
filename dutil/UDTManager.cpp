@@ -14,6 +14,11 @@ namespace DTun
     {
     }
 
+    SReactor& UDTManager::reactor()
+    {
+        return reactor_;
+    }
+
     boost::shared_ptr<SHandle> UDTManager::createStreamSocket()
     {
         UDTSOCKET sock = UDT::socket(AF_INET, SOCK_STREAM, 0);

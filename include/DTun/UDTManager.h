@@ -12,6 +12,8 @@ namespace DTun
         explicit UDTManager(UDTReactor& reactor);
         ~UDTManager();
 
+        virtual SReactor& reactor();
+
         virtual boost::shared_ptr<SHandle> createStreamSocket();
 
         virtual boost::shared_ptr<SHandle> createDatagramSocket();

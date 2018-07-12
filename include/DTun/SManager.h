@@ -2,6 +2,7 @@
 #define _DTUN_SMANAGER_H_
 
 #include "DTun/SHandle.h"
+#include "DTun/SReactor.h"
 
 namespace DTun
 {
@@ -10,6 +11,8 @@ namespace DTun
     public:
         SManager() {}
         virtual ~SManager() {}
+
+        virtual SReactor& reactor() = 0;
 
         virtual boost::shared_ptr<SHandle> createStreamSocket() = 0;
 

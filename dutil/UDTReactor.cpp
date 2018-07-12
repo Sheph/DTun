@@ -269,6 +269,11 @@ namespace DTun
         signalWr();
     }
 
+    void UDTReactor::dispatch(const Callback& callback, UInt32 timeoutMs)
+    {
+        assert(false);
+    }
+
     void UDTReactor::add(UDTHandler* handler)
     {
         int evts = handler->getPollEvents();

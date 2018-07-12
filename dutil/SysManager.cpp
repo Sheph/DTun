@@ -14,6 +14,11 @@ namespace DTun
     {
     }
 
+    SReactor& SysManager::reactor()
+    {
+        return reactor_;
+    }
+
     boost::shared_ptr<SHandle> SysManager::createStreamSocket()
     {
         SYSSOCKET sock = ::socket(AF_INET, SOCK_STREAM, 0);

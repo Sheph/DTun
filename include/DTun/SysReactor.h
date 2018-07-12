@@ -2,14 +2,16 @@
 #define _DTUN_SYSREACTOR_H_
 
 #include "DTun/SysHandler.h"
+#include "DTun/SReactor.h"
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/condition.hpp>
 #include <boost/thread.hpp>
+#include <boost/chrono.hpp>
 #include <map>
 
 namespace DTun
 {
-    class SysReactor : boost::noncopyable
+    class SysReactor : public SReactor
     {
     public:
         explicit SysReactor();
@@ -22,6 +24,8 @@ namespace DTun
         void processUpdates();
 
         void stop();
+
+        virtual void dispatch(const Callback& callback, UInt32 timeoutMs = 0);
 
         void add(SysHandler* handler);
         boost::shared_ptr<SysHandle> remove(SysHandler* handler);
@@ -59,6 +63,30 @@ namespace DTun
             bool notInEpoll;
         };
 
+        struct DispatchToken
+        {
+            DispatchToken(const boost::chrono::steady_clock::time_point& scheduledTime,
+                const Callback& callback, uint64_t id)
+            : scheduledTime(scheduledTime)
+            , callback(callback)
+            , id(id) {}
+            ~DispatchToken() {}
+
+            inline bool operator<(const DispatchToken& rhs) const
+            {
+                if (scheduledTime < rhs.scheduledTime) {
+                    return true;
+                } else if (scheduledTime > rhs.scheduledTime) {
+                    return false;
+                }
+                return id < rhs.id;
+            }
+
+            boost::chrono::steady_clock::time_point scheduledTime;
+            Callback callback;
+            uint64_t id;
+        };
+
         typedef std::map<uint64_t, HandlerInfo> HandlerMap;
         typedef std::map<SYSSOCKET, PollHandlerInfo> PollHandlerMap;
 
@@ -68,6 +96,8 @@ namespace DTun
 
         void signalWr();
         void signalRd();
+
+        void processTokens();
 
         boost::thread::id runThreadId_;
 
@@ -83,6 +113,9 @@ namespace DTun
         bool inPoll_;
         uint64_t pollIteration_;
         SysHandler* currentlyHandling_;
+        std::set<DispatchToken> tokens_;
+        uint64_t nextTokenId_;
+        boost::optional<boost::chrono::steady_clock::time_point> wakeupTime_;
     };
 }
 

@@ -65,6 +65,7 @@ set (COMMON_HEADERS
     ${DTUN_INCLUDE_DIR}/DTun/SConnector.h
     ${DTUN_INCLUDE_DIR}/DTun/SHandle.h
     ${DTUN_INCLUDE_DIR}/DTun/SHandler.h
+    ${DTUN_INCLUDE_DIR}/DTun/SReactor.h
     ${DTUN_INCLUDE_DIR}/DTun/SignalBlocker.h
     ${DTUN_INCLUDE_DIR}/DTun/SignalHandler.h
     ${DTUN_INCLUDE_DIR}/DTun/SManager.h

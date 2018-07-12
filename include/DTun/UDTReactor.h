@@ -2,6 +2,7 @@
 #define _DTUN_UDTREACTOR_H_
 
 #include "DTun/UDTHandler.h"
+#include "DTun/SReactor.h"
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/condition.hpp>
 #include <boost/thread.hpp>
@@ -9,7 +10,7 @@
 
 namespace DTun
 {
-    class UDTReactor : boost::noncopyable
+    class UDTReactor : public SReactor
     {
     public:
         explicit UDTReactor();
@@ -22,6 +23,8 @@ namespace DTun
         void processUpdates();
 
         void stop();
+
+        virtual void dispatch(const Callback& callback, UInt32 timeoutMs = 0);
 
         void add(UDTHandler* handler);
         boost::shared_ptr<UDTHandle> remove(UDTHandler* handler);

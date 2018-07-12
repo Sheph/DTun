@@ -12,6 +12,8 @@ namespace DTun
         explicit SysManager(SysReactor& reactor);
         ~SysManager();
 
+        virtual SReactor& reactor();
+
         virtual boost::shared_ptr<SHandle> createStreamSocket();
 
         virtual boost::shared_ptr<SHandle> createDatagramSocket();
