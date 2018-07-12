@@ -83,6 +83,13 @@ set (COMMON_HEADERS
     ${DTUN_INCLUDE_DIR}/DTun/UDTHandler.h
     ${DTUN_INCLUDE_DIR}/DTun/UDTManager.h
     ${DTUN_INCLUDE_DIR}/DTun/UDTReactor.h
+    ${DTUN_INCLUDE_DIR}/DTun/LTUDPAcceptor.h
+    ${DTUN_INCLUDE_DIR}/DTun/LTUDPConnection.h
+    ${DTUN_INCLUDE_DIR}/DTun/LTUDPConnector.h
+    ${DTUN_INCLUDE_DIR}/DTun/LTUDPHandle.h
+    ${DTUN_INCLUDE_DIR}/DTun/LTUDPHandleImpl.h
+    ${DTUN_INCLUDE_DIR}/DTun/LTUDPManager.h
+    ${DTUN_INCLUDE_DIR}/DTun/OpWatch.h
     ${DTUN_INCLUDE_DIR}/DTun/Utils.h
 )
 

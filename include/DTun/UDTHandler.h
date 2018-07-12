@@ -20,12 +20,12 @@ namespace DTun
         inline UDTReactor& reactor() { return reactor_; }
 
         virtual boost::shared_ptr<SHandle> handle() const { return handle_; }
-        virtual const boost::shared_ptr<UDTHandle>& udtHandle() const { return handle_; }
+        const boost::shared_ptr<UDTHandle>& udtHandle() const { return handle_; }
 
         inline void setCookie(uint64_t cookie) { cookie_ = cookie; }
         inline uint64_t cookie() const { return cookie_; }
 
-        virtual void resetHandle() { handle_.reset(); }
+        void resetHandle() { handle_.reset(); }
 
         virtual int getPollEvents() const = 0;
 

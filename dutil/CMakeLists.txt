@@ -16,6 +16,13 @@ set(SOURCES
     UDTHandler.cpp
     UDTManager.cpp
     UDTReactor.cpp
+    LTUDPAcceptor.cpp
+    LTUDPConnection.cpp
+    LTUDPConnector.cpp
+    LTUDPHandle.cpp
+    LTUDPHandleImpl.cpp
+    LTUDPManager.cpp
+    OpWatch.cpp
     Utils.cpp
 )
 

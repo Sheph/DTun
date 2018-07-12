@@ -25,7 +25,7 @@ namespace DTun
         inline void setCookie(uint64_t cookie) { cookie_ = cookie; }
         inline uint64_t cookie() const { return cookie_; }
 
-        virtual void resetHandle() { handle_.reset(); }
+        void resetHandle() { handle_.reset(); }
 
         virtual int getPollEvents() const = 0;
 
