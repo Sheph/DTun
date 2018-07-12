@@ -193,7 +193,7 @@ namespace DTun
         signalWr();
     }
 
-    void SysReactor::dispatch(const Callback& callback, UInt32 timeoutMs)
+    void SysReactor::post(const Callback& callback, UInt32 timeoutMs)
     {
         boost::chrono::steady_clock::time_point scheduledTime =
             boost::chrono::steady_clock::now() + boost::chrono::microseconds(timeoutMs);

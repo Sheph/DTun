@@ -269,7 +269,7 @@ namespace DTun
         signalWr();
     }
 
-    void UDTReactor::dispatch(const Callback& callback, UInt32 timeoutMs)
+    void UDTReactor::post(const Callback& callback, UInt32 timeoutMs)
     {
         assert(false);
     }
