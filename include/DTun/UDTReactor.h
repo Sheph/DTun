@@ -1,7 +1,7 @@
 #ifndef _DTUN_UDTREACTOR_H_
 #define _DTUN_UDTREACTOR_H_
 
-#include "DTun/UDTSocket.h"
+#include "DTun/UDTHandler.h"
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/condition.hpp>
 #include <boost/thread.hpp>
@@ -23,33 +23,33 @@ namespace DTun
 
         void stop();
 
-        void add(UDTSocket* socket);
-        UDTSOCKET remove(UDTSocket* socket);
-        void update(UDTSocket* socket);
+        void add(UDTHandler* handler);
+        boost::shared_ptr<UDTHandle> remove(UDTHandler* handler);
+        void update(UDTHandler* handler);
 
     private:
-        struct SocketInfo
+        struct HandlerInfo
         {
-            SocketInfo()
-            : socket(NULL)
+            HandlerInfo()
+            : handler(NULL)
             , pollEvents(0) {}
 
-            SocketInfo(UDTSocket* socket, int pollEvents)
-            : socket(socket)
+            HandlerInfo(UDTHandler* handler, int pollEvents)
+            : handler(handler)
             , pollEvents(pollEvents) {}
 
-            UDTSocket* socket;
+            UDTHandler* handler;
             int pollEvents;
         };
 
-        struct PollSocketInfo
+        struct PollHandlerInfo
         {
-            PollSocketInfo()
+            PollHandlerInfo()
             : cookie(0)
             , pollEvents(0)
             , notInEpoll(false) {}
 
-            PollSocketInfo(uint64_t cookie, int pollEvents)
+            PollHandlerInfo(uint64_t cookie, int pollEvents)
             : cookie(cookie)
             , pollEvents(pollEvents)
             , notInEpoll(false) {}
@@ -59,8 +59,8 @@ namespace DTun
             bool notInEpoll;
         };
 
-        typedef std::map<uint64_t, SocketInfo> SocketMap;
-        typedef std::map<UDTSOCKET, PollSocketInfo> PollSocketMap;
+        typedef std::map<uint64_t, HandlerInfo> HandlerMap;
+        typedef std::map<UDTSOCKET, PollHandlerInfo> PollHandlerMap;
 
         void reset();
 
@@ -78,11 +78,11 @@ namespace DTun
         uint64_t nextCookie_;
         UDTSOCKET signalWrSock_;
         UDTSOCKET signalRdSock_;
-        SocketMap sockets_;
-        PollSocketMap pollSockets_;
+        HandlerMap handlers_;
+        PollHandlerMap pollHandlers_;
         bool inPoll_;
         uint64_t pollIteration_;
-        UDTSocket* currentlyHandling_;
+        UDTHandler* currentlyHandling_;
     };
 }
 

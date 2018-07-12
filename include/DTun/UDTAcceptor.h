@@ -1,20 +1,19 @@
 #ifndef _DTUN_UDTACCEPTOR_H_
 #define _DTUN_UDTACCEPTOR_H_
 
-#include "DTun/UDTSocket.h"
+#include "DTun/UDTHandler.h"
+#include "DTun/SAcceptor.h"
 #include <boost/thread.hpp>
 
 namespace DTun
 {
-    class UDTAcceptor : public UDTSocket
+    class UDTAcceptor : public UDTHandler, public SAcceptor
     {
     public:
-        typedef boost::function<void (UDTSOCKET)> ListenCallback;
-
-        UDTAcceptor(UDTReactor& reactor, UDTSOCKET sock);
+        UDTAcceptor(UDTReactor& reactor, const boost::shared_ptr<UDTHandle>& handle);
         ~UDTAcceptor();
 
-        bool listen(int backlog, const ListenCallback& callback);
+        virtual bool listen(int backlog, const ListenCallback& callback);
 
         virtual void close();
 

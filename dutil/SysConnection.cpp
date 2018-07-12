@@ -1,5 +1,5 @@
-#include "DTun/TCPConnection.h"
-#include "DTun/TCPReactor.h"
+#include "DTun/SysConnection.h"
+#include "DTun/SysReactor.h"
 #include "DTun/Utils.h"
 #include "Logger.h"
 #include <unistd.h>
@@ -10,18 +10,18 @@
 
 namespace DTun
 {
-    TCPConnection::TCPConnection(TCPReactor& reactor, SYSSOCKET sock)
-    : TCPSocket(reactor, sock)
+    SysConnection::SysConnection(SysReactor& reactor, const boost::shared_ptr<SysHandle>& handle)
+    : SysHandler(reactor, handle)
     {
         reactor.add(this);
     }
 
-    TCPConnection::~TCPConnection()
+    SysConnection::~SysConnection()
     {
         close();
     }
 
-    void TCPConnection::write(const char* first, const char* last, const WriteCallback& callback)
+    void SysConnection::write(const char* first, const char* last, const WriteCallback& callback)
     {
         WriteReq req;
 
@@ -37,8 +37,14 @@ namespace DTun
         reactor().update(this);
     }
 
-    void TCPConnection::read(char* first, char* last, const ReadCallback& callback)
+    void SysConnection::read(char* first, char* last, const ReadCallback& callback, bool readAll)
     {
+        assert(!readAll);
+        if (readAll) {
+            LOG4CPLUS_FATAL(logger(), "realAll not supported!");
+            return;
+        }
+
         ReadReq req;
 
         req.first = first;
@@ -53,15 +59,15 @@ namespace DTun
         reactor().update(this);
     }
 
-    void TCPConnection::close()
+    void SysConnection::close()
     {
-        SYSSOCKET s = reactor().remove(this);
-        if (s != SYS_INVALID_SOCKET) {
-            DTun::closeSysSocketChecked(s);
+        boost::shared_ptr<SysHandle> handle = reactor().remove(this);
+        if (handle) {
+            handle->close();
         }
     }
 
-    int TCPConnection::getPollEvents() const
+    int SysConnection::getPollEvents() const
     {
         int res = 0;
 
@@ -76,7 +82,7 @@ namespace DTun
         return res;
     }
 
-    void TCPConnection::handleRead()
+    void SysConnection::handleRead()
     {
         ReadReq* req;
 
@@ -89,7 +95,7 @@ namespace DTun
         ReadCallback cb;
 
         int res;
-        if ((res = ::recv(sock(), req->first, req->last - req->first, 0)) == -1) {
+        if ((res = ::recv(sysHandle()->sock(), req->first, req->last - req->first, 0)) == -1) {
             int err = errno;
             LOG4CPLUS_TRACE(logger(), "Cannot read TCP socket: " << strerror(err));
 
@@ -120,7 +126,7 @@ namespace DTun
         }
     }
 
-    void TCPConnection::handleWrite()
+    void SysConnection::handleWrite()
     {
         WriteReq* req;
 
@@ -133,7 +139,7 @@ namespace DTun
         WriteCallback cb;
 
         int res;
-        if ((res = ::send(sock(), req->first, req->last - req->first, 0)) == -1) {
+        if ((res = ::send(sysHandle()->sock(), req->first, req->last - req->first, 0)) == -1) {
             int err = errno;
             LOG4CPLUS_TRACE(logger(), "Cannot write TCP socket: " << err);
 

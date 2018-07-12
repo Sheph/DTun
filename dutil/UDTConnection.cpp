@@ -9,8 +9,8 @@
 
 namespace DTun
 {
-    UDTConnection::UDTConnection(UDTReactor& reactor, UDTSOCKET sock)
-    : UDTSocket(reactor, sock)
+    UDTConnection::UDTConnection(UDTReactor& reactor, const boost::shared_ptr<UDTHandle>& handle)
+    : UDTHandler(reactor, handle)
     {
         reactor.add(this);
     }
@@ -56,9 +56,9 @@ namespace DTun
 
     void UDTConnection::close()
     {
-        UDTSOCKET s = reactor().remove(this);
-        if (s != UDT::INVALID_SOCK) {
-            DTun::closeUDTSocketChecked(s);
+        boost::shared_ptr<UDTHandle> handle = reactor().remove(this);
+        if (handle) {
+            handle->close();
         }
     }
 
@@ -91,7 +91,7 @@ namespace DTun
         int total_read;
 
         int res;
-        if ((res = UDT::recv(sock(), req->first, req->last - req->first, 0)) == UDT::ERROR) {
+        if ((res = UDT::recv(udtHandle()->sock(), req->first, req->last - req->first, 0)) == UDT::ERROR) {
             LOG4CPLUS_TRACE(logger(), "Cannot read UDT socket: " << UDT::getlasterror().getErrorMessage());
 
             cb = req->callback;
@@ -141,7 +141,7 @@ namespace DTun
         WriteCallback cb;
 
         int res;
-        if ((res = UDT::send(sock(), req->first, req->last - req->first, 0)) == UDT::ERROR) {
+        if ((res = UDT::send(udtHandle()->sock(), req->first, req->last - req->first, 0)) == UDT::ERROR) {
             LOG4CPLUS_TRACE(logger(), "Cannot write UDT socket: " << UDT::getlasterror().getErrorMessage());
 
             cb = req->callback;

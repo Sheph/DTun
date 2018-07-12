@@ -1,11 +1,11 @@
-#include "DTun/TCPReactor.h"
+#include "DTun/SysReactor.h"
 #include "DTun/Utils.h"
 #include "Logger.h"
 #include <sys/epoll.h>
 
 namespace DTun
 {
-    TCPReactor::TCPReactor()
+    SysReactor::SysReactor()
     : eid_(-1)
     , stopping_(false)
     , nextCookie_(0)
@@ -17,14 +17,14 @@ namespace DTun
     {
     }
 
-    TCPReactor::~TCPReactor()
+    SysReactor::~SysReactor()
     {
         reset();
     }
 
-    bool TCPReactor::start()
+    bool SysReactor::start()
     {
-        log4cplus::NDCContextCreator ndc("TCPReactor::start");
+        log4cplus::NDCContextCreator ndc("SysReactor::start");
 
         eid_ = ::epoll_create(1);
         if (eid_ == -1) {
@@ -85,18 +85,18 @@ namespace DTun
         return true;
     }
 
-    void TCPReactor::run()
+    void SysReactor::run()
     {
         runThreadId_ = boost::this_thread::get_id();
 
-        log4cplus::NDCContextCreator ndc("TCPReactor");
+        log4cplus::NDCContextCreator ndc("SysReactor");
 
         processUpdates();
 
         std::vector<epoll_event> ev;
 
         while (!stopping_) {
-            ev.resize(pollSockets_.size() + 1);
+            ev.resize(pollHandlers_.size() + 1);
 
             {
                 boost::mutex::scoped_lock lock(m_);
@@ -130,12 +130,12 @@ namespace DTun
                         signalRd();
                     } else {
                         LOG4CPLUS_TRACE(logger(), "epoll rd: " << fd);
-                        PollSocketMap::iterator psIt = pollSockets_.find(fd);
-                        if ((psIt != pollSockets_.end()) && ((psIt->second.pollEvents & EPOLLIN) != 0)) {
+                        PollHandlerMap::iterator psIt = pollHandlers_.find(fd);
+                        if ((psIt != pollHandlers_.end()) && ((psIt->second.pollEvents & EPOLLIN) != 0)) {
                             boost::mutex::scoped_lock lock(m_);
-                            SocketMap::iterator sIt = sockets_.find(psIt->second.cookie);
-                            if (sIt != sockets_.end()) {
-                                currentlyHandling_ = sIt->second.socket;
+                            HandlerMap::iterator sIt = handlers_.find(psIt->second.cookie);
+                            if (sIt != handlers_.end()) {
+                                currentlyHandling_ = sIt->second.handler;
                                 lock.unlock();
                                 currentlyHandling_->handleRead();
                                 lock.lock();
@@ -147,12 +147,12 @@ namespace DTun
                 }
                 if ((ev[i].events & (EPOLLOUT | EPOLLERR)) != 0) {
                     LOG4CPLUS_TRACE(logger(), "epoll wr: " << fd);
-                    PollSocketMap::iterator psIt = pollSockets_.find(fd);
-                    if ((psIt != pollSockets_.end()) && ((psIt->second.pollEvents & EPOLLOUT) != 0)) {
+                    PollHandlerMap::iterator psIt = pollHandlers_.find(fd);
+                    if ((psIt != pollHandlers_.end()) && ((psIt->second.pollEvents & EPOLLOUT) != 0)) {
                         boost::mutex::scoped_lock lock(m_);
-                        SocketMap::iterator sIt = sockets_.find(psIt->second.cookie);
-                        if (sIt != sockets_.end()) {
-                            currentlyHandling_ = sIt->second.socket;
+                        HandlerMap::iterator sIt = handlers_.find(psIt->second.cookie);
+                        if (sIt != handlers_.end()) {
+                            currentlyHandling_ = sIt->second.handler;
                             lock.unlock();
                             currentlyHandling_->handleWrite();
                             lock.lock();
@@ -173,72 +173,72 @@ namespace DTun
         runThreadId_ = boost::thread::id();
     }
 
-    void TCPReactor::stop()
+    void SysReactor::stop()
     {
         stopping_ = true;
         signalWr();
     }
 
-    void TCPReactor::add(TCPSocket* socket)
+    void SysReactor::add(SysHandler* handler)
     {
-        int evts = socket->getPollEvents();
+        int evts = handler->getPollEvents();
 
         boost::mutex::scoped_lock lock(m_);
 
-        socket->setCookie(nextCookie_++);
-        sockets_[socket->cookie()] = SocketInfo(socket, evts);
+        handler->setCookie(nextCookie_++);
+        handlers_[handler->cookie()] = HandlerInfo(handler, evts);
 
         if (!isSameThread()) {
             signalWr();
         }
     }
 
-    SYSSOCKET TCPReactor::remove(TCPSocket* socket)
+    boost::shared_ptr<SysHandle> SysReactor::remove(SysHandler* handler)
     {
         boost::mutex::scoped_lock lock(m_);
 
-        if (sockets_.count(socket->cookie()) == 0) {
-            return SYS_INVALID_SOCKET;
+        if (handlers_.count(handler->cookie()) == 0) {
+            return boost::shared_ptr<SysHandle>();
         }
 
-        sockets_.erase(socket->cookie());
+        handlers_.erase(handler->cookie());
 
         if (!isSameThread()) {
             signalWr();
             uint64_t pollIteration = pollIteration_;
             while ((inPoll_ && (pollIteration_ <= pollIteration)) ||
-                (currentlyHandling_ == socket)) {
+                (currentlyHandling_ == handler)) {
                 c_.wait(lock);
             }
         }
 
-        SYSSOCKET sock = socket->sock();
-        assert(sock != SYS_INVALID_SOCKET);
+        boost::shared_ptr<SysHandle> handle = handler->sysHandle();
+        assert(handle);
 
-        PollSocketMap::iterator it = pollSockets_.find(sock);
-        if ((it != pollSockets_.end()) && (it->second.cookie == socket->cookie())) {
+        PollHandlerMap::iterator it = pollHandlers_.find(handle->sock());
+        if ((it != pollHandlers_.end()) && (it->second.cookie == handler->cookie())) {
             if (it->second.pollEvents != 0) {
                 epoll_event ev;
-                if (::epoll_ctl(eid_, EPOLL_CTL_DEL, sock, &ev) == -1) {
+                if (::epoll_ctl(eid_, EPOLL_CTL_DEL, handle->sock(), &ev) == -1) {
                     LOG4CPLUS_ERROR(logger(), "epoll_ctl(del): " << strerror(errno));
                 }
             }
             it->second.notInEpoll = true;
         }
 
-        socket->resetSock();
+        handler->resetHandle();
 
-        return sock;
+        return handle;
     }
 
-    void TCPReactor::update(TCPSocket* socket)
+    void SysReactor::update(SysHandler* handler)
     {
         boost::mutex::scoped_lock lock(m_);
 
-        int evts = socket->getPollEvents();
+        int evts = handler->getPollEvents();
 
-        SocketMap::iterator it = sockets_.find(socket->cookie());
-        if (it == sockets_.end()) {
+        HandlerMap::iterator it = handlers_.find(handler->cookie());
+        if (it == handlers_.end()) {
             return;
         }
 
@@ -253,10 +253,10 @@ namespace DTun
         }
     }
 
-    void TCPReactor::reset()
+    void SysReactor::reset()
     {
-        assert(sockets_.empty());
-        assert(pollSockets_.empty());
+        assert(handlers_.empty());
+        assert(pollHandlers_.empty());
         if (eid_ != -1) {
             close(eid_);
             eid_ = -1;
@@ -272,13 +272,13 @@ namespace DTun
         }
     }
 
-    bool TCPReactor::isSameThread()
+    bool SysReactor::isSameThread()
     {
         return (runThreadId_ == boost::thread::id()) ||
             (boost::this_thread::get_id() == runThreadId_);
     }
 
-    void TCPReactor::signalWr()
+    void SysReactor::signalWr()
     {
         char c = '\0';
         if (::send(signalWrSock_, &c, 1, 0) == SYS_SOCKET_ERROR) {
@@ -286,7 +286,7 @@ namespace DTun
         }
     }
 
-    void TCPReactor::signalRd()
+    void SysReactor::signalRd()
     {
         char c = '\0';
         if (::recv(signalRdSock_, &c, 1, 0) != 1) {
@@ -294,20 +294,20 @@ namespace DTun
         }
     }
 
-    void TCPReactor::processUpdates()
+    void SysReactor::processUpdates()
     {
         boost::mutex::scoped_lock lock(m_);
 
-        for (PollSocketMap::iterator it = pollSockets_.begin(); it != pollSockets_.end();) {
-            SocketMap::iterator sIt = sockets_.find(it->second.cookie);
-            if (sIt == sockets_.end()) {
+        for (PollHandlerMap::iterator it = pollHandlers_.begin(); it != pollHandlers_.end();) {
+            HandlerMap::iterator sIt = handlers_.find(it->second.cookie);
+            if (sIt == handlers_.end()) {
                 if ((it->second.pollEvents != 0) && !it->second.notInEpoll) {
                     epoll_event ev;
                     if (::epoll_ctl(eid_, EPOLL_CTL_DEL, it->first, &ev) == -1) {
                         LOG4CPLUS_ERROR(logger(), "epoll_ctl(del): " << strerror(errno));
                     }
                 }
-                pollSockets_.erase(it++);
+                pollHandlers_.erase(it++);
             } else if (it->second.pollEvents != sIt->second.pollEvents) {
                 if (it->second.pollEvents != 0) {
                     epoll_event ev;
@@ -333,12 +333,12 @@ namespace DTun
             }
         }
 
-        for (SocketMap::iterator it = sockets_.begin(); it != sockets_.end(); ++it) {
-            PollSocketMap::iterator psIt = pollSockets_.find(it->second.socket->sock());
-            if (psIt == pollSockets_.end()) {
-                std::pair<PollSocketMap::iterator, bool> res =
-                    pollSockets_.insert(std::make_pair(it->second.socket->sock(),
-                        PollSocketInfo(it->second.socket->cookie(), it->second.pollEvents)));
+        for (HandlerMap::iterator it = handlers_.begin(); it != handlers_.end(); ++it) {
+            PollHandlerMap::iterator psIt = pollHandlers_.find(it->second.handler->sysHandle()->sock());
+            if (psIt == pollHandlers_.end()) {
+                std::pair<PollHandlerMap::iterator, bool> res =
+                    pollHandlers_.insert(std::make_pair(it->second.handler->sysHandle()->sock(),
+                        PollHandlerInfo(it->second.handler->cookie(), it->second.pollEvents)));
                 assert(res.second);
                 if (!res.second) {
                     LOG4CPLUS_FATAL(logger(), "duplicate fd 1");
@@ -349,14 +349,14 @@ namespace DTun
                     epoll_event ev;
                     memset(&ev, 0, sizeof(ev));
                     ev.events = pollEvents;
-                    ev.data.fd = it->second.socket->sock();
-                    if (::epoll_ctl(eid_, EPOLL_CTL_ADD, it->second.socket->sock(), &ev) == -1) {
+                    ev.data.fd = it->second.handler->sysHandle()->sock();
+                    if (::epoll_ctl(eid_, EPOLL_CTL_ADD, it->second.handler->sysHandle()->sock(), &ev) == -1) {
                         LOG4CPLUS_ERROR(logger(), "epoll_ctl(add): " << strerror(errno));
                     }
                 }
             } else {
-                assert(psIt->second.cookie == it->second.socket->cookie());
-                if (psIt->second.cookie != it->second.socket->cookie()) {
+                assert(psIt->second.cookie == it->second.handler->cookie());
+                if (psIt->second.cookie != it->second.handler->cookie()) {
                     LOG4CPLUS_FATAL(logger(), "duplicate fd 2");
                 }
             }

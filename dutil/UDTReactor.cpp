@@ -185,12 +185,12 @@ namespace DTun
                     signalRd();
                 } else {
                     LOG4CPLUS_TRACE(logger(), "epoll rd: " << *it);
-                    PollSocketMap::iterator psIt = pollSockets_.find(*it);
-                    if ((psIt != pollSockets_.end()) && ((psIt->second.pollEvents & UDT_EPOLL_IN) != 0)) {
+                    PollHandlerMap::iterator psIt = pollHandlers_.find(*it);
+                    if ((psIt != pollHandlers_.end()) && ((psIt->second.pollEvents & UDT_EPOLL_IN) != 0)) {
                         boost::mutex::scoped_lock lock(m_);
-                        SocketMap::iterator sIt = sockets_.find(psIt->second.cookie);
-                        if (sIt != sockets_.end()) {
-                            currentlyHandling_ = sIt->second.socket;
+                        HandlerMap::iterator sIt = handlers_.find(psIt->second.cookie);
+                        if (sIt != handlers_.end()) {
+                            currentlyHandling_ = sIt->second.handler;
                             lock.unlock();
                             currentlyHandling_->handleRead();
                             lock.lock();
@@ -202,12 +202,12 @@ namespace DTun
             }
             for (std::set<UDTSOCKET>::const_iterator it = writefds.begin(); it != writefds.end(); ++it) {
                 LOG4CPLUS_TRACE(logger(), "epoll wr: " << *it);
-                PollSocketMap::iterator psIt = pollSockets_.find(*it);
-                if ((psIt != pollSockets_.end()) && ((psIt->second.pollEvents & UDT_EPOLL_OUT) != 0)) {
+                PollHandlerMap::iterator psIt = pollHandlers_.find(*it);
+                if ((psIt != pollHandlers_.end()) && ((psIt->second.pollEvents & UDT_EPOLL_OUT) != 0)) {
                     boost::mutex::scoped_lock lock(m_);
-                    SocketMap::iterator sIt = sockets_.find(psIt->second.cookie);
-                    if (sIt != sockets_.end()) {
-                        currentlyHandling_ = sIt->second.socket;
+                    HandlerMap::iterator sIt = handlers_.find(psIt->second.cookie);
+                    if (sIt != handlers_.end()) {
+                        currentlyHandling_ = sIt->second.handler;
                         lock.unlock();
                         currentlyHandling_->handleWrite();
                         lock.lock();
@@ -219,14 +219,14 @@ namespace DTun
 
             processUpdates();
 
-            for (PollSocketMap::iterator it = pollSockets_.begin(); it != pollSockets_.end(); ++it) {
+            for (PollHandlerMap::iterator it = pollHandlers_.begin(); it != pollHandlers_.end(); ++it) {
                 boost::mutex::scoped_lock lock(m_);
-                SocketMap::iterator sIt = sockets_.find(it->second.cookie);
-                if (sIt == sockets_.end()) {
+                HandlerMap::iterator sIt = handlers_.find(it->second.cookie);
+                if (sIt == handlers_.end()) {
                     continue;
                 }
 
-                int state = UDT::getsockstate(sIt->second.socket->sock());
+                int state = UDT::getsockstate(sIt->second.handler->udtHandle()->sock());
 
                 if ((state != BROKEN) && (state != CLOSED) && (state != NONEXIST)) {
                     // FIXME: UDT does a very bad thing, it closes descriptors implicitly
@@ -238,13 +238,13 @@ namespace DTun
                     continue;
                 }
 
-                currentlyHandling_ = sIt->second.socket;
+                currentlyHandling_ = sIt->second.handler;
                 if ((it->second.pollEvents & UDT_EPOLL_OUT) != 0) {
                     lock.unlock();
                     currentlyHandling_->handleWrite();
                     lock.lock();
                 }
-                if (((it->second.pollEvents & UDT_EPOLL_IN) != 0) && (sockets_.count(it->second.cookie) > 0)) {
+                if (((it->second.pollEvents & UDT_EPOLL_IN) != 0) && (handlers_.count(it->second.cookie) > 0)) {
                     lock.unlock();
                     currentlyHandling_->handleRead();
                     lock.lock();
@@ -269,65 +269,65 @@ namespace DTun
         signalWr();
     }
 
-    void UDTReactor::add(UDTSocket* socket)
+    void UDTReactor::add(UDTHandler* handler)
     {
-        int evts = socket->getPollEvents();
+        int evts = handler->getPollEvents();
 
         boost::mutex::scoped_lock lock(m_);
 
-        socket->setCookie(nextCookie_++);
-        sockets_[socket->cookie()] = SocketInfo(socket, evts);
+        handler->setCookie(nextCookie_++);
+        handlers_[handler->cookie()] = HandlerInfo(handler, evts);
 
         if (!isSameThread()) {
             signalWr();
         }
     }
 
-    UDTSOCKET UDTReactor::remove(UDTSocket* socket)
+    boost::shared_ptr<UDTHandle> UDTReactor::remove(UDTHandler* handler)
     {
         boost::mutex::scoped_lock lock(m_);
 
-        if (sockets_.count(socket->cookie()) == 0) {
-            return UDT::INVALID_SOCK;
+        if (handlers_.count(handler->cookie()) == 0) {
+            return boost::shared_ptr<UDTHandle>();
         }
 
-        sockets_.erase(socket->cookie());
+        handlers_.erase(handler->cookie());
 
         if (!isSameThread()) {
             signalWr();
             uint64_t pollIteration = pollIteration_;
             while ((inPoll_ && (pollIteration_ <= pollIteration)) ||
-                (currentlyHandling_ == socket)) {
+                (currentlyHandling_ == handler)) {
                 c_.wait(lock);
             }
         }
 
-        UDTSOCKET sock = socket->sock();
-        assert(sock != UDT::INVALID_SOCK);
+        boost::shared_ptr<UDTHandle> handle = handler->udtHandle();
+        assert(handle);
 
-        PollSocketMap::iterator it = pollSockets_.find(sock);
-        if ((it != pollSockets_.end()) && (it->second.cookie == socket->cookie())) {
+        PollHandlerMap::iterator it = pollHandlers_.find(handle->sock());
+        if ((it != pollHandlers_.end()) && (it->second.cookie == handler->cookie())) {
             if (it->second.pollEvents != 0) {
-                if (UDT::epoll_remove_usock(eid_, sock) == UDT::ERROR) {
+                if (UDT::epoll_remove_usock(eid_, handle->sock()) == UDT::ERROR) {
                     LOG4CPLUS_ERROR(logger(), "epoll_remove_usock: " << UDT::getlasterror().getErrorMessage());
                 }
             }
             it->second.notInEpoll = true;
         }
 
-        socket->resetSock();
+        handler->resetHandle();
 
-        return sock;
+        return handle;
     }
 
-    void UDTReactor::update(UDTSocket* socket)
+    void UDTReactor::update(UDTHandler* handler)
     {
         boost::mutex::scoped_lock lock(m_);
 
-        int evts = socket->getPollEvents();
+        int evts = handler->getPollEvents();
 
-        SocketMap::iterator it = sockets_.find(socket->cookie());
-        if (it == sockets_.end()) {
+        HandlerMap::iterator it = handlers_.find(handler->cookie());
+        if (it == handlers_.end()) {
             return;
         }
 
@@ -344,8 +344,8 @@ namespace DTun
 
     void UDTReactor::reset()
     {
-        assert(sockets_.empty());
-        assert(pollSockets_.empty());
+        assert(handlers_.empty());
+        assert(pollHandlers_.empty());
         if (eid_ != UDT::ERROR) {
             UDT::epoll_release(eid_);
             eid_ = UDT::ERROR;
@@ -387,15 +387,15 @@ namespace DTun
     {
         boost::mutex::scoped_lock lock(m_);
 
-        for (PollSocketMap::iterator it = pollSockets_.begin(); it != pollSockets_.end();) {
-            SocketMap::iterator sIt = sockets_.find(it->second.cookie);
-            if (sIt == sockets_.end()) {
+        for (PollHandlerMap::iterator it = pollHandlers_.begin(); it != pollHandlers_.end();) {
+            HandlerMap::iterator sIt = handlers_.find(it->second.cookie);
+            if (sIt == handlers_.end()) {
                 if ((it->second.pollEvents != 0) && !it->second.notInEpoll) {
                     if (UDT::epoll_remove_usock(eid_, it->first) == UDT::ERROR) {
                         LOG4CPLUS_ERROR(logger(), "epoll_remove_usock: " << UDT::getlasterror().getErrorMessage());
                     }
                 }
-                pollSockets_.erase(it++);
+                pollHandlers_.erase(it++);
             } else if (it->second.pollEvents != sIt->second.pollEvents) {
                 if (it->second.pollEvents != 0) {
                     if (UDT::epoll_remove_usock(eid_, it->first) == UDT::ERROR) {
@@ -416,12 +416,12 @@ namespace DTun
             }
         }
 
-        for (SocketMap::iterator it = sockets_.begin(); it != sockets_.end(); ++it) {
-            PollSocketMap::iterator psIt = pollSockets_.find(it->second.socket->sock());
-            if (psIt == pollSockets_.end()) {
-                std::pair<PollSocketMap::iterator, bool> res =
-                    pollSockets_.insert(std::make_pair(it->second.socket->sock(),
-                        PollSocketInfo(it->second.socket->cookie(), it->second.pollEvents)));
+        for (HandlerMap::iterator it = handlers_.begin(); it != handlers_.end(); ++it) {
+            PollHandlerMap::iterator psIt = pollHandlers_.find(it->second.handler->udtHandle()->sock());
+            if (psIt == pollHandlers_.end()) {
+                std::pair<PollHandlerMap::iterator, bool> res =
+                    pollHandlers_.insert(std::make_pair(it->second.handler->udtHandle()->sock(),
+                        PollHandlerInfo(it->second.handler->cookie(), it->second.pollEvents)));
                 assert(res.second);
                 if (!res.second) {
                     LOG4CPLUS_FATAL(logger(), "duplicate fd 1");
@@ -429,13 +429,13 @@ namespace DTun
                 int pollEvents = it->second.pollEvents;
                 if (pollEvents != 0) {
                     pollEvents |= UDT_EPOLL_ERR;
-                    if (UDT::epoll_add_usock(eid_, it->second.socket->sock(), &pollEvents) == UDT::ERROR) {
+                    if (UDT::epoll_add_usock(eid_, it->second.handler->udtHandle()->sock(), &pollEvents) == UDT::ERROR) {
                         LOG4CPLUS_ERROR(logger(), "epoll_add_usock: " << UDT::getlasterror().getErrorMessage());
                     }
                 }
             } else {
-                assert(psIt->second.cookie == it->second.socket->cookie());
-                if (psIt->second.cookie != it->second.socket->cookie()) {
+                assert(psIt->second.cookie == it->second.handler->cookie());
+                if (psIt->second.cookie != it->second.handler->cookie()) {
                     LOG4CPLUS_FATAL(logger(), "duplicate fd 2");
                 }
             }

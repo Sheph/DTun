@@ -24,6 +24,10 @@
 #define SYS_SOCKET_ERROR -1
 #endif
 
+#ifndef __UDT_H__
+typedef int SYSSOCKET;
+#endif
+
 namespace DTun
 {
     typedef unsigned char UInt8;

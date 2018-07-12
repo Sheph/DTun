@@ -1,16 +1,16 @@
-#ifndef _DTUN_UDTCONNECTOR_H_
-#define _DTUN_UDTCONNECTOR_H_
+#ifndef _DTUN_SYSCONNECTOR_H_
+#define _DTUN_SYSCONNECTOR_H_
 
-#include "DTun/UDTHandler.h"
+#include "DTun/SysHandler.h"
 #include "DTun/SConnector.h"
 
 namespace DTun
 {
-    class UDTConnector : public UDTHandler, public SConnector
+    class SysConnector : public SysHandler, public SConnector
     {
     public:
-        UDTConnector(UDTReactor& reactor, const boost::shared_ptr<UDTHandle>& handle);
-        ~UDTConnector();
+        SysConnector(SysReactor& reactor, const boost::shared_ptr<SysHandle>& handle);
+        ~SysConnector();
 
         virtual bool connect(const std::string& address, const std::string& port, const ConnectCallback& callback, bool rendezvous);
 
@@ -23,7 +23,7 @@ namespace DTun
 
     private:
         ConnectCallback callback_;
-        bool noCloseSock_;
+        bool handedOut_;
     };
 }
 

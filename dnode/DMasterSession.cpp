@@ -1,13 +1,15 @@
 #include "DMasterSession.h"
 #include "Logger.h"
 #include "DTun/Utils.h"
+#include "DTun/SConnector.h"
+#include "DTun/SConnection.h"
 #include <boost/make_shared.hpp>
 #include <boost/bind.hpp>
 
 namespace DNode
 {
-    DMasterSession::DMasterSession(DTun::UDTReactor& reactor, const std::string& address, int port)
-    : reactor_(reactor)
+    DMasterSession::DMasterSession(DTun::SManager& mgr, const std::string& address, int port)
+    : mgr_(mgr)
     , address_(address)
     , port_(port)
     {
@@ -63,36 +65,25 @@ namespace DNode
 
     bool DMasterSession::start(SYSSOCKET s, const Callback& callback)
     {
-        UDTSOCKET sock = UDT::socket(AF_INET, SOCK_STREAM, 0);
-        if (sock == UDT::INVALID_SOCK) {
-            LOG4CPLUS_ERROR(logger(), "Cannot create UDT socket: " << UDT::getlasterror().getErrorMessage());
+        boost::shared_ptr<DTun::SHandle> handle = mgr_.createStreamSocket();
+        if (!handle) {
             DTun::closeSysSocketChecked(s);
             return false;
         }
 
-        bool optval = false;
-        if (UDT::setsockopt(sock, 0, UDT_REUSEADDR, &optval, sizeof(optval)) == UDT::ERROR) {
-            LOG4CPLUS_ERROR(logger(), "Cannot set reuseaddr for UDT socket: " << UDT::getlasterror().getErrorMessage());
-            DTun::closeUDTSocketChecked(sock);
-            DTun::closeSysSocketChecked(s);
-            return false;
-        }
-
-        if (UDT::bind2(sock, s) == UDT::ERROR) {
-            LOG4CPLUS_ERROR(logger(), "Cannot bind UDT socket: " << UDT::getlasterror().getErrorMessage());
-            DTun::closeUDTSocketChecked(sock);
+        if (!handle->bind(s)) {
             DTun::closeSysSocketChecked(s);
             return false;
         }
 
         callback_ = callback;
 
-        connector_ = boost::make_shared<DTun::UDTConnector>(boost::ref(reactor_), sock);
+        connector_ = handle->createConnector();
 
         std::ostringstream os;
         os << port_;
 
-        if (!connector_->connect(address_, os.str(), boost::bind(&DMasterSession::onConnect, this, _1))) {
+        if (!connector_->connect(address_, os.str(), boost::bind(&DMasterSession::onConnect, this, _1), false)) {
             return false;
         }
 
@@ -103,15 +94,15 @@ namespace DNode
     {
         LOG4CPLUS_TRACE(logger(), "DMasterSession::onConnect(" << err << ")");
 
-        UDTSOCKET sock = connector_->sock();
+        boost::shared_ptr<DTun::SHandle> handle = connector_->handle();
 
         connector_->close();
 
         if (err) {
-            DTun::closeUDTSocketChecked(sock);
+            handle->close();
             callback_(err);
         } else {
-            conn_ = boost::make_shared<DTun::UDTConnection>(boost::ref(reactor_), sock);
+            conn_ = handle->createConnection();
 
             conn_->write(&buff_[0], &buff_[0] + buff_.size(),
                 boost::bind(&DMasterSession::onSend, this, _1));

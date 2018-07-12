@@ -1,24 +1,22 @@
-#ifndef _DTUN_TCPCONNECTION_H_
-#define _DTUN_TCPCONNECTION_H_
+#ifndef _DTUN_SYSCONNECTION_H_
+#define _DTUN_SYSCONNECTION_H_
 
-#include "DTun/TCPSocket.h"
+#include "DTun/SysHandler.h"
+#include "DTun/SConnection.h"
 #include <boost/thread/mutex.hpp>
 #include <list>
 
 namespace DTun
 {
-    class TCPConnection : public TCPSocket
+    class SysConnection : public SysHandler, public SConnection
     {
     public:
-        typedef boost::function<void (int)> WriteCallback;
-        typedef boost::function<void (int, int)> ReadCallback;
+        SysConnection(SysReactor& reactor, const boost::shared_ptr<SysHandle>& handle);
+        ~SysConnection();
 
-        TCPConnection(TCPReactor& reactor, SYSSOCKET sock);
-        ~TCPConnection();
+        virtual void write(const char* first, const char* last, const WriteCallback& callback);
 
-        void write(const char* first, const char* last, const WriteCallback& callback);
-
-        void read(char* first, char* last, const ReadCallback& callback);
+        virtual void read(char* first, char* last, const ReadCallback& callback, bool readAll);
 
         virtual void close();
 

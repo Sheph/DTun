@@ -1,24 +1,22 @@
 #ifndef _DTUN_UDTCONNECTION_H_
 #define _DTUN_UDTCONNECTION_H_
 
-#include "DTun/UDTSocket.h"
+#include "DTun/UDTHandler.h"
+#include "DTun/SConnection.h"
 #include <boost/thread/mutex.hpp>
 #include <list>
 
 namespace DTun
 {
-    class UDTConnection : public UDTSocket
+    class UDTConnection : public UDTHandler, public SConnection
     {
     public:
-        typedef boost::function<void (int)> WriteCallback;
-        typedef boost::function<void (int, int)> ReadCallback;
-
-        UDTConnection(UDTReactor& reactor, UDTSOCKET sock);
+        UDTConnection(UDTReactor& reactor, const boost::shared_ptr<UDTHandle>& handle);
         ~UDTConnection();
 
-        void write(const char* first, const char* last, const WriteCallback& callback);
+        virtual void write(const char* first, const char* last, const WriteCallback& callback);
 
-        void read(char* first, char* last, const ReadCallback& callback, bool readAll);
+        virtual void read(char* first, char* last, const ReadCallback& callback, bool readAll);
 
         virtual void close();
 

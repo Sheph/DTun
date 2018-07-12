@@ -2,10 +2,11 @@
 #define _DMASTERSESSION_H_
 
 #include "DTun/DProtocol.h"
-#include "DTun/UDTConnection.h"
-#include "DTun/UDTConnector.h"
+#include "DTun/SManager.h"
 #include <boost/noncopyable.hpp>
+#include <boost/function.hpp>
 #include <map>
+#include <vector>
 
 namespace DNode
 {
@@ -14,7 +15,7 @@ namespace DNode
     public:
         typedef boost::function<void (int)> Callback;
 
-        DMasterSession(DTun::UDTReactor& reactor, const std::string& address, int port);
+        DMasterSession(DTun::SManager& mgr, const std::string& address, int port);
         ~DMasterSession();
 
         // 's' will be closed even in case of failure!
@@ -30,7 +31,7 @@ namespace DNode
             DTun::UInt32 connId,
             const Callback& callback);
 
-        inline const boost::shared_ptr<DTun::UDTConnection>& conn() const { return conn_; }
+        inline const boost::shared_ptr<DTun::SConnection>& conn() const { return conn_; }
 
     private:
         bool start(SYSSOCKET s, const Callback& callback);
@@ -38,13 +39,13 @@ namespace DNode
         void onConnect(int err);
         void onSend(int err);
 
-        DTun::UDTReactor& reactor_;
+        DTun::SManager& mgr_;
         std::string address_;
         int port_;
         std::vector<char> buff_;
         Callback callback_;
-        boost::shared_ptr<DTun::UDTConnection> conn_;
-        boost::shared_ptr<DTun::UDTConnector> connector_;
+        boost::shared_ptr<DTun::SConnection> conn_;
+        boost::shared_ptr<DTun::SConnector> connector_;
     };
 }
 

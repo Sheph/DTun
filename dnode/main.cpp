@@ -2,7 +2,9 @@
 #include "Logger.h"
 #include "DTun/SignalBlocker.h"
 #include "DTun/UDTReactor.h"
-#include "DTun/TCPReactor.h"
+#include "DTun/SysReactor.h"
+#include "DTun/UDTManager.h"
+#include "DTun/SysManager.h"
 #include "DTun/Utils.h"
 #include "DTun/StreamAppConfig.h"
 #include <boost/thread.hpp>
@@ -19,7 +21,7 @@ static void udtReactorThreadFn(DTun::UDTReactor& reactor)
     reactor.run();
 }
 
-static void tcpReactorThreadFn(DTun::TCPReactor& reactor)
+static void sysReactorThreadFn(DTun::SysReactor& reactor)
 {
     reactor.run();
 }
@@ -37,7 +39,7 @@ extern "C" int tun2socks_needs_proxy(uint32_t ip)
 
 namespace DNode
 {
-    DTun::UDTReactor* theUdtReactor = NULL;
+    DTun::SManager* theRemoteMgr = NULL;
 }
 
 int main(int argc, char* argv[])
@@ -106,18 +108,21 @@ int main(int argc, char* argv[])
             return 1;
         }
 
-        DTun::TCPReactor tcpReactor;
+        DTun::SysReactor sysReactor;
 
-        if (!tcpReactor.start()) {
+        if (!sysReactor.start()) {
             UDT::cleanup();
             return 1;
         }
 
         boost::scoped_ptr<boost::thread> udtReactorThread;
-        boost::scoped_ptr<boost::thread> tcpReactorThread;
+        boost::scoped_ptr<boost::thread> sysReactorThread;
 
         {
-            DNode::DMasterClient masterClient(udtReactor, tcpReactor, appConfig);
+            DTun::UDTManager udtManager(udtReactor);
+            DTun::SysManager sysManager(sysReactor);
+
+            DNode::DMasterClient masterClient(udtManager, sysManager, appConfig);
 
             if (!masterClient.start()) {
                 UDT::cleanup();
@@ -126,26 +131,26 @@ int main(int argc, char* argv[])
 
             udtReactorThread.reset(new boost::thread(
                 boost::bind(&udtReactorThreadFn, boost::ref(udtReactor))));
-            tcpReactorThread.reset(new boost::thread(
-                boost::bind(&tcpReactorThreadFn, boost::ref(tcpReactor))));
+            sysReactorThread.reset(new boost::thread(
+                boost::bind(&sysReactorThreadFn, boost::ref(sysReactor))));
 
             LOG4CPLUS_INFO(DNode::logger(), "Started");
 
             signalBlocker.unblock();
 
             DNode::theMasterClient = &masterClient;
-            DNode::theUdtReactor = &udtReactor;
+            DNode::theRemoteMgr = &udtManager;
 
             res = tun2socks_main(argc, argv, isDebugged, &theStatsHandler);
 
             DNode::theMasterClient = NULL;
-            DNode::theUdtReactor = NULL;
+            DNode::theRemoteMgr = NULL;
         }
 
         udtReactor.stop();
-        tcpReactor.stop();
+        sysReactor.stop();
         udtReactorThread->join();
-        tcpReactorThread->join();
+        sysReactorThread->join();
     }
 
     UDT::cleanup();

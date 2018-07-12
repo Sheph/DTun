@@ -1,7 +1,10 @@
 #include "DMasterClient.h"
 #include "Logger.h"
 #include "DTun/Utils.h"
+#include "DTun/SConnector.h"
+#include "DTun/SConnection.h"
 #include <boost/make_shared.hpp>
+#include <boost/bind.hpp>
 #include <fcntl.h>
 
 namespace DNode
@@ -26,10 +29,10 @@ namespace DNode
         }
     }
 
-    DMasterClient::DMasterClient(DTun::UDTReactor& udtReactor, DTun::TCPReactor& tcpReactor,
+    DMasterClient::DMasterClient(DTun::SManager& remoteMgr, DTun::SManager& localMgr,
         const boost::shared_ptr<DTun::AppConfig>& appConfig)
-    : udtReactor_(udtReactor)
-    , tcpReactor_(tcpReactor)
+    : remoteMgr_(remoteMgr)
+    , localMgr_(localMgr)
     , closing_(false)
     , nextConnId_(0)
     , numOutConnections_(0)
@@ -80,18 +83,17 @@ namespace DNode
 
     bool DMasterClient::start()
     {
-        UDTSOCKET sock = UDT::socket(AF_INET, SOCK_STREAM, 0);
-        if (sock == UDT::INVALID_SOCK) {
-            LOG4CPLUS_ERROR(logger(), "Cannot create UDT socket: " << UDT::getlasterror().getErrorMessage());
-            return false;
+        boost::shared_ptr<DTun::SHandle> handle = remoteMgr_.createStreamSocket();
+        if (!handle) {
+           return false;
         }
 
-        connector_ = boost::make_shared<DTun::UDTConnector>(boost::ref(udtReactor_), sock);
+        connector_ = handle->createConnector();
 
         std::ostringstream os;
         os << port_;
 
-        if (!connector_->connect(address_, os.str(), boost::bind(&DMasterClient::onConnect, this, _1))) {
+        if (!connector_->connect(address_, os.str(), boost::bind(&DMasterClient::onConnect, this, _1), false)) {
             return false;
         }
 
@@ -124,7 +126,7 @@ namespace DNode
         }
 
         boost::shared_ptr<DMasterSession> sess =
-            boost::make_shared<DMasterSession>(boost::ref(udtReactor_), address_, port_);
+            boost::make_shared<DMasterSession>(boost::ref(remoteMgr_), address_, port_);
 
         DTun::UInt32 connId = nextConnId_++;
         if (connId == 0) {
@@ -200,18 +202,18 @@ namespace DNode
 
         boost::mutex::scoped_lock lock(m_);
 
-        UDTSOCKET sock = connector_->sock();
+        boost::shared_ptr<DTun::SHandle> handle = connector_->handle();
 
         connector_->close();
 
         if (err) {
             LOG4CPLUS_ERROR(logger(), "No connection to server");
 
-            DTun::closeUDTSocketChecked(sock);
+            handle->close();
         } else {
             LOG4CPLUS_INFO(logger(), "Connected to server");
 
-            conn_ = boost::make_shared<DTun::UDTConnection>(boost::ref(udtReactor_), sock);
+            conn_ = handle->createConnection();
 
             DTun::DProtocolHeader header;
             DTun::DProtocolMsgHello msg;
@@ -235,7 +237,7 @@ namespace DNode
         boost::mutex::scoped_lock lock(m_);
 
         if (err) {
-            boost::shared_ptr<DTun::UDTConnection> tmp = conn_;
+            boost::shared_ptr<DTun::SConnection> tmp = conn_;
             conn_.reset();
             lock.unlock();
             LOG4CPLUS_ERROR(logger(), "Connection to server lost");
@@ -255,7 +257,7 @@ namespace DNode
         boost::mutex::scoped_lock lock(m_);
 
         if (err) {
-            boost::shared_ptr<DTun::UDTConnection> tmp = conn_;
+            boost::shared_ptr<DTun::SConnection> tmp = conn_;
             conn_.reset();
             lock.unlock();
             LOG4CPLUS_ERROR(logger(), "Connection to server lost");
@@ -287,7 +289,7 @@ namespace DNode
             break;
         default:
             LOG4CPLUS_ERROR(logger(), "bad msg code: " << static_cast<int>(header.msgCode));
-            boost::shared_ptr<DTun::UDTConnection> tmp = conn_;
+            boost::shared_ptr<DTun::SConnection> tmp = conn_;
             conn_.reset();
             lock.unlock();
             break;
@@ -301,7 +303,7 @@ namespace DNode
         boost::mutex::scoped_lock lock(m_);
 
         if (err) {
-            boost::shared_ptr<DTun::UDTConnection> tmp = conn_;
+            boost::shared_ptr<DTun::SConnection> tmp = conn_;
             conn_.reset();
             lock.unlock();
             LOG4CPLUS_ERROR(logger(), "Connection to server lost");
@@ -331,7 +333,7 @@ namespace DNode
         boost::mutex::scoped_lock lock(m_);
 
         if (err) {
-            boost::shared_ptr<DTun::UDTConnection> tmp = conn_;
+            boost::shared_ptr<DTun::SConnection> tmp = conn_;
             conn_.reset();
             lock.unlock();
             LOG4CPLUS_ERROR(logger(), "Connection to server lost");
@@ -370,7 +372,7 @@ namespace DNode
         boost::mutex::scoped_lock lock(m_);
 
         if (err) {
-            boost::shared_ptr<DTun::UDTConnection> tmp = conn_;
+            boost::shared_ptr<DTun::SConnection> tmp = conn_;
             conn_.reset();
             lock.unlock();
             LOG4CPLUS_ERROR(logger(), "Connection to server lost");
@@ -456,7 +458,7 @@ namespace DNode
 
         if (!err) {
             boost::shared_ptr<ProxySession> proxySess =
-                boost::make_shared<ProxySession>(boost::ref(udtReactor_), boost::ref(tcpReactor_));
+                boost::make_shared<ProxySession>(boost::ref(remoteMgr_), boost::ref(localMgr_));
 
             if (proxySess->start(boundSock, localIp, localPort, remoteIp, remotePort,
                 boost::bind(&DMasterClient::onProxyDone, this, boost::weak_ptr<ProxySession>(proxySess)))) {
@@ -523,7 +525,7 @@ namespace DNode
         }
 
         boost::shared_ptr<DMasterSession> sess =
-            boost::make_shared<DMasterSession>(boost::ref(udtReactor_), address_, port_);
+            boost::make_shared<DMasterSession>(boost::ref(remoteMgr_), address_, port_);
 
         if (!sess->startAcceptor(s, srcNodeId, nodeId_, srcConnId,
             boost::bind(&DMasterClient::onAcceptConnection, this, _1, boost::weak_ptr<DMasterSession>(sess),

@@ -1,13 +1,16 @@
 #include "ProxySession.h"
 #include "DTun/Utils.h"
+#include "DTun/SConnector.h"
+#include "DTun/SConnection.h"
 #include "Logger.h"
 #include <boost/make_shared.hpp>
+#include <boost/bind.hpp>
 
 namespace DNode
 {
-    ProxySession::ProxySession(DTun::UDTReactor& udtReactor, DTun::TCPReactor& tcpReactor)
-    : udtReactor_(udtReactor)
-    , tcpReactor_(tcpReactor)
+    ProxySession::ProxySession(DTun::SManager& remoteMgr, DTun::SManager& localMgr)
+    : remoteMgr_(remoteMgr)
+    , localMgr_(localMgr)
     , localSndBuff_(65535)
     , localSndBuffBytes_(0)
     , remoteSndBuff_(65535)
@@ -27,29 +30,18 @@ namespace DNode
     {
         boost::mutex::scoped_lock lock(m_);
 
-        UDTSOCKET remoteSock = UDT::socket(AF_INET, SOCK_STREAM, 0);
-        if (remoteSock == UDT::INVALID_SOCK) {
-            LOG4CPLUS_ERROR(logger(), "Cannot create UDT socket: " << UDT::getlasterror().getErrorMessage());
+        boost::shared_ptr<DTun::SHandle> remoteHandle = remoteMgr_.createStreamSocket();
+        if (!remoteHandle) {
             DTun::closeSysSocketChecked(s);
             return false;
         }
 
-        bool optval = false;
-        if (UDT::setsockopt(remoteSock, 0, UDT_REUSEADDR, &optval, sizeof(optval)) == UDT::ERROR) {
-            LOG4CPLUS_ERROR(logger(), "Cannot set reuseaddr for UDT socket: " << UDT::getlasterror().getErrorMessage());
-            DTun::closeUDTSocketChecked(remoteSock);
+        if (!remoteHandle->bind(s)) {
             DTun::closeSysSocketChecked(s);
             return false;
         }
 
-        if (UDT::bind2(remoteSock, s) == UDT::ERROR) {
-            LOG4CPLUS_ERROR(logger(), "Cannot bind UDT socket: " << UDT::getlasterror().getErrorMessage());
-            DTun::closeUDTSocketChecked(remoteSock);
-            DTun::closeSysSocketChecked(s);
-            return false;
-        }
-
-        remoteConnector_ = boost::make_shared<DTun::UDTConnector>(boost::ref(udtReactor_), remoteSock);
+        remoteConnector_ = remoteHandle->createConnector();
 
         if (!remoteConnector_->connect(DTun::ipToString(remoteIp), DTun::portToString(remotePort),
             boost::bind(&ProxySession::onRemoteConnect, this, _1), true)) {
@@ -58,18 +50,17 @@ namespace DNode
             return false;
         }
 
-        SYSSOCKET localSock = ::socket(AF_INET, SOCK_STREAM, 0);
-        if (localSock == SYS_INVALID_SOCKET) {
-            LOG4CPLUS_ERROR(logger(), "Cannot create TCP socket: " << strerror(errno));
+        boost::shared_ptr<DTun::SHandle> localHandle = localMgr_.createStreamSocket();
+        if (!localHandle) {
             lock.unlock();
             remoteConnector_.reset();
             return false;
         }
 
-        localConnector_ = boost::make_shared<DTun::TCPConnector>(boost::ref(tcpReactor_), localSock);
+        localConnector_ = localHandle->createConnector();
 
         if (!localConnector_->connect(DTun::ipToString(localIp), DTun::portToString(localPort),
-            boost::bind(&ProxySession::onLocalConnect, this, _1))) {
+            boost::bind(&ProxySession::onLocalConnect, this, _1), false)) {
             lock.unlock();
             localConnector_.reset();
             remoteConnector_.reset();
@@ -85,13 +76,13 @@ namespace DNode
     {
         LOG4CPLUS_TRACE(logger(), "ProxySession::onLocalConnect(" << err << ")");
 
-        SYSSOCKET sock = localConnector_->sock();
+        boost::shared_ptr<DTun::SHandle> handle = localConnector_->handle();
         localConnector_->close();
 
         boost::mutex::scoped_lock lock(m_);
 
         if (done_ || err) {
-            DTun::closeSysSocketChecked(sock);
+            handle->close();
         }
 
         if (done_) {
@@ -105,7 +96,7 @@ namespace DNode
             return;
         }
 
-        localConn_ = boost::make_shared<DTun::TCPConnection>(boost::ref(tcpReactor_), sock);
+        localConn_ = handle->createConnection();
 
         if (remoteConn_ && !connected_) {
             connected_ = true;
@@ -171,13 +162,13 @@ namespace DNode
     {
         LOG4CPLUS_TRACE(logger(), "ProxySession::onRemoteConnect(" << err << ")");
 
-        UDTSOCKET sock = remoteConnector_->sock();
+        boost::shared_ptr<DTun::SHandle> handle = remoteConnector_->handle();
         remoteConnector_->close();
 
         boost::mutex::scoped_lock lock(m_);
 
         if (done_ || err) {
-            DTun::closeUDTSocketChecked(sock);
+            handle->close();
         }
 
         if (done_) {
@@ -191,7 +182,7 @@ namespace DNode
             return;
         }
 
-        remoteConn_ = boost::make_shared<DTun::UDTConnection>(boost::ref(udtReactor_), sock);
+        remoteConn_ = handle->createConnection();
 
         if (localConn_ && !connected_) {
             connected_ = true;
@@ -275,7 +266,7 @@ namespace DNode
 
         localRcvBuff_.resize(toRecv);
         localConn_->read(&localRcvBuff_[0], &localRcvBuff_[0] + localRcvBuff_.size(),
-            boost::bind(&ProxySession::onLocalRecv, this, _1, _2));
+            boost::bind(&ProxySession::onLocalRecv, this, _1, _2), false);
     }
 
     void ProxySession::sendLocal(int numBytes)

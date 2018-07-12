@@ -3,13 +3,14 @@
 
 #include "DTun/Types.h"
 #include "DTun/DProtocol.h"
-#include "DTun/UDTReactor.h"
-#include "DTun/UDTConnector.h"
-#include "DTun/UDTConnection.h"
-#include "DTun/TCPReactor.h"
+#include "DTun/SManager.h"
 #include "DTun/AppConfig.h"
 #include "DMasterSession.h"
 #include "ProxySession.h"
+#include <boost/optional.hpp>
+#include <boost/thread/mutex.hpp>
+#include <boost/weak_ptr.hpp>
+#include <set>
 
 namespace DNode
 {
@@ -18,7 +19,7 @@ namespace DNode
     public:
         typedef boost::function<void (int, DTun::UInt32, DTun::UInt16)> RegisterConnectionCallback;
 
-        DMasterClient(DTun::UDTReactor& udtReactor, DTun::TCPReactor& tcpReactor,
+        DMasterClient(DTun::SManager& remoteMgr, DTun::SManager& localMgr,
             const boost::shared_ptr<DTun::AppConfig>& appConfig);
         ~DMasterClient();
 
@@ -91,8 +92,8 @@ namespace DNode
             DTun::UInt32 remoteIp,
             DTun::UInt16 remotePort);
 
-        DTun::UDTReactor& udtReactor_;
-        DTun::TCPReactor& tcpReactor_;
+        DTun::SManager& remoteMgr_;
+        DTun::SManager& localMgr_;
         std::string address_;
         int port_;
         DTun::UInt32 nodeId_;
@@ -106,8 +107,8 @@ namespace DNode
         ConnMasterSessionMap connMasterSessions_;
         AccMasterSessions accMasterSessions_;
         ProxySessions proxySessions_;
-        boost::shared_ptr<DTun::UDTConnection> conn_;
-        boost::shared_ptr<DTun::UDTConnector> connector_;
+        boost::shared_ptr<DTun::SConnection> conn_;
+        boost::shared_ptr<DTun::SConnector> connector_;
     };
 
     extern DMasterClient* theMasterClient;

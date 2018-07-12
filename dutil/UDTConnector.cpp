@@ -9,8 +9,8 @@
 
 namespace DTun
 {
-    UDTConnector::UDTConnector(UDTReactor& reactor, UDTSOCKET sock)
-    : UDTSocket(reactor, sock)
+    UDTConnector::UDTConnector(UDTReactor& reactor, const boost::shared_ptr<UDTHandle>& handle)
+    : UDTHandler(reactor, handle)
     , noCloseSock_(false)
     {
         reactor.add(this);
@@ -24,19 +24,19 @@ namespace DTun
     bool UDTConnector::connect(const std::string& address, const std::string& port, const ConnectCallback& callback, bool rendezvous)
     {
         bool optval = false;
-        if (UDT::setsockopt(sock(), 0, UDT_RCVSYN, &optval, sizeof(optval)) == UDT::ERROR) {
+        if (UDT::setsockopt(udtHandle()->sock(), 0, UDT_RCVSYN, &optval, sizeof(optval)) == UDT::ERROR) {
             LOG4CPLUS_ERROR(logger(), "Cannot setsockopt on UDT socket: " << UDT::getlasterror().getErrorMessage());
             return false;
         }
 
-        if (UDT::setsockopt(sock(), 0, UDT_SNDSYN, &optval, sizeof(optval)) == UDT::ERROR) {
+        if (UDT::setsockopt(udtHandle()->sock(), 0, UDT_SNDSYN, &optval, sizeof(optval)) == UDT::ERROR) {
             LOG4CPLUS_ERROR(logger(), "Cannot setsockopt on UDT socket: " << UDT::getlasterror().getErrorMessage());
             return false;
         }
 
         if (rendezvous) {
             optval = true;
-            if (UDT::setsockopt(sock(), 0, UDT_RENDEZVOUS, &optval, sizeof(optval)) == UDT::ERROR) {
+            if (UDT::setsockopt(udtHandle()->sock(), 0, UDT_RENDEZVOUS, &optval, sizeof(optval)) == UDT::ERROR) {
                 LOG4CPLUS_ERROR(logger(), "Cannot set rendezvous mode on UDT socket: " << UDT::getlasterror().getErrorMessage());
                 return false;
             }
@@ -57,7 +57,7 @@ namespace DTun
             return false;
         }
 
-        if (UDT::connect(sock(), res->ai_addr, res->ai_addrlen) == UDT::ERROR) {
+        if (UDT::connect(udtHandle()->sock(), res->ai_addr, res->ai_addrlen) == UDT::ERROR) {
             LOG4CPLUS_ERROR(logger(), "Cannot connect UDT socket: " << UDT::getlasterror().getErrorMessage());
             freeaddrinfo(res);
             return false;
@@ -74,9 +74,9 @@ namespace DTun
 
     void UDTConnector::close()
     {
-        UDTSOCKET s = reactor().remove(this);
-        if (!noCloseSock_ && (s != UDT::INVALID_SOCK)) {
-            DTun::closeUDTSocketChecked(s);
+        boost::shared_ptr<UDTHandle> handle = reactor().remove(this);
+        if (!noCloseSock_ && handle) {
+            handle->close();
         }
     }
 
@@ -95,7 +95,7 @@ namespace DTun
         callback_ = ConnectCallback();
         reactor().update(this);
 
-        int state = UDT::getsockstate(sock());
+        int state = UDT::getsockstate(udtHandle()->sock());
         noCloseSock_ = true;
         cb((state == CONNECTED) ? 0 : CUDTException::ECONNFAIL);
     }

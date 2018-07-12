@@ -1,18 +1,22 @@
 set(SOURCES
-    SignalHandler.cpp
-    SignalBlocker.cpp
-    UDTReactor.cpp
-    UDTConnector.cpp
-    UDTConnection.cpp
-    UDTAcceptor.cpp
-    UDTSocket.cpp
-    TCPReactor.cpp
-    TCPConnector.cpp
-    TCPConnection.cpp
-    TCPSocket.cpp
     Logger.cpp
-    Utils.cpp
+    SignalBlocker.cpp
+    SignalHandler.cpp
     StreamAppConfig.cpp
+    SysConnection.cpp
+    SysConnector.cpp
+    SysHandle.cpp
+    SysHandler.cpp
+    SysManager.cpp
+    SysReactor.cpp
+    UDTAcceptor.cpp
+    UDTConnection.cpp
+    UDTConnector.cpp
+    UDTHandle.cpp
+    UDTHandler.cpp
+    UDTManager.cpp
+    UDTReactor.cpp
+    Utils.cpp
 )
 
 add_library(dutil STATIC ${SOURCES})

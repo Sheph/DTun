@@ -6,7 +6,10 @@ extern "C" {
 #include "DMasterClient.h"
 #include "Logger.h"
 #include "DTun/Utils.h"
+#include "DTun/SConnector.h"
+#include "DTun/SConnection.h"
 #include <boost/make_shared.hpp>
+#include <boost/bind.hpp>
 
 #define STATE_CONNECTING 1
 #define STATE_UP 2
@@ -14,7 +17,7 @@ extern "C" {
 
 namespace DNode
 {
-    extern DTun::UDTReactor* theUdtReactor;
+    extern DTun::SManager* theRemoteMgr;
 
     class ProxyTCPClient : boost::noncopyable
     {
@@ -185,26 +188,14 @@ namespace DNode
                 return;
             }
 
-            UDTSOCKET sock = UDT::socket(AF_INET, SOCK_STREAM, 0);
-            if (sock == UDT::INVALID_SOCK) {
-                LOG4CPLUS_ERROR(logger(), "Cannot create UDT socket: " << UDT::getlasterror().getErrorMessage());
+            boost::shared_ptr<DTun::SHandle> handle = theRemoteMgr->createStreamSocket();
+            if (!handle) {
                 state_ = STATE_ERR;
                 signalReactor();
                 return;
             }
 
-            bool optval = false;
-            if (UDT::setsockopt(sock, 0, UDT_REUSEADDR, &optval, sizeof(optval)) == UDT::ERROR) {
-                LOG4CPLUS_ERROR(logger(), "Cannot set reuseaddr for UDT socket: " << UDT::getlasterror().getErrorMessage());
-                DTun::closeUDTSocketChecked(sock);
-                state_ = STATE_ERR;
-                signalReactor();
-                return;
-            }
-
-            if (UDT::bind2(sock, boundSock_) == UDT::ERROR) {
-                LOG4CPLUS_ERROR(logger(), "Cannot bind UDT socket: " << UDT::getlasterror().getErrorMessage());
-                DTun::closeUDTSocketChecked(sock);
+            if (!handle->bind(boundSock_)) {
                 state_ = STATE_ERR;
                 signalReactor();
                 return;
@@ -212,7 +203,7 @@ namespace DNode
 
             boundSock_ = SYS_INVALID_SOCKET;
 
-            connector_ = boost::make_shared<DTun::UDTConnector>(boost::ref(*theUdtReactor), sock);
+            connector_ = handle->createConnector();
 
             if (!connector_->connect(DTun::ipToString(remoteIp), DTun::portToString(remotePort),
                 boost::bind(&ProxyTCPClient::onConnect, this, _1), true)) {
@@ -228,25 +219,25 @@ namespace DNode
 
             boost::mutex::scoped_lock lock(m_);
 
-            UDTSOCKET sock = connector_->sock();
+            boost::shared_ptr<DTun::SHandle> handle = connector_->handle();
 
             connector_->close();
 
             if (err) {
-                DTun::closeUDTSocketChecked(sock);
+                handle->close();
                 state_ = STATE_ERR;
             }
 
             if (!reactorSignal_) {
                 if (!err) {
-                    DTun::closeUDTSocketChecked(sock);
+                    handle->close();
                 }
                 return;
             }
 
             if (!err) {
                 state_ = STATE_UP;
-                conn_ = boost::make_shared<DTun::UDTConnection>(boost::ref(*theUdtReactor), sock);
+                conn_ = handle->createConnection();
             }
 
             signalReactor();
@@ -304,8 +295,8 @@ namespace DNode
         DTun::UInt32 connId_;
         DTun::UInt32 debugConnId_;
         SYSSOCKET boundSock_;
-        boost::shared_ptr<DTun::UDTConnection> conn_;
-        boost::shared_ptr<DTun::UDTConnector> connector_;
+        boost::shared_ptr<DTun::SConnection> conn_;
+        boost::shared_ptr<DTun::SConnector> connector_;
     };
 }
 

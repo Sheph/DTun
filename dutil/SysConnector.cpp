@@ -1,5 +1,5 @@
-#include "DTun/TCPConnector.h"
-#include "DTun/TCPReactor.h"
+#include "DTun/SysConnector.h"
+#include "DTun/SysReactor.h"
 #include "DTun/Utils.h"
 #include "Logger.h"
 #include <unistd.h>
@@ -11,27 +11,33 @@
 
 namespace DTun
 {
-    TCPConnector::TCPConnector(TCPReactor& reactor, SYSSOCKET sock)
-    : TCPSocket(reactor, sock)
+    SysConnector::SysConnector(SysReactor& reactor, const boost::shared_ptr<SysHandle>& handle)
+    : SysHandler(reactor, handle)
     , handedOut_(false)
     {
         reactor.add(this);
     }
 
-    TCPConnector::~TCPConnector()
+    SysConnector::~SysConnector()
     {
         close();
     }
 
-    bool TCPConnector::connect(const std::string& address, const std::string& port, const ConnectCallback& callback)
+    bool SysConnector::connect(const std::string& address, const std::string& port, const ConnectCallback& callback, bool rendezvous)
     {
-        if (::fcntl(sock(), F_SETFL, O_NONBLOCK) < 0) {
+        assert(!rendezvous);
+        if (rendezvous) {
+            LOG4CPLUS_FATAL(logger(), "rendezvous not supported!");
+            return false;
+        }
+
+        if (::fcntl(sysHandle()->sock(), F_SETFL, O_NONBLOCK) < 0) {
             LOG4CPLUS_ERROR(logger(), "cannot set sock non-blocking");
             return false;
         }
 
         int optval = 1;
-        if (::setsockopt(sock(), SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) < 0) {
+        if (::setsockopt(sysHandle()->sock(), SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) < 0) {
             LOG4CPLUS_ERROR(logger(), "cannot set sock reuse addr");
             return false;
         }
@@ -51,7 +57,7 @@ namespace DTun
             return false;
         }
 
-        int conn_res = ::connect(sock(), res->ai_addr, res->ai_addrlen);
+        int conn_res = ::connect(sysHandle()->sock(), res->ai_addr, res->ai_addrlen);
 
         freeaddrinfo(res);
 
@@ -67,24 +73,24 @@ namespace DTun
         return true;
     }
 
-    void TCPConnector::close()
+    void SysConnector::close()
     {
-        SYSSOCKET s = reactor().remove(this);
-        if (!handedOut_ && (s != SYS_INVALID_SOCKET)) {
-            DTun::closeSysSocketChecked(s);
+        boost::shared_ptr<SysHandle> handle = reactor().remove(this);
+        if (!handedOut_ && handle) {
+            handle->close();
         }
     }
 
-    int TCPConnector::getPollEvents() const
+    int SysConnector::getPollEvents() const
     {
         return callback_ ? EPOLLOUT : 0;
     }
 
-    void TCPConnector::handleRead()
+    void SysConnector::handleRead()
     {
     }
 
-    void TCPConnector::handleWrite()
+    void SysConnector::handleWrite()
     {
         ConnectCallback cb = callback_;
         callback_ = ConnectCallback();
@@ -92,7 +98,7 @@ namespace DTun
 
         int result = 0;
         socklen_t resultLen = sizeof(result);
-        if (::getsockopt(sock(), SOL_SOCKET, SO_ERROR, &result, &resultLen) < 0) {
+        if (::getsockopt(sysHandle()->sock(), SOL_SOCKET, SO_ERROR, &result, &resultLen) < 0) {
             result = errno;
             LOG4CPLUS_ERROR(logger(), "Cannot getsockopt TCP socket: " << strerror(errno));
         }

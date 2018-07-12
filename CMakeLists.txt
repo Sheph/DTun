@@ -57,19 +57,33 @@ add_definitions(-DBADVPN_USE_SIGNALFD)
 add_definitions(-D_GNU_SOURCE)
 
 set (COMMON_HEADERS
+    ${DTUN_INCLUDE_DIR}/udt.h
+    ${DTUN_INCLUDE_DIR}/DTun/AppConfig.h
+    ${DTUN_INCLUDE_DIR}/DTun/DProtocol.h
+    ${DTUN_INCLUDE_DIR}/DTun/SAcceptor.h
+    ${DTUN_INCLUDE_DIR}/DTun/SConnection.h
+    ${DTUN_INCLUDE_DIR}/DTun/SConnector.h
+    ${DTUN_INCLUDE_DIR}/DTun/SHandle.h
+    ${DTUN_INCLUDE_DIR}/DTun/SHandler.h
     ${DTUN_INCLUDE_DIR}/DTun/SignalBlocker.h
     ${DTUN_INCLUDE_DIR}/DTun/SignalHandler.h
-    ${DTUN_INCLUDE_DIR}/DTun/DProtocol.h
-    ${DTUN_INCLUDE_DIR}/DTun/Types.h
-    ${DTUN_INCLUDE_DIR}/DTun/Utils.h
-    ${DTUN_INCLUDE_DIR}/DTun/UDTSocket.h
-    ${DTUN_INCLUDE_DIR}/DTun/UDTReactor.h
-    ${DTUN_INCLUDE_DIR}/DTun/UDTAcceptor.h
-    ${DTUN_INCLUDE_DIR}/DTun/UDTConnector.h
-    ${DTUN_INCLUDE_DIR}/DTun/UDTConnection.h
-    ${DTUN_INCLUDE_DIR}/DTun/AppConfig.h
+    ${DTUN_INCLUDE_DIR}/DTun/SManager.h
     ${DTUN_INCLUDE_DIR}/DTun/StreamAppConfig.h
-    ${DTUN_INCLUDE_DIR}/udt.h
+    ${DTUN_INCLUDE_DIR}/DTun/SysConnection.h
+    ${DTUN_INCLUDE_DIR}/DTun/SysConnector.h
+    ${DTUN_INCLUDE_DIR}/DTun/SysHandle.h
+    ${DTUN_INCLUDE_DIR}/DTun/SysHandler.h
+    ${DTUN_INCLUDE_DIR}/DTun/SysManager.h
+    ${DTUN_INCLUDE_DIR}/DTun/SysReactor.h
+    ${DTUN_INCLUDE_DIR}/DTun/Types.h
+    ${DTUN_INCLUDE_DIR}/DTun/UDTAcceptor.h
+    ${DTUN_INCLUDE_DIR}/DTun/UDTConnection.h
+    ${DTUN_INCLUDE_DIR}/DTun/UDTConnector.h
+    ${DTUN_INCLUDE_DIR}/DTun/UDTHandle.h
+    ${DTUN_INCLUDE_DIR}/DTun/UDTHandler.h
+    ${DTUN_INCLUDE_DIR}/DTun/UDTManager.h
+    ${DTUN_INCLUDE_DIR}/DTun/UDTReactor.h
+    ${DTUN_INCLUDE_DIR}/DTun/Utils.h
 )
 
 include_directories(

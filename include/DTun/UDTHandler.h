@@ -1,35 +1,31 @@
-#ifndef _DTUN_UDTSOCKET_H_
-#define _DTUN_UDTSOCKET_H_
+#ifndef _DTUN_UDTHANDLER_H_
+#define _DTUN_UDTHANDLER_H_
 
-#include "DTun/Types.h"
+#include "DTun/UDTHandle.h"
+#include "DTun/SHandler.h"
 #include <boost/noncopyable.hpp>
 #include <boost/function.hpp>
 #include <boost/shared_ptr.hpp>
-#include "udt.h"
 
 namespace DTun
 {
     class UDTReactor;
 
-    class UDTSocket : boost::noncopyable
+    class UDTHandler : virtual public SHandler
     {
     public:
-        UDTSocket(UDTReactor& reactor, UDTSOCKET sock);
-        virtual ~UDTSocket();
-
-        bool getSockName(UInt32& ip, UInt16& port);
-        bool getPeerName(UInt32& ip, UInt16& port);
+        UDTHandler(UDTReactor& reactor, const boost::shared_ptr<UDTHandle>& handle);
+        virtual ~UDTHandler();
 
         inline UDTReactor& reactor() { return reactor_; }
 
-        inline UDTSOCKET sock() const { return sock_; }
+        virtual boost::shared_ptr<SHandle> handle() const { return handle_; }
+        virtual const boost::shared_ptr<UDTHandle>& udtHandle() const { return handle_; }
 
         inline void setCookie(uint64_t cookie) { cookie_ = cookie; }
         inline uint64_t cookie() const { return cookie_; }
 
-        void resetSock() { sock_ = UDT::INVALID_SOCK; }
-
-        virtual void close() = 0;
+        virtual void resetHandle() { handle_.reset(); }
 
         virtual int getPollEvents() const = 0;
 
@@ -38,7 +34,7 @@ namespace DTun
 
     private:
         UDTReactor& reactor_;
-        UDTSOCKET sock_;
+        boost::shared_ptr<UDTHandle> handle_;
         uint64_t cookie_;
     };
 }

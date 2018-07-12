@@ -2,11 +2,12 @@
 #include "DTun/UDTReactor.h"
 #include "DTun/Utils.h"
 #include "Logger.h"
+#include <boost/make_shared.hpp>
 
 namespace DTun
 {
-    UDTAcceptor::UDTAcceptor(UDTReactor& reactor, UDTSOCKET sock)
-    : UDTSocket(reactor, sock)
+    UDTAcceptor::UDTAcceptor(UDTReactor& reactor, const boost::shared_ptr<UDTHandle>& handle)
+    : UDTHandler(reactor, handle)
     {
         reactor.add(this);
     }
@@ -18,7 +19,7 @@ namespace DTun
 
     bool UDTAcceptor::listen(int backlog, const ListenCallback& callback)
     {
-        if (UDT::listen(sock(), backlog) == UDT::ERROR) {
+        if (UDT::listen(udtHandle()->sock(), backlog) == UDT::ERROR) {
            LOG4CPLUS_ERROR(logger(), "Cannot listen UDT socket: " << UDT::getlasterror().getErrorMessage());
            return false;
         }
@@ -32,9 +33,9 @@ namespace DTun
 
     void UDTAcceptor::close()
     {
-        UDTSOCKET s = reactor().remove(this);
-        if (s != UDT::INVALID_SOCK) {
-            DTun::closeUDTSocketChecked(s);
+        boost::shared_ptr<UDTHandle> handle = reactor().remove(this);
+        if (handle) {
+            handle->close();
         }
     }
 
@@ -50,7 +51,7 @@ namespace DTun
 
         UDTSOCKET client;
 
-        if ((client = UDT::accept(sock(), (sockaddr*)&clientaddr, &addrlen)) == UDT::INVALID_SOCK) {
+        if ((client = UDT::accept(udtHandle()->sock(), (sockaddr*)&clientaddr, &addrlen)) == UDT::INVALID_SOCK) {
             LOG4CPLUS_ERROR(logger(), "Cannot accept UDT socket: " << UDT::getlasterror().getErrorMessage());
             return;
         }
@@ -68,7 +69,7 @@ namespace DTun
             return;
         }
 
-        callback_(client);
+        callback_(boost::make_shared<UDTHandle>(boost::ref(reactor()), client));
     }
 
     void UDTAcceptor::handleWrite()

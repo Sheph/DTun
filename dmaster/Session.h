@@ -2,9 +2,10 @@
 #define _SESSION_H_
 
 #include "DTun/DProtocol.h"
-#include "DTun/UDTConnection.h"
+#include "DTun/SConnection.h"
 #include <boost/noncopyable.hpp>
 #include <map>
+#include <vector>
 
 namespace DMaster
 {
@@ -24,7 +25,7 @@ namespace DMaster
         typedef boost::function<void (DTun::UInt32, DTun::UInt32)> StartAcceptorCallback;
         typedef boost::function<void (int)> ErrorCallback;
 
-        explicit Session(const boost::shared_ptr<DTun::UDTConnection>& conn);
+        explicit Session(const boost::shared_ptr<DTun::SConnection>& conn);
         ~Session();
 
         inline void setStartPersistentCallback(const StartPersistentCallback& cb) { startPersistentCallback_ = cb; }
@@ -88,7 +89,7 @@ namespace DMaster
         DTun::UInt32 peerIp_;
         DTun::UInt16 peerPort_;
 
-        boost::shared_ptr<DTun::UDTConnection> conn_;
+        boost::shared_ptr<DTun::SConnection> conn_;
     };
 }
 

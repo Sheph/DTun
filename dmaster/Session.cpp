@@ -5,7 +5,7 @@
 
 namespace DMaster
 {
-    Session::Session(const boost::shared_ptr<DTun::UDTConnection>& conn)
+    Session::Session(const boost::shared_ptr<DTun::SConnection>& conn)
     : type_(TypeUnknown)
     , nodeId_(0)
     , conn_(conn)
@@ -13,7 +13,7 @@ namespace DMaster
         // Another UDT crap, if we do this later after receiving
         // HELLO we might run into situation when UDT library implicitly closes
         // our socket and doesn't allow us to query for peer address...
-        if (!conn->getPeerName(peerIp_, peerPort_)) {
+        if (!conn->handle()->getPeerName(peerIp_, peerPort_)) {
             peerIp_ = 0;
             peerPort_ = 0;
         }
@@ -167,7 +167,7 @@ namespace DMaster
         default:
             LOG4CPLUS_ERROR(logger(), "bad msg code: " << header.msgCode);
             if (errorCallback_) {
-                errorCallback_(CUDTException::EUNKNOWN);
+                errorCallback_(1);
             }
             break;
         }
@@ -253,7 +253,7 @@ namespace DMaster
         LOG4CPLUS_TRACE(logger(), "Session::onRecvAny(" << err << ", " << numBytes << ")");
 
         if (errorCallback_) {
-            errorCallback_(err ? err : CUDTException::EUNKNOWN);
+            errorCallback_(err ? err : 1);
         }
     }
 

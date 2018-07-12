@@ -8,13 +8,11 @@
 #define BOOST_CB_DISABLE_DEBUG
 
 #include "DTun/Types.h"
-#include "DTun/UDTReactor.h"
-#include "DTun/UDTConnector.h"
-#include "DTun/UDTConnection.h"
-#include "DTun/TCPReactor.h"
-#include "DTun/TCPConnector.h"
-#include "DTun/TCPConnection.h"
+#include "DTun/SManager.h"
 #include <boost/circular_buffer.hpp>
+#include <boost/thread/mutex.hpp>
+#include <boost/function.hpp>
+#include <vector>
 
 namespace DNode
 {
@@ -23,7 +21,7 @@ namespace DNode
     public:
         typedef boost::function<void ()> DoneCallback;
 
-        ProxySession(DTun::UDTReactor& udtReactor, DTun::TCPReactor& tcpReactor);
+        ProxySession(DTun::SManager& remoteMgr, DTun::SManager& localMgr);
         ~ProxySession();
 
         // 's' will be closed even in case of failure!
@@ -46,8 +44,8 @@ namespace DNode
         void recvRemote();
         void sendRemote(int numBytes);
 
-        DTun::UDTReactor& udtReactor_;
-        DTun::TCPReactor& tcpReactor_;
+        DTun::SManager& remoteMgr_;
+        DTun::SManager& localMgr_;
         DoneCallback callback_;
 
         boost::mutex m_;
@@ -63,10 +61,10 @@ namespace DNode
         bool done_;
         bool localShutdown_;
 
-        boost::shared_ptr<DTun::TCPConnection> localConn_;
-        boost::shared_ptr<DTun::UDTConnection> remoteConn_;
-        boost::shared_ptr<DTun::TCPConnector> localConnector_;
-        boost::shared_ptr<DTun::UDTConnector> remoteConnector_;
+        boost::shared_ptr<DTun::SConnection> localConn_;
+        boost::shared_ptr<DTun::SConnection> remoteConn_;
+        boost::shared_ptr<DTun::SConnector> localConnector_;
+        boost::shared_ptr<DTun::SConnector> remoteConnector_;
     };
 }
 

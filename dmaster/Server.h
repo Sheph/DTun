@@ -3,7 +3,8 @@
 
 #include "Session.h"
 #include "DTun/UDTReactor.h"
-#include "DTun/UDTAcceptor.h"
+#include "DTun/UDTManager.h"
+#include "DTun/SAcceptor.h"
 #include <boost/noncopyable.hpp>
 #include <boost/weak_ptr.hpp>
 
@@ -24,7 +25,7 @@ namespace DMaster
     private:
         typedef std::set<boost::shared_ptr<Session> > Sessions;
 
-        void onAccept(UDTSOCKET sock);
+        void onAccept(const boost::shared_ptr<DTun::SHandle>& handle);
 
         void onSessionStartPersistent(const boost::weak_ptr<Session>& sess);
 
@@ -44,8 +45,9 @@ namespace DMaster
 
         int port_;
         DTun::UDTReactor reactor_;
+        DTun::UDTManager mgr_;
         Sessions sessions_;
-        boost::shared_ptr<DTun::UDTAcceptor> acceptor_;
+        boost::shared_ptr<DTun::SAcceptor> acceptor_;
     };
 }
 

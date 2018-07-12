@@ -1,7 +1,7 @@
-#ifndef _DTUN_TCPREACTOR_H_
-#define _DTUN_TCPREACTOR_H_
+#ifndef _DTUN_SYSREACTOR_H_
+#define _DTUN_SYSREACTOR_H_
 
-#include "DTun/TCPSocket.h"
+#include "DTun/SysHandler.h"
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/condition.hpp>
 #include <boost/thread.hpp>
@@ -9,11 +9,11 @@
 
 namespace DTun
 {
-    class TCPReactor : boost::noncopyable
+    class SysReactor : boost::noncopyable
     {
     public:
-        explicit TCPReactor();
-        ~TCPReactor();
+        explicit SysReactor();
+        ~SysReactor();
 
         bool start();
 
@@ -23,33 +23,33 @@ namespace DTun
 
         void stop();
 
-        void add(TCPSocket* socket);
-        SYSSOCKET remove(TCPSocket* socket);
-        void update(TCPSocket* socket);
+        void add(SysHandler* handler);
+        boost::shared_ptr<SysHandle> remove(SysHandler* handler);
+        void update(SysHandler* handler);
 
     private:
-        struct SocketInfo
+        struct HandlerInfo
         {
-            SocketInfo()
-            : socket(NULL)
+            HandlerInfo()
+            : handler(NULL)
             , pollEvents(0) {}
 
-            SocketInfo(TCPSocket* socket, int pollEvents)
-            : socket(socket)
+            HandlerInfo(SysHandler* handler, int pollEvents)
+            : handler(handler)
             , pollEvents(pollEvents) {}
 
-            TCPSocket* socket;
+            SysHandler* handler;
             int pollEvents;
         };
 
-        struct PollSocketInfo
+        struct PollHandlerInfo
         {
-            PollSocketInfo()
+            PollHandlerInfo()
             : cookie(0)
             , pollEvents(0)
             , notInEpoll(false) {}
 
-            PollSocketInfo(uint64_t cookie, int pollEvents)
+            PollHandlerInfo(uint64_t cookie, int pollEvents)
             : cookie(cookie)
             , pollEvents(pollEvents)
             , notInEpoll(false) {}
@@ -59,8 +59,8 @@ namespace DTun
             bool notInEpoll;
         };
 
-        typedef std::map<uint64_t, SocketInfo> SocketMap;
-        typedef std::map<SYSSOCKET, PollSocketInfo> PollSocketMap;
+        typedef std::map<uint64_t, HandlerInfo> HandlerMap;
+        typedef std::map<SYSSOCKET, PollHandlerInfo> PollHandlerMap;
 
         void reset();
 
@@ -78,11 +78,11 @@ namespace DTun
         uint64_t nextCookie_;
         SYSSOCKET signalWrSock_;
         SYSSOCKET signalRdSock_;
-        SocketMap sockets_;
-        PollSocketMap pollSockets_;
+        HandlerMap handlers_;
+        PollHandlerMap pollHandlers_;
         bool inPoll_;
         uint64_t pollIteration_;
-        TCPSocket* currentlyHandling_;
+        SysHandler* currentlyHandling_;
     };
 }
 

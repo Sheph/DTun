@@ -12,6 +12,7 @@ namespace DMaster
 {
     Server::Server(int port)
     : port_(port)
+    , mgr_(reactor_)
     {
     }
 
@@ -43,27 +44,22 @@ namespace DMaster
             return false;
         }
 
-        UDTSOCKET serverSocket = UDT::socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-
-        if (serverSocket == UDT::INVALID_SOCK) {
-            LOG4CPLUS_ERROR(logger(), "Cannot create UDT socket: " << UDT::getlasterror().getErrorMessage());
+        boost::shared_ptr<DTun::SHandle> serverHandle = mgr_.createStreamSocket();
+        if (serverHandle) {
             freeaddrinfo(res);
             return false;
         }
 
-        if (UDT::bind(serverSocket, res->ai_addr, res->ai_addrlen) == UDT::ERROR) {
-            LOG4CPLUS_ERROR(logger(), "Cannot bind UDT socket: " << UDT::getlasterror().getErrorMessage());
+        if (!serverHandle->bind(res->ai_addr, res->ai_addrlen)) {
             freeaddrinfo(res);
-            DTun::closeUDTSocketChecked(serverSocket);
             return false;
         }
 
         freeaddrinfo(res);
 
-        acceptor_ = boost::make_shared<DTun::UDTAcceptor>(boost::ref(reactor_), serverSocket);
+        acceptor_ = serverHandle->createAcceptor();
 
         if (!acceptor_->listen(10, boost::bind(&Server::onAccept, this, _1))) {
-           DTun::closeUDTSocketChecked(serverSocket);
            acceptor_.reset();
            return false;
         }
@@ -86,12 +82,11 @@ namespace DMaster
         reactor_.stop();
     }
 
-    void Server::onAccept(UDTSOCKET sock)
+    void Server::onAccept(const boost::shared_ptr<DTun::SHandle>& handle)
     {
-        LOG4CPLUS_TRACE(logger(), "Server::onAccept(" << sock << ")");
+        LOG4CPLUS_TRACE(logger(), "Server::onAccept(" << handle << ")");
 
-        boost::shared_ptr<Session> session = boost::make_shared<Session>(
-            boost::make_shared<DTun::UDTConnection>(boost::ref(reactor_), sock));
+        boost::shared_ptr<Session> session = boost::make_shared<Session>(handle->createConnection());
 
         sessions_.insert(session);
 
