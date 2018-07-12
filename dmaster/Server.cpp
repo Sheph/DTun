@@ -45,7 +45,7 @@ namespace DMaster
         }
 
         boost::shared_ptr<DTun::SHandle> serverHandle = mgr_.createStreamSocket();
-        if (serverHandle) {
+        if (!serverHandle) {
             freeaddrinfo(res);
             return false;
         }
