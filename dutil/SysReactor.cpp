@@ -321,7 +321,7 @@ namespace DTun
         }
     }
 
-    bool SysReactor::isSameThread()
+    bool SysReactor::isSameThread() const
     {
         return (runThreadId_ == boost::thread::id()) ||
             (boost::this_thread::get_id() == runThreadId_);

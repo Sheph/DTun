@@ -24,7 +24,7 @@ namespace DTun
         }
 
         watch_->close();
-        toKillHandles_.clear();
+        onKillHandles();
         reapConnCache();
         assert(connCache_.empty());
         assert(numAliveHandles_ == 0);
@@ -59,6 +59,8 @@ namespace DTun
 
         netif_set_pretend_tcp(&netif_, 1);
 
+        netif_set_default(&netif_);
+
         watch_ = boost::make_shared<OpWatch>();
 
         innerMgr_.reactor().post(
@@ -76,6 +78,9 @@ namespace DTun
         if (!res) {
             LOG4CPLUS_FATAL(logger(), "double kill!");
         }
+        lock.unlock();
+        innerMgr_.reactor().dispatch(
+            watch_->wrap(boost::bind(&LTUDPManager::onKillHandles, this)));
     }
 
     boost::shared_ptr<SConnection> LTUDPManager::createTransportConnection(const struct sockaddr* name, int namelen)
@@ -218,7 +223,20 @@ namespace DTun
             assert(IP_TMR_INTERVAL == 4 * TCP_TMR_INTERVAL);
             ip_reass_tmr();
 #endif
+            // also do other stuff
+            reapConnCache();
         }
+    }
+
+    void LTUDPManager::onKillHandles()
+    {
+        LOG4CPLUS_TRACE(logger(), "onKillHandles()");
+
+        boost::mutex::scoped_lock lock(m_);
+        for (HandleSet::iterator it = toKillHandles_.begin(); it != toKillHandles_.end(); ++it) {
+            (*it)->kill();
+        }
+        toKillHandles_.clear();
     }
 
     void LTUDPManager::reapConnCache()

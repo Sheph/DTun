@@ -29,6 +29,8 @@ namespace DTun
 
         boost::shared_ptr<SConnection> createTransportConnection(const struct sockaddr* name, int namelen);
 
+        inline struct netif& netif() { return netif_; }
+
     private:
         typedef std::set<boost::shared_ptr<LTUDPHandleImpl> > HandleSet;
         typedef std::map<std::pair<UInt32, UInt16>, boost::weak_ptr<SConnection> > ConnectionCache;
@@ -44,6 +46,8 @@ namespace DTun
             const boost::shared_ptr<std::vector<char> >& rcvBuff);
 
         void onTcpTimeout();
+
+        void onKillHandles();
 
         void reapConnCache();
 

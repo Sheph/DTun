@@ -383,7 +383,7 @@ namespace DTun
         }
     }
 
-    bool UDTReactor::isSameThread()
+    bool UDTReactor::isSameThread() const
     {
         return (runThreadId_ == boost::thread::id()) ||
             (boost::this_thread::get_id() == runThreadId_);

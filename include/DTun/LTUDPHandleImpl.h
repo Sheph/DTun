@@ -18,15 +18,17 @@ namespace DTun
         explicit LTUDPHandleImpl(LTUDPManager& mgr);
         ~LTUDPHandleImpl();
 
-        inline LTUDPManager& mgr() { return mgr_; }
+        void kill();
 
-        inline const boost::shared_ptr<SConnection>& conn() const { return conn_; }
+        inline LTUDPManager& mgr() { return mgr_; }
 
         bool bind(const struct sockaddr* name, int namelen);
 
         void listen(int backlog, const ListenCallback& callback);
 
     private:
+        static err_t listenerAcceptFunc(void* arg, struct tcp_pcb* newpcb, err_t err);
+
         LTUDPManager& mgr_;
         boost::shared_ptr<SConnection> conn_;
         struct tcp_pcb* pcb_;

@@ -23,6 +23,8 @@ namespace DTun
 
         virtual void stop() = 0;
 
+        virtual bool isSameThread() const = 0;
+
         virtual void post(const Callback& callback, UInt32 timeoutMs = 0) = 0;
 
         virtual void dispatch(const Callback& callback) = 0;

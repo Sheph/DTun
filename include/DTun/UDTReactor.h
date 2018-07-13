@@ -24,6 +24,8 @@ namespace DTun
 
         virtual void stop();
 
+        virtual bool isSameThread() const;
+
         virtual void post(const Callback& callback, UInt32 timeoutMs = 0);
 
         virtual void dispatch(const Callback& callback);
@@ -70,8 +72,6 @@ namespace DTun
         typedef std::map<UDTSOCKET, PollHandlerInfo> PollHandlerMap;
 
         void reset();
-
-        bool isSameThread();
 
         void signalWr();
         void signalRd();
