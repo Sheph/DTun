@@ -25,6 +25,8 @@ namespace DTun
 
         virtual boost::shared_ptr<SHandle> createDatagramSocket();
 
+        void addToKill(const boost::shared_ptr<LTUDPHandleImpl>& handle);
+
     private:
         typedef std::set<boost::shared_ptr<LTUDPHandleImpl> > HandleSet;
         typedef std::map<std::pair<UInt32, UInt16>, boost::weak_ptr<SConnection> > ConnectionCache;

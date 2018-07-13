@@ -48,8 +48,7 @@ namespace DMaster
         boost::shared_ptr<DTun::SHandle> serverHandle = mgr_.createStreamSocket();
         if (!serverHandle) {
             freeaddrinfo(res);
-            LOG4CPLUS_INFO(logger(), "Server is NOT ready at port " << port_);
-            return true;
+            return false;
         }
 
         if (!serverHandle->bind(res->ai_addr, res->ai_addrlen)) {

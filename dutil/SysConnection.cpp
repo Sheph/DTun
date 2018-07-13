@@ -97,7 +97,7 @@ namespace DTun
         int res;
         if ((res = ::recv(sysHandle()->sock(), req->first, req->last - req->first, 0)) == -1) {
             int err = errno;
-            LOG4CPLUS_TRACE(logger(), "Cannot read TCP socket: " << strerror(err));
+            LOG4CPLUS_TRACE(logger(), "Cannot read sys socket: " << strerror(err));
 
             cb = req->callback;
 
@@ -141,7 +141,7 @@ namespace DTun
         int res;
         if ((res = ::send(sysHandle()->sock(), req->first, req->last - req->first, 0)) == -1) {
             int err = errno;
-            LOG4CPLUS_TRACE(logger(), "Cannot write TCP socket: " << err);
+            LOG4CPLUS_TRACE(logger(), "Cannot write sys socket: " << err);
 
             cb = req->callback;
 

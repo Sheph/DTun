@@ -1,6 +1,7 @@
 #ifndef _DTUN_LTUDPACCEPTOR_H_
 #define _DTUN_LTUDPACCEPTOR_H_
 
+#include "DTun/SReactor.h"
 #include "DTun/SAcceptor.h"
 #include "DTun/LTUDPHandle.h"
 #include "DTun/OpWatch.h"
@@ -20,10 +21,10 @@ namespace DTun
         virtual bool listen(int backlog, const ListenCallback& callback);
 
     private:
-        //void onListen(...);
+        void onStartListen(int backlog, const ListenCallback& callback);
 
         boost::shared_ptr<LTUDPHandle> handle_;
-        //OpWatch watch_;
+        boost::shared_ptr<OpWatch> watch_;
     };
 }
 

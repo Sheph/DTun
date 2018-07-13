@@ -31,7 +31,11 @@ namespace DTun
 
     boost::shared_ptr<SHandle> SysManager::createDatagramSocket()
     {
-        assert(false);
-        return boost::shared_ptr<SHandle>();
+        SYSSOCKET sock = ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+        if (sock == SYS_INVALID_SOCKET) {
+            LOG4CPLUS_ERROR(logger(), "Cannot create UDP socket: " << strerror(errno));
+            return boost::shared_ptr<SHandle>();
+        }
+        return boost::make_shared<SysHandle>(boost::ref(reactor_), sock);
     }
 }

@@ -2,6 +2,7 @@
 #define _DTUN_LTUDPHANDLE_H_
 
 #include "DTun/LTUDPHandleImpl.h"
+#include "DTun/SReactor.h"
 #include <boost/enable_shared_from_this.hpp>
 
 namespace DTun
@@ -14,6 +15,10 @@ namespace DTun
     public:
         LTUDPHandle(LTUDPManager& mgr, const boost::shared_ptr<SConnection>& conn);
         ~LTUDPHandle();
+
+        inline const boost::shared_ptr<LTUDPHandleImpl>& impl() const { return impl_; }
+
+        inline SReactor& reactor() { return reactor_; }
 
         virtual bool bind(SYSSOCKET s);
 
@@ -32,7 +37,7 @@ namespace DTun
         virtual boost::shared_ptr<SConnection> createConnection();
 
     private:
-        LTUDPManager& mgr_;
+        SReactor& reactor_;
         boost::shared_ptr<LTUDPHandleImpl> impl_;
     };
 }

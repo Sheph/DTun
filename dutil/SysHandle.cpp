@@ -2,6 +2,7 @@
 #include "DTun/SysConnector.h"
 #include "DTun/SysConnection.h"
 #include "DTun/Utils.h"
+#include "Logger.h"
 #include <boost/make_shared.hpp>
 
 namespace DTun
@@ -25,8 +26,12 @@ namespace DTun
 
     bool SysHandle::bind(const struct sockaddr* name, int namelen)
     {
-        assert(false);
-        return false;
+        if (::bind(sock_, name, namelen) == SYS_SOCKET_ERROR) {
+            LOG4CPLUS_ERROR(logger(), "Cannot bind sys socket: " << strerror(errno));
+            return false;
+        }
+
+        return true;
     }
 
     bool SysHandle::getSockName(UInt32& ip, UInt16& port) const
