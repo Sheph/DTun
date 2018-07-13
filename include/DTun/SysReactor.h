@@ -11,7 +11,7 @@
 
 namespace DTun
 {
-    class SysReactor : public SReactor
+    class DTUN_API SysReactor : public SReactor
     {
     public:
         explicit SysReactor();
@@ -28,6 +28,8 @@ namespace DTun
         virtual void post(const Callback& callback, UInt32 timeoutMs = 0);
 
         virtual void dispatch(const Callback& callback);
+
+        virtual std::string dump();
 
         void add(SysHandler* handler);
         boost::shared_ptr<SysHandle> remove(SysHandler* handler);

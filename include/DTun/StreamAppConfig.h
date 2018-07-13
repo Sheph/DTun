@@ -10,7 +10,7 @@
 
 namespace DTun
 {
-    class StreamAppConfig : public AppConfig
+    class DTUN_API StreamAppConfig : public AppConfig
     {
     public:
         StreamAppConfig();

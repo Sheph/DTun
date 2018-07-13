@@ -10,7 +10,7 @@
 
 namespace DTun
 {
-    class UDTReactor : public SReactor
+    class DTUN_API UDTReactor : public SReactor
     {
     public:
         explicit UDTReactor();
@@ -27,6 +27,8 @@ namespace DTun
         virtual void post(const Callback& callback, UInt32 timeoutMs = 0);
 
         virtual void dispatch(const Callback& callback);
+
+        virtual std::string dump();
 
         void add(UDTHandler* handler);
         boost::shared_ptr<UDTHandle> remove(UDTHandler* handler);

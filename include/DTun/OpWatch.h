@@ -10,7 +10,7 @@
 
 namespace DTun
 {
-    class OpWatch : boost::noncopyable,
+    class DTUN_API OpWatch : boost::noncopyable,
         public boost::enable_shared_from_this<OpWatch>
     {
     public:

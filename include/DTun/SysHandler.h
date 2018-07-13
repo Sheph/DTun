@@ -11,7 +11,7 @@ namespace DTun
 {
     class SysReactor;
 
-    class SysHandler : public virtual SHandler
+    class DTUN_API SysHandler : public virtual SHandler
     {
     public:
         SysHandler(SysReactor& reactor, const boost::shared_ptr<SysHandle>& handle);

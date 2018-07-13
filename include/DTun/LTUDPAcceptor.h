@@ -8,7 +8,7 @@
 
 namespace DTun
 {
-    class LTUDPAcceptor : public SAcceptor
+    class DTUN_API LTUDPAcceptor : public SAcceptor
     {
     public:
         explicit LTUDPAcceptor(const boost::shared_ptr<LTUDPHandle>& handle);

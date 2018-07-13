@@ -222,6 +222,11 @@ namespace DTun
         }
     }
 
+    std::string SysReactor::dump()
+    {
+        return "";
+    }
+
     void SysReactor::add(SysHandler* handler)
     {
         int evts = handler->getPollEvents();

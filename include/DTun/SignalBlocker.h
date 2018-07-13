@@ -7,7 +7,7 @@
 
 namespace DTun
 {
-    class SignalBlocker : boost::noncopyable
+    class DTUN_API SignalBlocker : boost::noncopyable
     {
     public:
         explicit SignalBlocker(bool withSigInt);

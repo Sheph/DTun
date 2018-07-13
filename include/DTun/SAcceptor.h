@@ -6,7 +6,7 @@
 
 namespace DTun
 {
-    class SAcceptor : public virtual SHandler
+    class DTUN_API SAcceptor : public virtual SHandler
     {
     public:
         typedef boost::function<void (const boost::shared_ptr<SHandle>&)> ListenCallback;

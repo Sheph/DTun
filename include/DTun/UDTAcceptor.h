@@ -7,7 +7,7 @@
 
 namespace DTun
 {
-    class UDTAcceptor : public UDTHandler, public SAcceptor
+    class DTUN_API UDTAcceptor : public UDTHandler, public SAcceptor
     {
     public:
         UDTAcceptor(UDTReactor& reactor, const boost::shared_ptr<UDTHandle>& handle);

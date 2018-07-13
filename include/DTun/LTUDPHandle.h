@@ -9,7 +9,7 @@ namespace DTun
 {
     class LTUDPManager;
 
-    class LTUDPHandle : public SHandle,
+    class DTUN_API LTUDPHandle : public SHandle,
         public boost::enable_shared_from_this<LTUDPHandle>
     {
     public:

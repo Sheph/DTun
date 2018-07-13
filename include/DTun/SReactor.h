@@ -7,7 +7,7 @@
 
 namespace DTun
 {
-    class SReactor : boost::noncopyable
+    class DTUN_API SReactor : boost::noncopyable
     {
     public:
         typedef boost::function<void ()> Callback;
@@ -26,6 +26,8 @@ namespace DTun
         virtual void post(const Callback& callback, UInt32 timeoutMs = 0) = 0;
 
         virtual void dispatch(const Callback& callback) = 0;
+
+        virtual std::string dump() = 0;
     };
 }
 

@@ -6,7 +6,7 @@
 
 namespace DTun
 {
-    class SysManager : public SManager
+    class DTUN_API SysManager : public SManager
     {
     public:
         explicit SysManager(SysReactor& reactor);

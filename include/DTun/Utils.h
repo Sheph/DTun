@@ -5,18 +5,18 @@
 
 namespace DTun
 {
-    bool isDebuggerPresent();
+    DTUN_API bool isDebuggerPresent();
 
-    std::string ipToString(UInt32 ipAddress);
+    DTUN_API std::string ipToString(UInt32 ipAddress);
 
-    bool stringToIp(const std::string& str, UInt32& ipAddress);
+    DTUN_API bool stringToIp(const std::string& str, UInt32& ipAddress);
 
-    std::string portToString(UInt16 port);
+    DTUN_API std::string portToString(UInt16 port);
 
-    std::string ipPortToString(UInt32 ipAddress, UInt16 port);
+    DTUN_API std::string ipPortToString(UInt32 ipAddress, UInt16 port);
 
-    void closeSysSocketChecked(SYSSOCKET sock);
-    void closeUDTSocketChecked(int sock);
+    DTUN_API void closeSysSocketChecked(SYSSOCKET sock);
+    DTUN_API void closeUDTSocketChecked(int sock);
 }
 
 #endif

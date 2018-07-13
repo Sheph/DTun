@@ -10,7 +10,7 @@ namespace DTun
 {
     class LTUDPManager;
 
-    class LTUDPHandleImpl : boost::noncopyable
+    class DTUN_API LTUDPHandleImpl : boost::noncopyable
     {
     public:
         typedef boost::function<bool (const boost::shared_ptr<SHandle>&)> ListenCallback;

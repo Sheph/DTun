@@ -11,7 +11,7 @@ namespace DTun
 {
     class LTUDPHandleImpl;
 
-    class LTUDPManager : public SManager
+    class DTUN_API LTUDPManager : public SManager
     {
     public:
         explicit LTUDPManager(SManager& mgr);
@@ -53,6 +53,7 @@ namespace DTun
 
         boost::mutex m_;
         int numAliveHandles_;
+        int tcpTimerMod4_;
         HandleSet toKillHandles_;
         ConnectionCache connCache_;
     };

@@ -8,7 +8,7 @@ namespace DTun
 {
     class SysReactor;
 
-    class SysHandle : public SHandle,
+    class DTUN_API SysHandle : public SHandle,
         public boost::enable_shared_from_this<SysHandle>
     {
     public:

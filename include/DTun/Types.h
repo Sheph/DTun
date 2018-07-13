@@ -27,6 +27,8 @@
 typedef int SYSSOCKET;
 #endif
 
+#define DTUN_API __attribute__ ((visibility("default")))
+
 namespace DTun
 {
     typedef unsigned char UInt8;

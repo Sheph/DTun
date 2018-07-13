@@ -174,11 +174,11 @@ namespace DNode
                 ++numFds;
             }
         }
-        CUDTStats udtStats = UDT::getstats();
+
         boost::mutex::scoped_lock lock(m_);
         LOG4CPLUS_INFO(logger(), "connSess=" << connMasterSessions_.size()
             << ", accSess=" << accMasterSessions_.size() << ", prx=" << proxySessions_.size() << ", numOut=" << numOutConnections_
-            << ", udtSocks=" << udtStats.numSockets << ", udtCsocks=" << udtStats.numClosedSockets << ", udtMult=" << udtStats.numMultiplexers
+            << ", " << remoteMgr_.reactor().dump()
             << ", numFds=" << numFds << ", maxFds=" << fdMax);
     }
 

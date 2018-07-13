@@ -99,19 +99,15 @@ int main(int argc, char* argv[])
     {
         DTun::SignalBlocker signalBlocker(true);
 
-        UDT::startup();
-
         DTun::UDTReactor udtReactor;
 
         if (!udtReactor.start()) {
-            UDT::cleanup();
             return 1;
         }
 
         DTun::SysReactor sysReactor;
 
         if (!sysReactor.start()) {
-            UDT::cleanup();
             return 1;
         }
 
@@ -125,7 +121,6 @@ int main(int argc, char* argv[])
             DNode::DMasterClient masterClient(udtManager, sysManager, appConfig);
 
             if (!masterClient.start()) {
-                UDT::cleanup();
                 return 1;
             }
 
@@ -152,8 +147,6 @@ int main(int argc, char* argv[])
         udtReactorThread->join();
         sysReactorThread->join();
     }
-
-    UDT::cleanup();
 
     LOG4CPLUS_INFO(DNode::logger(), "Done");
 

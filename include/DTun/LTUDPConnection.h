@@ -7,7 +7,7 @@
 
 namespace DTun
 {
-    class LTUDPConnection : public SConnection
+    class DTUN_API LTUDPConnection : public SConnection
     {
     public:
         explicit LTUDPConnection(const boost::shared_ptr<LTUDPHandle>& handle);

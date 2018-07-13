@@ -6,7 +6,7 @@
 
 namespace DTun
 {
-    class SManager : boost::noncopyable
+    class DTUN_API SManager : boost::noncopyable
     {
     public:
         SManager() {}

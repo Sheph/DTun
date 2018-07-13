@@ -11,7 +11,7 @@ namespace DTun
 {
     class UDTReactor;
 
-    class UDTHandler : virtual public SHandler
+    class DTUN_API UDTHandler : virtual public SHandler
     {
     public:
         UDTHandler(UDTReactor& reactor, const boost::shared_ptr<UDTHandle>& handle);

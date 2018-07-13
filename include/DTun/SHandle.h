@@ -11,7 +11,7 @@ namespace DTun
     class SAcceptor;
     class SConnection;
 
-    class SHandle : boost::noncopyable
+    class DTUN_API SHandle : boost::noncopyable
     {
     public:
         SHandle() {}

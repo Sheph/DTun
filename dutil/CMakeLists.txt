@@ -26,6 +26,6 @@ set(SOURCES
     Utils.cpp
 )
 
-add_library(dutil STATIC ${SOURCES})
+add_library(dutil SHARED ${SOURCES})
 
-target_link_libraries(dutil lwip ${LOG4CPLUS_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${Boost_SYSTEM_LIBRARY} ${Boost_THREAD_LIBRARY} ${Boost_CHRONO_LIBRARY} ${Boost_PROGRAM_OPTIONS_LIBRARY} rt)
+target_link_libraries(dutil PRIVATE lwip udt PUBLIC ${LOG4CPLUS_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${Boost_SYSTEM_LIBRARY} ${Boost_THREAD_LIBRARY} ${Boost_CHRONO_LIBRARY} ${Boost_PROGRAM_OPTIONS_LIBRARY} rt)

@@ -75,8 +75,6 @@ int main(int argc, char* argv[])
         sigHandler.reset(new DTun::SignalHandler(&signalHandler));
     }
 
-    UDT::startup();
-
     boost::scoped_ptr<DTun::SReactor> reactor;
     boost::scoped_ptr<DTun::SManager> innerMgr;
     boost::scoped_ptr<DTun::SManager> mgr;
@@ -88,7 +86,6 @@ int main(int argc, char* argv[])
         innerMgr.reset(new DTun::SysManager(*sysReactor));
         mgr.reset(ltudpMgr = new DTun::LTUDPManager(*innerMgr));
         if (!ltudpMgr->start()) {
-            UDT::cleanup();
             return 1;
         }
     } else {
@@ -100,7 +97,6 @@ int main(int argc, char* argv[])
     boost::shared_ptr<Server> server_tmp = boost::make_shared<Server>(boost::ref(*mgr), port);
 
     if (!server_tmp->start()) {
-        UDT::cleanup();
         return 1;
     }
 
@@ -115,8 +111,6 @@ int main(int argc, char* argv[])
     innerMgr.reset();
     reactor->processUpdates();
     reactor.reset();
-
-    UDT::cleanup();
 
     LOG4CPLUS_INFO(logger(), "Done!");
 

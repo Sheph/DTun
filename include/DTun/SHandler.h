@@ -5,7 +5,7 @@
 
 namespace DTun
 {
-    class SHandler : boost::noncopyable
+    class DTUN_API SHandler : boost::noncopyable
     {
     public:
         SHandler() {}

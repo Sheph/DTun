@@ -7,7 +7,7 @@
 
 namespace DTun
 {
-    class SignalHandler : boost::noncopyable
+    class DTUN_API SignalHandler : boost::noncopyable
     {
     public:
         typedef boost::function<void (int)> Callback;

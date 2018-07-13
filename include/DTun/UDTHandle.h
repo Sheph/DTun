@@ -9,7 +9,7 @@ namespace DTun
 {
     class UDTReactor;
 
-    class UDTHandle : public SHandle,
+    class DTUN_API UDTHandle : public SHandle,
         public boost::enable_shared_from_this<UDTHandle>
     {
     public:

@@ -6,7 +6,7 @@
 
 namespace DTun
 {
-    class SConnector : public virtual SHandler
+    class DTUN_API SConnector : public virtual SHandler
     {
     public:
         typedef boost::function<void (int)> ConnectCallback;

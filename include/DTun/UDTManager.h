@@ -6,7 +6,7 @@
 
 namespace DTun
 {
-    class UDTManager : public SManager
+    class DTUN_API UDTManager : public SManager
     {
     public:
         explicit UDTManager(UDTReactor& reactor);

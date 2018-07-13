@@ -6,12 +6,14 @@
 #include <boost/bind.hpp>
 #include <lwip/init.h>
 #include <lwip/priv/tcp_priv.h>
+#include <lwip/ip4_frag.h>
 
 namespace DTun
 {
     LTUDPManager::LTUDPManager(SManager& mgr)
     : innerMgr_(mgr)
     , numAliveHandles_(0)
+    , tcpTimerMod4_(0)
     {
     }
 
@@ -159,6 +161,8 @@ namespace DTun
 
     err_t LTUDPManager::netifOutputFunc(struct netif* netif, struct pbuf* p, const ip4_addr_t* ipaddr)
     {
+        LOG4CPLUS_TRACE(logger(), "LTUDPManager netifOutput(" << p->len << ")");
+
         return ERR_OK;
     }
 
@@ -178,6 +182,19 @@ namespace DTun
             return;
         }
 
+        struct pbuf* p = pbuf_alloc(PBUF_RAW, numBytes, PBUF_POOL);
+
+        if (p) {
+            pbuf_take(p, &(*rcvBuff)[0], numBytes);
+
+            if (netif_.input(p, &netif_) != ERR_OK) {
+                LOG4CPLUS_ERROR(logger(), "netif.input failed");
+                pbuf_free(p);
+            }
+        } else {
+            LOG4CPLUS_ERROR(logger(), "pbuf_alloc failed");
+        }
+
         conn_shared->read(&(*rcvBuff)[0], &(*rcvBuff)[0] + rcvBuff->size(),
             boost::bind(&LTUDPManager::onRecv, this, _1, _2, conn, rcvBuff), false);
     }
@@ -188,6 +205,20 @@ namespace DTun
 
         innerMgr_.reactor().post(
             watch_->wrap(boost::bind(&LTUDPManager::onTcpTimeout, this)), TCP_TMR_INTERVAL);
+
+        // Call the TCP timer function (every 1/4 second)
+        tcp_tmr();
+
+        // Increment tcp_timer_mod4
+        tcpTimerMod4_ = (tcpTimerMod4_ + 1) % 4;
+
+        // Every second, call other timer functions
+        if (tcpTimerMod4_ == 0) {
+#if IP_REASSEMBLY
+            assert(IP_TMR_INTERVAL == 4 * TCP_TMR_INTERVAL);
+            ip_reass_tmr();
+#endif
+        }
     }
 
     void LTUDPManager::reapConnCache()

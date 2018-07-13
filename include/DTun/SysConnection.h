@@ -8,7 +8,7 @@
 
 namespace DTun
 {
-    class SysConnection : public SysHandler, public SConnection
+    class DTUN_API SysConnection : public SysHandler, public SConnection
     {
     public:
         SysConnection(SysReactor& reactor, const boost::shared_ptr<SysHandle>& handle);

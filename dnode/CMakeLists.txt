@@ -68,4 +68,4 @@ configure_file(config2.ini ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/config2.ini @ONLY)
 
 add_executable(dnode ${SOURCES})
 
-target_link_libraries(dnode dutil lwip udt ${Boost_SYSTEM_LIBRARY} ${Boost_THREAD_LIBRARY} rt dl)
+target_link_libraries(dnode dutil lwip ${Boost_SYSTEM_LIBRARY} ${Boost_THREAD_LIBRARY} rt dl)

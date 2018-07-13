@@ -19,11 +19,15 @@ namespace DTun
     UDTReactor::~UDTReactor()
     {
         reset();
+
+        UDT::cleanup();
     }
 
     bool UDTReactor::start()
     {
         log4cplus::NDCContextCreator ndc("UDTReactor::start");
+
+        UDT::startup();
 
         eid_ = UDT::epoll_create();
         if (eid_ == UDT::ERROR) {
@@ -277,6 +281,14 @@ namespace DTun
     void UDTReactor::dispatch(const Callback& callback)
     {
         assert(false);
+    }
+
+    std::string UDTReactor::dump()
+    {
+        CUDTStats udtStats = UDT::getstats();
+        std::ostringstream os;
+        os << "udtSocks=" << udtStats.numSockets << ", udtCsocks=" << udtStats.numClosedSockets << ", udtMult=" << udtStats.numMultiplexers;
+        return os.str();
     }
 
     void UDTReactor::add(UDTHandler* handler)

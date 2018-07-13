@@ -8,7 +8,7 @@
 
 namespace DTun
 {
-    class AppConfig
+    class DTUN_API AppConfig
     {
     public:
         AppConfig() {}
