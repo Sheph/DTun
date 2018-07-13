@@ -1,5 +1,6 @@
 #include "DTun/Utils.h"
 #include "Logger.h"
+#include "udt.h"
 #include <sstream>
 #include <sys/stat.h>
 #include <string.h>

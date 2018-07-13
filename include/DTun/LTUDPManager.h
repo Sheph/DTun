@@ -27,11 +27,25 @@ namespace DTun
 
         void addToKill(const boost::shared_ptr<LTUDPHandleImpl>& handle);
 
+        boost::shared_ptr<SConnection> createTransportConnection(const struct sockaddr* name, int namelen);
+
     private:
         typedef std::set<boost::shared_ptr<LTUDPHandleImpl> > HandleSet;
         typedef std::map<std::pair<UInt32, UInt16>, boost::weak_ptr<SConnection> > ConnectionCache;
 
+        static err_t netifInitFunc(struct netif* netif);
+
+        static err_t netifInputFunc(struct pbuf* p, struct netif* netif);
+
+        static err_t netifOutputFunc(struct netif* netif, struct pbuf* p, const ip4_addr_t* ipaddr);
+
+        void onRecv(int err, int numBytes,
+            const boost::weak_ptr<SConnection>& conn,
+            const boost::shared_ptr<std::vector<char> >& rcvBuff);
+
         void onTcpTimeout();
+
+        void reapConnCache();
 
         SManager& innerMgr_;
         boost::shared_ptr<OpWatch> watch_;

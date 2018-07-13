@@ -75,7 +75,6 @@ namespace DMaster
         mgr_.reactor().run();
         acceptor_.reset();
         sessions_.clear();
-        mgr_.reactor().processUpdates();
     }
 
     void Server::stop()

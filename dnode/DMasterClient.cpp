@@ -3,6 +3,7 @@
 #include "DTun/Utils.h"
 #include "DTun/SConnector.h"
 #include "DTun/SConnection.h"
+#include "udt.h"
 #include <boost/make_shared.hpp>
 #include <boost/bind.hpp>
 #include <fcntl.h>

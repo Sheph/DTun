@@ -15,12 +15,14 @@ namespace DTun
     public:
         typedef boost::function<bool (const boost::shared_ptr<SHandle>&)> ListenCallback;
 
-        LTUDPHandleImpl(LTUDPManager& mgr, const boost::shared_ptr<SConnection>& conn);
+        explicit LTUDPHandleImpl(LTUDPManager& mgr);
         ~LTUDPHandleImpl();
 
         inline LTUDPManager& mgr() { return mgr_; }
 
         inline const boost::shared_ptr<SConnection>& conn() const { return conn_; }
+
+        bool bind(const struct sockaddr* name, int namelen);
 
         void listen(int backlog, const ListenCallback& callback);
 

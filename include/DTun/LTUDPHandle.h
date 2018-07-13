@@ -13,7 +13,7 @@ namespace DTun
         public boost::enable_shared_from_this<LTUDPHandle>
     {
     public:
-        LTUDPHandle(LTUDPManager& mgr, const boost::shared_ptr<SConnection>& conn);
+        explicit LTUDPHandle(LTUDPManager& mgr);
         ~LTUDPHandle();
 
         inline const boost::shared_ptr<LTUDPHandleImpl>& impl() const { return impl_; }

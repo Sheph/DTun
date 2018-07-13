@@ -7,9 +7,9 @@
 
 namespace DTun
 {
-    LTUDPHandle::LTUDPHandle(LTUDPManager& mgr, const boost::shared_ptr<SConnection>& conn)
+    LTUDPHandle::LTUDPHandle(LTUDPManager& mgr)
     : reactor_(mgr.reactor())
-    , impl_(boost::make_shared<LTUDPHandleImpl>(boost::ref(mgr), conn))
+    , impl_(boost::make_shared<LTUDPHandleImpl>(boost::ref(mgr)))
     {
     }
 
@@ -26,7 +26,7 @@ namespace DTun
 
     bool LTUDPHandle::bind(const struct sockaddr* name, int namelen)
     {
-        return impl_->conn()->handle()->bind(name, namelen);
+        return impl_->bind(name, namelen);
     }
 
     bool LTUDPHandle::getSockName(UInt32& ip, UInt16& port) const

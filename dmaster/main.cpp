@@ -111,6 +111,11 @@ int main(int argc, char* argv[])
     server.reset();
     server_tmp.reset();
 
+    mgr.reset();
+    innerMgr.reset();
+    reactor->processUpdates();
+    reactor.reset();
+
     UDT::cleanup();
 
     LOG4CPLUS_INFO(logger(), "Done!");
