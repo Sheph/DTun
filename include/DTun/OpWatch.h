@@ -29,13 +29,13 @@ namespace DTun
             return boost::bind(&OpWatch::onWrappedCallbackWithResult0, shared_from_this(), callback);
         }
 
-        template<class A1>
+        template <class A1>
         boost::function<void(A1)> wrap(const boost::function<void(A1)>& callback)
         {
             return boost::bind(&OpWatch::onWrappedCallback1<A1>, shared_from_this(), callback, _1);
         }
 
-        template<class A1>
+        template <class A1>
         boost::function<bool(A1)> wrapWithResult(const boost::function<void(A1)>& callback)
         {
             return boost::bind(&OpWatch::onWrappedCallbackWithResult1<A1>, shared_from_this(), callback, _1);

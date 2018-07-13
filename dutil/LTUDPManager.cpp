@@ -23,10 +23,30 @@ namespace DTun
             return;
         }
 
+        // stop watch, timers will no longer fire
         watch_->close();
-        onKillHandles();
-        reapConnCache();
+
+        ConnectionCache connCache;
+
+        {
+            boost::mutex::scoped_lock lock(m_);
+            connCache.swap(connCache_);
+        }
+
+        // close call connection, i/o will no longer take place
+        for (ConnectionCache::iterator it = connCache.begin(); it != connCache.end(); ++it) {
+            boost::shared_ptr<SConnection> conn = it->second.lock();
+            if (conn) {
+                conn->close();
+            }
+        }
+
+        connCache.clear();
+
+        // no i/o, no timers, it's safe to kill handles even from another thread
+        onKillHandles(false);
         assert(connCache_.empty());
+        assert(toKillHandles_.empty());
         assert(numAliveHandles_ == 0);
 
         netif_remove(&netif_);
@@ -80,7 +100,7 @@ namespace DTun
         }
         lock.unlock();
         innerMgr_.reactor().dispatch(
-            watch_->wrap(boost::bind(&LTUDPManager::onKillHandles, this)));
+            watch_->wrap(boost::bind(&LTUDPManager::onKillHandles, this, true)));
     }
 
     boost::shared_ptr<SConnection> LTUDPManager::createTransportConnection(const struct sockaddr* name, int namelen)
@@ -228,15 +248,20 @@ namespace DTun
         }
     }
 
-    void LTUDPManager::onKillHandles()
+    void LTUDPManager::onKillHandles(bool sameThreadOnly)
     {
-        LOG4CPLUS_TRACE(logger(), "onKillHandles()");
+        LOG4CPLUS_TRACE(logger(), "onKillHandles(" << sameThreadOnly << ")");
 
-        boost::mutex::scoped_lock lock(m_);
-        for (HandleSet::iterator it = toKillHandles_.begin(); it != toKillHandles_.end(); ++it) {
-            (*it)->kill();
+        HandleSet toKillHandles;
+
+        {
+            boost::mutex::scoped_lock lock(m_);
+            toKillHandles.swap(toKillHandles_);
         }
-        toKillHandles_.clear();
+
+        for (HandleSet::iterator it = toKillHandles.begin(); it != toKillHandles.end(); ++it) {
+            (*it)->kill(sameThreadOnly);
+        }
     }
 
     void LTUDPManager::reapConnCache()

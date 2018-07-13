@@ -20,12 +20,12 @@ namespace DTun
         virtual bool connect(const std::string& address, const std::string& port, const ConnectCallback& callback, bool rendezvous);
 
     private:
-        //void onConnect(int err);
+        void onStartConnect(const std::string& address, const std::string& port, const ConnectCallback& callback, bool rendezvous);
+        void onConnect(int err, const ConnectCallback& callback);
 
-        boost::shared_ptr<LTUDPHandle> handle_;
-        ConnectCallback callback_;
         bool handedOut_;
-        //OpWatch watch_;
+        boost::shared_ptr<LTUDPHandle> handle_;
+        boost::shared_ptr<OpWatch> watch_;
     };
 }
 

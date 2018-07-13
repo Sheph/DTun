@@ -51,8 +51,7 @@ namespace DTun
 
     boost::shared_ptr<SConnector> LTUDPHandle::createConnector()
     {
-        assert(false);
-        return boost::shared_ptr<SConnector>();
+        return boost::make_shared<LTUDPConnector>(shared_from_this());
     }
 
     boost::shared_ptr<SAcceptor> LTUDPHandle::createAcceptor()

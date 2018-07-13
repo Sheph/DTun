@@ -13,11 +13,16 @@ namespace DTun
     LTUDPHandleImpl::~LTUDPHandleImpl()
     {
         assert(!pcb_);
+        assert(!conn_);
     }
 
-    void LTUDPHandleImpl::kill()
+    void LTUDPHandleImpl::kill(bool sameThreadOnly)
     {
-        assert(mgr_.reactor().isSameThread());
+        assert(!sameThreadOnly || mgr_.reactor().isSameThread());
+        if (conn_) {
+            conn_->close();
+            conn_.reset();
+        }
         if (pcb_) {
             tcp_close(pcb_);
             pcb_ = NULL;
@@ -64,6 +69,13 @@ namespace DTun
         tcp_accept(pcb_, &LTUDPHandleImpl::listenerAcceptFunc);
 
         listenCallback_ = callback;
+    }
+
+    void LTUDPHandleImpl::connect(const std::string& address, const std::string& port, const ConnectCallback& callback, bool rendezvous)
+    {
+        assert(mgr_.reactor().isSameThread());
+
+        connectCallback_ = callback;
     }
 
     err_t LTUDPHandleImpl::listenerAcceptFunc(void* arg, struct tcp_pcb* newpcb, err_t err)

@@ -47,7 +47,7 @@ namespace DTun
 
         void onTcpTimeout();
 
-        void onKillHandles();
+        void onKillHandles(bool sameThreadOnly);
 
         void reapConnCache();
 
@@ -58,8 +58,8 @@ namespace DTun
         boost::mutex m_;
         int numAliveHandles_;
         int tcpTimerMod4_;
-        HandleSet toKillHandles_;
         ConnectionCache connCache_;
+        HandleSet toKillHandles_;
     };
 }
 

@@ -5,6 +5,7 @@
 #include "DTun/SysReactor.h"
 #include "DTun/UDTManager.h"
 #include "DTun/SysManager.h"
+#include "DTun/LTUDPManager.h"
 #include "DTun/Utils.h"
 #include "DTun/StreamAppConfig.h"
 #include <boost/thread.hpp>
@@ -47,18 +48,22 @@ int main(int argc, char* argv[])
     boost::program_options::variables_map vm;
     std::string logLevel = "TRACE";
     std::string appConfigFile = "config.ini";
+    bool ltudp = false;
 
     try {
         boost::program_options::options_description desc("Options");
 
         desc.add_options()
             ("log4cplus_level", boost::program_options::value<std::string>(&logLevel), "Log level")
-            ("app_config", boost::program_options::value<std::string>(&appConfigFile), "App config");
+            ("app_config", boost::program_options::value<std::string>(&appConfigFile), "App config")
+            ("ltudp", "LTUDP");
 
         boost::program_options::store(boost::program_options::command_line_parser(
             argc, argv).options(desc).allow_unregistered().run(), vm);
 
         boost::program_options::notify(vm);
+
+        ltudp = (vm.count("ltudp") > 0);
     } catch (const boost::program_options::error& e) {
         std::cerr << "Invalid command line arguments: " << e.what() << std::endl;
         return 1;
@@ -99,10 +104,14 @@ int main(int argc, char* argv[])
     {
         DTun::SignalBlocker signalBlocker(true);
 
-        DTun::UDTReactor udtReactor;
+        boost::scoped_ptr<DTun::UDTReactor> udtReactor;
 
-        if (!udtReactor.start()) {
-            return 1;
+        if (!ltudp) {
+            udtReactor.reset(new DTun::UDTReactor());
+
+            if (!udtReactor->start()) {
+                return 1;
+            }
         }
 
         DTun::SysReactor sysReactor;
@@ -115,17 +124,32 @@ int main(int argc, char* argv[])
         boost::scoped_ptr<boost::thread> sysReactorThread;
 
         {
-            DTun::UDTManager udtManager(udtReactor);
+            boost::scoped_ptr<DTun::SManager> innerRemoteMgr;
+            boost::scoped_ptr<DTun::SManager> remoteMgr;
+
+            if (ltudp) {
+                DTun::LTUDPManager* ltudpMgr;
+                innerRemoteMgr.reset(new DTun::SysManager(sysReactor));
+                remoteMgr.reset(ltudpMgr = new DTun::LTUDPManager(*innerRemoteMgr));
+                if (!ltudpMgr->start()) {
+                    return 1;
+                }
+            } else {
+                remoteMgr.reset(new DTun::UDTManager(*udtReactor));
+            }
+
             DTun::SysManager sysManager(sysReactor);
 
-            DNode::DMasterClient masterClient(udtManager, sysManager, appConfig);
+            DNode::DMasterClient masterClient(*remoteMgr, sysManager, appConfig);
 
             if (!masterClient.start()) {
                 return 1;
             }
 
-            udtReactorThread.reset(new boost::thread(
-                boost::bind(&udtReactorThreadFn, boost::ref(udtReactor))));
+            if (!ltudp) {
+                udtReactorThread.reset(new boost::thread(
+                    boost::bind(&udtReactorThreadFn, boost::ref(*udtReactor))));
+            }
             sysReactorThread.reset(new boost::thread(
                 boost::bind(&sysReactorThreadFn, boost::ref(sysReactor))));
 
@@ -134,7 +158,7 @@ int main(int argc, char* argv[])
             signalBlocker.unblock();
 
             DNode::theMasterClient = &masterClient;
-            DNode::theRemoteMgr = &udtManager;
+            DNode::theRemoteMgr = remoteMgr.get();
 
             res = tun2socks_main(argc, argv, isDebugged, &theStatsHandler);
 
@@ -142,9 +166,13 @@ int main(int argc, char* argv[])
             DNode::theRemoteMgr = NULL;
         }
 
-        udtReactor.stop();
+        if (!ltudp) {
+            udtReactor->stop();
+        }
         sysReactor.stop();
-        udtReactorThread->join();
+        if (!ltudp) {
+            udtReactorThread->join();
+        }
         sysReactorThread->join();
     }
 
