@@ -15,6 +15,14 @@ namespace DTun
         SReactor() {}
         virtual ~SReactor() {}
 
+        virtual bool start() = 0;
+
+        virtual void run() = 0;
+
+        virtual void processUpdates() = 0;
+
+        virtual void stop() = 0;
+
         virtual void post(const Callback& callback, UInt32 timeoutMs = 0) = 0;
 
         virtual void dispatch(const Callback& callback) = 0;

@@ -17,6 +17,8 @@ namespace DTun
         explicit LTUDPManager(SManager& mgr);
         ~LTUDPManager();
 
+        virtual SReactor& reactor();
+
         bool start();
 
         virtual boost::shared_ptr<SHandle> createStreamSocket();
@@ -26,6 +28,8 @@ namespace DTun
     private:
         typedef std::set<boost::shared_ptr<LTUDPHandleImpl> > HandleSet;
         typedef std::map<std::pair<UInt32, UInt16>, boost::weak_ptr<SConnection> > ConnectionCache;
+
+        void onTcpTimeout();
 
         SManager& innerMgr_;
         boost::shared_ptr<OpWatch> watch_;

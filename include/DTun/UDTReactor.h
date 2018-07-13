@@ -16,13 +16,13 @@ namespace DTun
         explicit UDTReactor();
         ~UDTReactor();
 
-        bool start();
+        virtual bool start();
 
-        void run();
+        virtual void run();
 
-        void processUpdates();
+        virtual void processUpdates();
 
-        void stop();
+        virtual void stop();
 
         virtual void post(const Callback& callback, UInt32 timeoutMs = 0);
 

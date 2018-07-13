@@ -2,6 +2,7 @@
 #include "Logger.h"
 #include "DTun/Utils.h"
 #include <boost/make_shared.hpp>
+#include <boost/bind.hpp>
 #include <sstream>
 #include <unistd.h>
 #include <cstdlib>
@@ -10,9 +11,9 @@
 
 namespace DMaster
 {
-    Server::Server(int port)
+    Server::Server(DTun::SManager& mgr, int port)
     : port_(port)
-    , mgr_(reactor_)
+    , mgr_(mgr)
     {
     }
 
@@ -22,7 +23,7 @@ namespace DMaster
 
     bool Server::start()
     {
-        if (!reactor_.start()) {
+        if (!mgr_.reactor().start()) {
             return false;
         }
 
@@ -47,7 +48,8 @@ namespace DMaster
         boost::shared_ptr<DTun::SHandle> serverHandle = mgr_.createStreamSocket();
         if (!serverHandle) {
             freeaddrinfo(res);
-            return false;
+            LOG4CPLUS_INFO(logger(), "Server is NOT ready at port " << port_);
+            return true;
         }
 
         if (!serverHandle->bind(res->ai_addr, res->ai_addrlen)) {
@@ -71,15 +73,15 @@ namespace DMaster
 
     void Server::run()
     {
-        reactor_.run();
+        mgr_.reactor().run();
         acceptor_.reset();
         sessions_.clear();
-        reactor_.processUpdates();
+        mgr_.reactor().processUpdates();
     }
 
     void Server::stop()
     {
-        reactor_.stop();
+        mgr_.reactor().stop();
     }
 
     void Server::onAccept(const boost::shared_ptr<DTun::SHandle>& handle)

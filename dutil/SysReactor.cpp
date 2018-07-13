@@ -91,6 +91,8 @@ namespace DTun
 
         log4cplus::NDCContextCreator ndc("SysReactor");
 
+        processTokens();
+
         processUpdates();
 
         std::vector<epoll_event> ev;
@@ -110,7 +112,7 @@ namespace DTun
                         boost::chrono::steady_clock::now();
                     if (*wakeupTime_ > now) {
                         timeout = boost::chrono::duration_cast<boost::chrono::milliseconds>(
-                            *wakeupTime_ - now).count();
+                            *wakeupTime_ - now).count() + 1;
                     } else {
                         timeout = 0;
                     }
@@ -177,6 +179,8 @@ namespace DTun
                 }
             }
 
+            processTokens();
+
             processUpdates();
 
             LOG4CPLUS_TRACE(logger(), "epoll run done");
@@ -196,7 +200,7 @@ namespace DTun
     void SysReactor::post(const Callback& callback, UInt32 timeoutMs)
     {
         boost::chrono::steady_clock::time_point scheduledTime =
-            boost::chrono::steady_clock::now() + boost::chrono::microseconds(timeoutMs);
+            boost::chrono::steady_clock::now() + boost::chrono::milliseconds(timeoutMs);
 
         boost::mutex::scoped_lock lock(m_);
 
@@ -294,6 +298,7 @@ namespace DTun
 
     void SysReactor::reset()
     {
+        tokens_.clear();
         assert(handlers_.empty());
         assert(pollHandlers_.empty());
         if (eid_ != -1) {
@@ -335,8 +340,6 @@ namespace DTun
 
     void SysReactor::processUpdates()
     {
-        processTokens();
-
         boost::mutex::scoped_lock lock(m_);
 
         for (PollHandlerMap::iterator it = pollHandlers_.begin(); it != pollHandlers_.end();) {
@@ -408,7 +411,9 @@ namespace DTun
     {
         boost::mutex::scoped_lock lock(m_);
 
-        while (!tokens_.empty()) {
+        int count = tokens_.size() * 2;
+
+        while (!tokens_.empty() && (count-- > 0)) {
             boost::chrono::steady_clock::time_point now =
                 boost::chrono::steady_clock::now();
 
@@ -424,6 +429,7 @@ namespace DTun
 
             lock.unlock();
             cb();
+            lock.lock();
         }
     }
 }

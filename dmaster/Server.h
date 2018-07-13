@@ -2,18 +2,18 @@
 #define _SERVER_H_
 
 #include "Session.h"
-#include "DTun/UDTReactor.h"
-#include "DTun/UDTManager.h"
+#include "DTun/SManager.h"
 #include "DTun/SAcceptor.h"
 #include <boost/noncopyable.hpp>
 #include <boost/weak_ptr.hpp>
+#include <set>
 
 namespace DMaster
 {
     class Server : boost::noncopyable
     {
     public:
-        explicit Server(int port);
+        explicit Server(DTun::SManager& mgr, int port);
         ~Server();
 
         bool start();
@@ -44,8 +44,7 @@ namespace DMaster
         void removeSession(const boost::shared_ptr<Session>& sess);
 
         int port_;
-        DTun::UDTReactor reactor_;
-        DTun::UDTManager mgr_;
+        DTun::SManager& mgr_;
         Sessions sessions_;
         boost::shared_ptr<DTun::SAcceptor> acceptor_;
     };
