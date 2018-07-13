@@ -26,6 +26,8 @@ namespace DTun
 
         virtual void post(const Callback& callback, UInt32 timeoutMs = 0);
 
+        virtual void dispatch(const Callback& callback);
+
         void add(UDTHandler* handler);
         boost::shared_ptr<UDTHandle> remove(UDTHandler* handler);
         void update(UDTHandler* handler);

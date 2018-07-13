@@ -27,6 +27,8 @@ namespace DTun
 
         virtual void post(const Callback& callback, UInt32 timeoutMs = 0);
 
+        virtual void dispatch(const Callback& callback);
+
         void add(SysHandler* handler);
         boost::shared_ptr<SysHandle> remove(SysHandler* handler);
         void update(SysHandler* handler);

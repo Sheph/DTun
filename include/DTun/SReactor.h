@@ -16,6 +16,8 @@ namespace DTun
         virtual ~SReactor() {}
 
         virtual void post(const Callback& callback, UInt32 timeoutMs = 0) = 0;
+
+        virtual void dispatch(const Callback& callback) = 0;
     };
 }
 

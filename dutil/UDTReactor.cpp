@@ -274,6 +274,11 @@ namespace DTun
         assert(false);
     }
 
+    void UDTReactor::dispatch(const Callback& callback)
+    {
+        assert(false);
+    }
+
     void UDTReactor::add(UDTHandler* handler)
     {
         int evts = handler->getPollEvents();

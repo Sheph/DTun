@@ -209,6 +209,15 @@ namespace DTun
         }
     }
 
+    void SysReactor::dispatch(const Callback& callback)
+    {
+        if (isSameThread()) {
+            callback();
+        } else {
+            post(callback);
+        }
+    }
+
     void SysReactor::add(SysHandler* handler)
     {
         int evts = handler->getPollEvents();
