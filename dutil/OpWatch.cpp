@@ -11,7 +11,6 @@ namespace DTun
 
     OpWatch::~OpWatch()
     {
-        close();
     }
 
     void OpWatch::close()

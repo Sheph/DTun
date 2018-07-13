@@ -27,11 +27,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <system/BTime.h>
-
 #include <lwip/sys.h>
+#include <time.h>
 
 u32_t sys_now (void)
 {
-    return btime_gettime();
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (u32_t)(ts.tv_sec * 1000L + ts.tv_nsec / 1000000L);
 }

@@ -26,8 +26,4 @@ set(LWIP_SOURCES
     custom/sys.c
 )
 
-include_directories(
-    ../dnode
-)
-
 add_library(lwip STATIC ${LWIP_SOURCES})

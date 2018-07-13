@@ -2,6 +2,7 @@
 #define _DTUN_LTUDPMANAGER_H_
 
 #include "DTun/SManager.h"
+#include "DTun/OpWatch.h"
 #include <boost/thread/mutex.hpp>
 #include <set>
 #include <lwip/netif.h>
@@ -26,9 +27,8 @@ namespace DTun
         typedef std::set<boost::shared_ptr<LTUDPHandleImpl> > HandleSet;
         typedef std::map<std::pair<UInt32, UInt16>, boost::weak_ptr<SConnection> > ConnectionCache;
 
-        void onConnectionRecv(int err, int numBytes);
-
         SManager& innerMgr_;
+        boost::shared_ptr<OpWatch> watch_;
         struct netif netif_;
 
         boost::mutex m_;

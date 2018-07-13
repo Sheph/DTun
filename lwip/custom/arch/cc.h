@@ -35,23 +35,6 @@
 #include <errno.h>
 #include <stdint.h>
 
-#include <misc/debug.h>
-#include <misc/byteorder.h>
-#include <misc/packed.h>
-#include <misc/print_macros.h>
-#include <misc/byteorder.h>
-#include <base/BLog.h>
-
-#define PACK_STRUCT_BEGIN B_START_PACKED
-#define PACK_STRUCT_END B_END_PACKED
-#define PACK_STRUCT_STRUCT B_PACKED
-
-#define LWIP_PLATFORM_DIAG(x) { if (BLog_WouldLog(BLOG_CHANNEL_lwip, BLOG_INFO)) { BLog_Begin(); BLog_Append x; BLog_Finish(BLOG_CHANNEL_lwip, BLOG_INFO); } }
-#define LWIP_PLATFORM_ASSERT(x) { fprintf(stderr, "%s: lwip assertion failure: %s\n", __FUNCTION__, (x)); abort(); }
-
-#define lwip_htons(x) hton16(x)
-#define lwip_htonl(x) hton32(x)
-
 #define LWIP_RAND() ( \
     (((uint32_t)(rand() & 0xFF)) << 24) | \
     (((uint32_t)(rand() & 0xFF)) << 16) | \

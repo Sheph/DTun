@@ -13,7 +13,6 @@
 #include <unistd.h>
 #include <errno.h>
 #include <netinet/in.h>
-#include <netinet/tcp.h>
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <sys/types.h>
