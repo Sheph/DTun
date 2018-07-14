@@ -1,5 +1,6 @@
 #include "DTun/LTUDPHandleImpl.h"
 #include "DTun/LTUDPManager.h"
+#include "DTun/Utils.h"
 #include "Logger.h"
 
 namespace DTun
@@ -22,7 +23,9 @@ namespace DTun
         conn_.reset();
         if (pcb_) {
             tcp_arg(pcb_, NULL);
-            tcp_err(pcb_, NULL);
+            if (!listenCallback_) {
+                tcp_err(pcb_, NULL);
+            }
             tcp_close(pcb_);
             pcb_ = NULL;
         }
@@ -144,7 +147,7 @@ namespace DTun
 
         tcp_arg(pcb, this);
         tcp_err(pcb, &LTUDPHandleImpl::errorFunc);
-        err = tcp_connect(pcb, &addr, ((const struct sockaddr_in*)res->ai_addr)->sin_port, &LTUDPHandleImpl::connectFunc);
+        err = tcp_connect(pcb, &addr, lwip_ntohs(((const struct sockaddr_in*)res->ai_addr)->sin_port), &LTUDPHandleImpl::connectFunc);
 
         freeaddrinfo(res);
 

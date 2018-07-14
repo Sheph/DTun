@@ -62,7 +62,7 @@ namespace DTun
         lwip_init();
 
         ip4_addr_t addr;
-        stringToIp("10.0.0.1", addr.addr);
+        stringToIp("1.1.1.1", addr.addr);
         ip4_addr_t netmask;
         stringToIp("255.255.255.0", netmask.addr);
         ip4_addr_t gw;
@@ -110,14 +110,18 @@ namespace DTun
 
         const struct sockaddr_in* name4 = (const struct sockaddr_in*)name;
 
-        bool isAny = name4->sin_addr.s_addr == htonl(INADDR_ANY);
+        if (name4->sin_addr.s_addr != htonl(INADDR_ANY)) {
+            LOG4CPLUS_ERROR(logger(), "Binding to something other than INADDR_ANY is not supported");
+            return boost::shared_ptr<SConnection>();
+        }
 
-        std::pair<UInt32, UInt16> key = std::make_pair(name4->sin_addr.s_addr, name4->sin_port);
+        bool isAny = (name4->sin_port == 0);
+
         boost::shared_ptr<SConnection> res;
 
         boost::mutex::scoped_lock lock(m_);
         if (!isAny) {
-            ConnectionCache::iterator it = connCache_.find(key);
+            ConnectionCache::iterator it = connCache_.find(name4->sin_port);
             if (it != connCache_.end()) {
                 res = it->second.lock();
                 if (!res) {
@@ -134,12 +138,14 @@ namespace DTun
             if (!handle->bind(name, namelen)) {
                 return res;
             }
-            if (isAny && !handle->getSockName(key.first, key.second)) {
+            UInt32 ip = 0;
+            UInt16 port = name4->sin_port;
+            if (isAny && !handle->getSockName(ip, port)) {
                 return res;
             }
 
             res = handle->createConnection();
-            connCache_.insert(std::make_pair(key, res));
+            connCache_.insert(std::make_pair(port, res));
 
             boost::shared_ptr<std::vector<char> > rcvBuff =
                 boost::make_shared<std::vector<char> >(8192);
@@ -169,7 +175,7 @@ namespace DTun
         netif->name[1] = 'u';
         netif->output = netifOutputFunc;
         netif->output_ip6 = NULL;
-        netif->mtu = 1500;
+        netif->mtu = 0;
 
         return ERR_OK;
     }
@@ -193,7 +199,32 @@ namespace DTun
 
     err_t LTUDPManager::netifOutputFunc(struct netif* netif, struct pbuf* p, const ip4_addr_t* ipaddr)
     {
-        LOG4CPLUS_TRACE(logger(), "LTUDPManager netifOutput(" << p->len << ")");
+        LTUDPManager* this_ = (LTUDPManager*)netif->state;
+
+        this_->tmpBuff_.resize(p->tot_len);
+
+        pbuf_copy_partial(p, &this_->tmpBuff_[0], p->tot_len, 0);
+
+        const struct ip_hdr* iphdr = (const struct ip_hdr*)&this_->tmpBuff_[0];
+        uint16_t iphdrLen = IPH_HL(iphdr) * 4;
+
+        assert((IPH_OFFSET(iphdr) & PP_HTONS(IP_OFFMASK | IP_MF)) == 0); // ensure no fragmentation
+        assert(IPH_PROTO(iphdr) == IP_PROTO_TCP);
+        assert(iphdrLen == sizeof(*iphdr));
+        assert(iphdr->_tos == 0);
+        assert(iphdr->_offset == 0);
+        assert(iphdr->_ttl == 255);
+
+        const struct tcp_hdr* tcphdr = (const struct tcp_hdr*)(&this_->tmpBuff_[0] + iphdrLen);
+
+        LOG4CPLUS_TRACE(logger(), "LTUDPManager netifOutput(" << p->len
+            << ", from=" << DTun::ipPortToString(iphdr->src.addr, tcphdr->src)
+            << ", to=" << DTun::ipPortToString(iphdr->dest.addr, tcphdr->dest) << ")");
+
+        boost::shared_ptr<SConnection> conn = this_->getTransportConnection(tcphdr->src);
+        if (!conn) {
+            return ERR_OK;
+        }
 
         return ERR_OK;
     }
@@ -281,5 +312,15 @@ namespace DTun
                 connCache_.erase(it++);
             }
         }
+    }
+
+    boost::shared_ptr<SConnection> LTUDPManager::getTransportConnection(UInt16 port)
+    {
+        boost::mutex::scoped_lock lock(m_);
+        ConnectionCache::const_iterator it = connCache_.find(port);
+        if (it == connCache_.end()) {
+            return boost::shared_ptr<SConnection>();
+        }
+        return it->second.lock();
     }
 }

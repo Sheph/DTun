@@ -31,7 +31,7 @@ namespace DTun
 
     private:
         typedef std::set<boost::shared_ptr<LTUDPHandleImpl> > HandleSet;
-        typedef std::map<std::pair<UInt32, UInt16>, boost::weak_ptr<SConnection> > ConnectionCache;
+        typedef std::map<UInt16, boost::weak_ptr<SConnection> > ConnectionCache;
 
         static err_t netifInitFunc(struct netif* netif);
 
@@ -49,9 +49,12 @@ namespace DTun
 
         void reapConnCache();
 
+        boost::shared_ptr<SConnection> getTransportConnection(UInt16 port);
+
         SManager& innerMgr_;
         boost::shared_ptr<OpWatch> watch_;
         struct netif netif_;
+        std::vector<char> tmpBuff_;
 
         boost::mutex m_;
         int numAliveHandles_;
