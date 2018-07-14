@@ -7,6 +7,7 @@
 #include <lwip/init.h>
 #include <lwip/priv/tcp_priv.h>
 #include <lwip/ip4_frag.h>
+#include <lwip/inet_chksum.h>
 
 namespace DTun
 {
@@ -149,8 +150,8 @@ namespace DTun
 
             boost::shared_ptr<std::vector<char> > rcvBuff =
                 boost::make_shared<std::vector<char> >(8192);
-            res->readFrom(&(*rcvBuff)[0], &(*rcvBuff)[0] + rcvBuff->size(),
-                boost::bind(&LTUDPManager::onRecv, this, _1, _2, _3, _4, boost::weak_ptr<SConnection>(res), rcvBuff));
+            res->readFrom(&(*rcvBuff)[0] + sizeof(struct ip_hdr) + 4, &(*rcvBuff)[0] + rcvBuff->size() - (sizeof(struct ip_hdr) + 4),
+                boost::bind(&LTUDPManager::onRecv, this, _1, _2, _3, _4, port, boost::weak_ptr<SConnection>(res), rcvBuff));
         }
 
         return res;
@@ -239,7 +240,7 @@ namespace DTun
     }
 
     void LTUDPManager::onRecv(int err, int numBytes, UInt32 srcIp, UInt16 srcPort,
-        const boost::weak_ptr<SConnection>& conn,
+        UInt16 dstPort, const boost::weak_ptr<SConnection>& conn,
         const boost::shared_ptr<std::vector<char> >& rcvBuff)
     {
         boost::shared_ptr<SConnection> conn_shared = conn.lock();
@@ -254,21 +255,54 @@ namespace DTun
             return;
         }
 
-        struct pbuf* p = pbuf_alloc(PBUF_RAW, numBytes, PBUF_POOL);
+        if (numBytes >= ((int)sizeof(struct tcp_hdr) - 4)) {
+            struct pbuf* p = pbuf_alloc(PBUF_RAW, numBytes + sizeof(struct ip_hdr) + 4, PBUF_POOL);
 
-        if (p) {
-            pbuf_take(p, &(*rcvBuff)[0], numBytes);
+            if (p) {
+                struct ip_hdr* iphdr = (struct ip_hdr*)&(*rcvBuff)[0];
+                struct tcp_hdr* tcphdr = (struct tcp_hdr*)(iphdr + 1);
 
-            if (netif_.input(p, &netif_) != ERR_OK) {
-                LOG4CPLUS_ERROR(logger(), "netif.input failed");
-                pbuf_free(p);
+                IPH_VHL_SET(iphdr, 4, sizeof(struct ip_hdr) / 4);
+                IPH_TOS_SET(iphdr, 0);
+                IPH_LEN_SET(iphdr, lwip_htons(p->tot_len));
+                IPH_OFFSET_SET(iphdr, 0);
+                IPH_ID_SET(iphdr, 0);
+                IPH_TTL_SET(iphdr, 255);
+                IPH_PROTO_SET(iphdr, IP_PROTO_TCP);
+                iphdr->src.addr = srcIp;
+                iphdr->dest.addr = ip_addr_get_ip4_u32(&netif_.ip_addr);
+                IPH_CHKSUM_SET(iphdr, 0);
+                IPH_CHKSUM_SET(iphdr, inet_chksum(iphdr, sizeof(struct ip_hdr)));
+
+                tcphdr->src = srcPort;
+                tcphdr->dest = dstPort;
+                tcphdr->chksum = 0;
+
+                pbuf_take(p, &(*rcvBuff)[0], numBytes + sizeof(struct ip_hdr) + 4);
+
+                ip_addr_t srcAddr, dstAddr;
+                ip_addr_set_ip4_u32(&srcAddr, iphdr->src.addr);
+                ip_addr_set_ip4_u32(&dstAddr, iphdr->dest.addr);
+
+                pbuf_header(p, -(s16_t)sizeof(struct ip_hdr));
+                uint16_t chksum = ip_chksum_pseudo(p, IP_PROTO_TCP, p->tot_len, &srcAddr, &dstAddr);
+                tcphdr = (struct tcp_hdr*)p->payload;
+                tcphdr->chksum = chksum;
+                pbuf_header(p, sizeof(struct ip_hdr));
+
+                if (netif_.input(p, &netif_) != ERR_OK) {
+                    LOG4CPLUS_ERROR(logger(), "netif.input failed");
+                    pbuf_free(p);
+                }
+            } else {
+                LOG4CPLUS_ERROR(logger(), "pbuf_alloc failed");
             }
         } else {
-            LOG4CPLUS_ERROR(logger(), "pbuf_alloc failed");
+            LOG4CPLUS_WARN(logger(), "LTUDPManager::onRecv too short " << numBytes);
         }
 
-        conn_shared->readFrom(&(*rcvBuff)[0], &(*rcvBuff)[0] + rcvBuff->size(),
-            boost::bind(&LTUDPManager::onRecv, this, _1, _2, _3, _4, conn, rcvBuff));
+        conn_shared->readFrom(&(*rcvBuff)[0] + sizeof(struct ip_hdr) + 4, &(*rcvBuff)[0] + rcvBuff->size() - (sizeof(struct ip_hdr) + 4),
+            boost::bind(&LTUDPManager::onRecv, this, _1, _2, _3, _4, dstPort, conn, rcvBuff));
     }
 
     void LTUDPManager::onSend(int err, const boost::shared_ptr<std::vector<char> >& sndBuff)

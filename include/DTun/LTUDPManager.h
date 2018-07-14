@@ -40,7 +40,7 @@ namespace DTun
         static err_t netifOutputFunc(struct netif* netif, struct pbuf* p, const ip4_addr_t* ipaddr);
 
         void onRecv(int err, int numBytes, UInt32 srcIp, UInt16 srcPort,
-            const boost::weak_ptr<SConnection>& conn,
+            UInt16 dstPort, const boost::weak_ptr<SConnection>& conn,
             const boost::shared_ptr<std::vector<char> >& rcvBuff);
 
         void onSend(int err, const boost::shared_ptr<std::vector<char> >& sndBuff);
