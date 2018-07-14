@@ -34,7 +34,7 @@ namespace DTun
             connCache.swap(connCache_);
         }
 
-        // close call connection, i/o will no longer take place
+        // close all connections, i/o will no longer take place
         for (ConnectionCache::iterator it = connCache.begin(); it != connCache.end(); ++it) {
             boost::shared_ptr<SConnection> conn = it->second.lock();
             if (conn) {
