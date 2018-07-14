@@ -3,6 +3,8 @@
 
 #include "DTun/Types.h"
 #include "DTun/SConnection.h"
+#include "DTun/SConnector.h"
+#include "DTun/SAcceptor.h"
 #include <boost/noncopyable.hpp>
 #include <lwip/tcp.h>
 
@@ -13,9 +15,6 @@ namespace DTun
     class DTUN_API LTUDPHandleImpl : boost::noncopyable
     {
     public:
-        typedef boost::function<bool (const boost::shared_ptr<SHandle>&)> ListenCallback;
-        typedef boost::function<bool (int)> ConnectCallback;
-
         explicit LTUDPHandleImpl(LTUDPManager& mgr);
         ~LTUDPHandleImpl();
 
@@ -25,17 +24,21 @@ namespace DTun
 
         bool bind(const struct sockaddr* name, int namelen);
 
-        void listen(int backlog, const ListenCallback& callback);
+        void listen(int backlog, const SAcceptor::ListenCallback& callback);
 
-        void connect(const std::string& address, const std::string& port, const ConnectCallback& callback, bool rendezvous);
+        void connect(const std::string& address, const std::string& port, const SConnector::ConnectCallback& callback, bool rendezvous);
 
     private:
         static err_t listenerAcceptFunc(void* arg, struct tcp_pcb* newpcb, err_t err);
 
+        static err_t connectFunc(void* arg, struct tcp_pcb* pcb, err_t err);
+
+        static void errorFunc(void* arg, err_t err);
+
         LTUDPManager& mgr_;
         struct tcp_pcb* pcb_;
-        ListenCallback listenCallback_;
-        ConnectCallback connectCallback_;
+        SAcceptor::ListenCallback listenCallback_;
+        SConnector::ConnectCallback connectCallback_;
         boost::shared_ptr<SConnection> conn_;
     };
 }

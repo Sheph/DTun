@@ -2,8 +2,9 @@
 
 namespace DTun
 {
-    OpWatch::OpWatch()
-    : state_(StateActive)
+    OpWatch::OpWatch(SReactor& reactor)
+    : reactor_(reactor)
+    , state_(StateActive)
     , inCallback_(false)
     {
     }
@@ -27,9 +28,12 @@ namespace DTun
             res = true;
         }
 
-        while (inCallback_) {
-            c_.wait(lock);
+        if (inCallback_ && !reactor_.isSameThread()) {
+            while (inCallback_) {
+                c_.wait(lock);
+            }
         }
+
         state_ = StateClosed;
 
         return res;

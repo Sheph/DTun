@@ -7,7 +7,7 @@ namespace DTun
 {
     LTUDPAcceptor::LTUDPAcceptor(const boost::shared_ptr<LTUDPHandle>& handle)
     : handle_(handle)
-    , watch_(boost::make_shared<OpWatch>())
+    , watch_(boost::make_shared<OpWatch>(boost::ref(handle->reactor())))
     {
     }
 
@@ -33,6 +33,6 @@ namespace DTun
 
     void LTUDPAcceptor::onStartListen(int backlog, const ListenCallback& callback)
     {
-        handle_->impl()->listen(backlog, watch_->wrapWithResult(callback));
+        handle_->impl()->listen(backlog, watch_->wrap(callback));
     }
 }

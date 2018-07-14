@@ -2,6 +2,7 @@
 #define _DTUN_OPWATCH_H_
 
 #include "DTun/Types.h"
+#include "DTun/SReactor.h"
 #include <boost/function.hpp>
 #include <boost/enable_shared_from_this.hpp>
 #include <boost/thread/mutex.hpp>
@@ -14,7 +15,7 @@ namespace DTun
         public boost::enable_shared_from_this<OpWatch>
     {
     public:
-        OpWatch();
+        explicit OpWatch(SReactor& reactor);
         ~OpWatch();
 
         bool close();
@@ -24,21 +25,10 @@ namespace DTun
             return boost::bind(&OpWatch::onWrappedCallback0, shared_from_this(), callback);
         }
 
-        boost::function<bool()> wrapWithResult(const boost::function<void()>& callback)
-        {
-            return boost::bind(&OpWatch::onWrappedCallbackWithResult0, shared_from_this(), callback);
-        }
-
         template <class A1>
         boost::function<void(A1)> wrap(const boost::function<void(A1)>& callback)
         {
             return boost::bind(&OpWatch::onWrappedCallback1<A1>, shared_from_this(), callback, _1);
-        }
-
-        template <class A1>
-        boost::function<bool(A1)> wrapWithResult(const boost::function<void(A1)>& callback)
-        {
-            return boost::bind(&OpWatch::onWrappedCallbackWithResult1<A1>, shared_from_this(), callback, _1);
         }
 
     private:
@@ -51,14 +41,9 @@ namespace DTun
 
         void onWrappedCallback0(const boost::function<void()>& callback)
         {
-            onWrappedCallbackWithResult0(callback);
-        }
-
-        bool onWrappedCallbackWithResult0(const boost::function<void()>& callback)
-        {
             boost::mutex::scoped_lock lock(m_);
             if (state_ != StateActive) {
-                return false;
+                return;
             }
             inCallback_ = true;
             lock.unlock();
@@ -70,21 +55,14 @@ namespace DTun
             if (signal) {
                 c_.notify_all();
             }
-            return true;
         }
 
         template <class A1>
         void onWrappedCallback1(const boost::function<void(A1)>& callback, const A1& a1)
         {
-            onWrappedCallbackWithResult1(callback, a1);
-        }
-
-        template <class A1>
-        bool onWrappedCallbackWithResult1(const boost::function<void(A1)>& callback, const A1& a1)
-        {
             boost::mutex::scoped_lock lock(m_);
             if (state_ != StateActive) {
-                return false;
+                return;
             }
             inCallback_ = true;
             lock.unlock();
@@ -96,9 +74,9 @@ namespace DTun
             if (signal) {
                 c_.notify_all();
             }
-            return true;
         }
 
+        SReactor& reactor_;
         boost::mutex m_;
         boost::condition_variable c_;
         State state_;

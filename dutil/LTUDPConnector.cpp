@@ -8,7 +8,7 @@ namespace DTun
     LTUDPConnector::LTUDPConnector(const boost::shared_ptr<LTUDPHandle>& handle)
     : handedOut_(false)
     , handle_(handle)
-    , watch_(boost::make_shared<OpWatch>())
+    , watch_(boost::make_shared<OpWatch>(boost::ref(handle->reactor())))
     {
     }
 
@@ -35,7 +35,7 @@ namespace DTun
     void LTUDPConnector::onStartConnect(const std::string& address, const std::string& port, const ConnectCallback& callback, bool rendezvous)
     {
         handle_->impl()->connect(address, port,
-            watch_->wrapWithResult<int>(boost::bind(&LTUDPConnector::onConnect, this, _1, callback)), rendezvous);
+            watch_->wrap<int>(boost::bind(&LTUDPConnector::onConnect, this, _1, callback)), rendezvous);
     }
 
     void LTUDPConnector::onConnect(int err, const ConnectCallback& callback)

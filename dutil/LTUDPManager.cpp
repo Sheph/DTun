@@ -62,9 +62,9 @@ namespace DTun
         lwip_init();
 
         ip4_addr_t addr;
-        stringToIp("255.255.255.255", addr.addr);
+        stringToIp("10.0.0.1", addr.addr);
         ip4_addr_t netmask;
-        stringToIp("255.255.255.255", netmask.addr);
+        stringToIp("255.255.255.0", netmask.addr);
         ip4_addr_t gw;
         ip4_addr_set_any(&gw);
 
@@ -77,11 +77,9 @@ namespace DTun
 
         netif_set_link_up(&netif_);
 
-        netif_set_pretend_tcp(&netif_, 1);
-
         netif_set_default(&netif_);
 
-        watch_ = boost::make_shared<OpWatch>();
+        watch_ = boost::make_shared<OpWatch>(boost::ref(innerMgr_.reactor()));
 
         innerMgr_.reactor().post(
             watch_->wrap(boost::bind(&LTUDPManager::onTcpTimeout, this)), TCP_TMR_INTERVAL);
@@ -112,15 +110,19 @@ namespace DTun
 
         const struct sockaddr_in* name4 = (const struct sockaddr_in*)name;
 
+        bool isAny = name4->sin_addr.s_addr == htonl(INADDR_ANY);
+
         std::pair<UInt32, UInt16> key = std::make_pair(name4->sin_addr.s_addr, name4->sin_port);
         boost::shared_ptr<SConnection> res;
 
         boost::mutex::scoped_lock lock(m_);
-        ConnectionCache::iterator it = connCache_.find(key);
-        if (it != connCache_.end()) {
-            res = it->second.lock();
-            if (!res) {
-                connCache_.erase(it);
+        if (!isAny) {
+            ConnectionCache::iterator it = connCache_.find(key);
+            if (it != connCache_.end()) {
+                res = it->second.lock();
+                if (!res) {
+                    connCache_.erase(it);
+                }
             }
         }
 
@@ -132,6 +134,10 @@ namespace DTun
             if (!handle->bind(name, namelen)) {
                 return res;
             }
+            if (isAny && !handle->getSockName(key.first, key.second)) {
+                return res;
+            }
+
             res = handle->createConnection();
             connCache_.insert(std::make_pair(key, res));
 
@@ -163,6 +169,7 @@ namespace DTun
         netif->name[1] = 'u';
         netif->output = netifOutputFunc;
         netif->output_ip6 = NULL;
+        netif->mtu = 1500;
 
         return ERR_OK;
     }
