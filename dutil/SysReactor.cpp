@@ -312,11 +312,11 @@ namespace DTun
         }
         stopping_ = false;
         if (signalWrSock_ != SYS_INVALID_SOCKET) {
-            DTun::closeSysSocketChecked(signalWrSock_);
+            closeSysSocketChecked(signalWrSock_);
             signalWrSock_ = SYS_INVALID_SOCKET;
         }
         if (signalRdSock_ != SYS_INVALID_SOCKET) {
-            DTun::closeSysSocketChecked(signalRdSock_);
+            closeSysSocketChecked(signalRdSock_);
             signalRdSock_ = SYS_INVALID_SOCKET;
         }
     }

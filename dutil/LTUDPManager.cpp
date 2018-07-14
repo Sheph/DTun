@@ -149,8 +149,8 @@ namespace DTun
 
             boost::shared_ptr<std::vector<char> > rcvBuff =
                 boost::make_shared<std::vector<char> >(8192);
-            res->read(&(*rcvBuff)[0], &(*rcvBuff)[0] + rcvBuff->size(),
-                boost::bind(&LTUDPManager::onRecv, this, _1, _2, boost::weak_ptr<SConnection>(res), rcvBuff), false);
+            res->readFrom(&(*rcvBuff)[0], &(*rcvBuff)[0] + rcvBuff->size(),
+                boost::bind(&LTUDPManager::onRecv, this, _1, _2, _3, _4, boost::weak_ptr<SConnection>(res), rcvBuff));
         }
 
         return res;
@@ -226,10 +226,19 @@ namespace DTun
             return ERR_OK;
         }
 
+        boost::shared_ptr<std::vector<char> > sndBuff =
+            boost::make_shared<std::vector<char> >(p->tot_len - iphdrLen - 4);
+
+        memcpy(&(*sndBuff)[0], (const char*)tcphdr + 4, sndBuff->size());
+
+        conn->writeTo(&(*sndBuff)[0], &(*sndBuff)[0] + sndBuff->size(),
+            iphdr->dest.addr, tcphdr->dest,
+            boost::bind(&LTUDPManager::onSend, this_, _1, sndBuff));
+
         return ERR_OK;
     }
 
-    void LTUDPManager::onRecv(int err, int numBytes,
+    void LTUDPManager::onRecv(int err, int numBytes, UInt32 srcIp, UInt16 srcPort,
         const boost::weak_ptr<SConnection>& conn,
         const boost::shared_ptr<std::vector<char> >& rcvBuff)
     {
@@ -238,7 +247,7 @@ namespace DTun
             return;
         }
 
-        LOG4CPLUS_TRACE(logger(), "LTUDPManager::onRecv(" << err << ", " << numBytes << ")");
+        LOG4CPLUS_TRACE(logger(), "LTUDPManager::onRecv(" << err << ", " << numBytes << ", " << ipPortToString(srcIp, srcPort) << ")");
 
         if (err) {
             LOG4CPLUS_ERROR(logger(), "LTUDPManager::onRecv error!");
@@ -258,8 +267,17 @@ namespace DTun
             LOG4CPLUS_ERROR(logger(), "pbuf_alloc failed");
         }
 
-        conn_shared->read(&(*rcvBuff)[0], &(*rcvBuff)[0] + rcvBuff->size(),
-            boost::bind(&LTUDPManager::onRecv, this, _1, _2, conn, rcvBuff), false);
+        conn_shared->readFrom(&(*rcvBuff)[0], &(*rcvBuff)[0] + rcvBuff->size(),
+            boost::bind(&LTUDPManager::onRecv, this, _1, _2, _3, _4, conn, rcvBuff));
+    }
+
+    void LTUDPManager::onSend(int err, const boost::shared_ptr<std::vector<char> >& sndBuff)
+    {
+        LOG4CPLUS_TRACE(logger(), "LTUDPManager::onSend(" << err << ")");
+
+        if (err) {
+            LOG4CPLUS_ERROR(logger(), "LTUDPManager::onSend error!");
+        }
     }
 
     void LTUDPManager::onTcpTimeout()

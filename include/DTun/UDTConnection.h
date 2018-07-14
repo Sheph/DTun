@@ -18,6 +18,10 @@ namespace DTun
 
         virtual void read(char* first, char* last, const ReadCallback& callback, bool readAll);
 
+        virtual void writeTo(const char* first, const char* last, UInt32 destIp, UInt16 destPort, const WriteCallback& callback);
+
+        virtual void readFrom(char* first, char* last, const ReadFromCallback& callback);
+
         virtual void close();
 
         virtual int getPollEvents() const;

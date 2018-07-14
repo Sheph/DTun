@@ -1,7 +1,9 @@
 #include "DTun/SysManager.h"
 #include "DTun/SysHandle.h"
+#include "DTun/Utils.h"
 #include "Logger.h"
 #include <boost/make_shared.hpp>
+#include <fcntl.h>
 
 namespace DTun
 {
@@ -36,6 +38,13 @@ namespace DTun
             LOG4CPLUS_ERROR(logger(), "Cannot create UDP socket: " << strerror(errno));
             return boost::shared_ptr<SHandle>();
         }
+
+        if (::fcntl(sock, F_SETFL, O_NONBLOCK) < 0) {
+            LOG4CPLUS_ERROR(logger(), "cannot set sock non-blocking");
+            closeSysSocketChecked(sock);
+            return boost::shared_ptr<SHandle>();
+        }
+
         return boost::make_shared<SysHandle>(boost::ref(reactor_), sock);
     }
 }

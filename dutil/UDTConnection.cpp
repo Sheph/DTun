@@ -54,6 +54,20 @@ namespace DTun
         reactor().update(this);
     }
 
+    void UDTConnection::writeTo(const char* first, const char* last, UInt32 destIp, UInt16 destPort, const WriteCallback& callback)
+    {
+        assert(false);
+        LOG4CPLUS_FATAL(logger(), "writeTo not supported!");
+        return;
+    }
+
+    void UDTConnection::readFrom(char* first, char* last, const ReadFromCallback& callback)
+    {
+        assert(false);
+        LOG4CPLUS_FATAL(logger(), "readFrom not supported!");
+        return;
+    }
+
     void UDTConnection::close()
     {
         boost::shared_ptr<UDTHandle> handle = reactor().remove(this);

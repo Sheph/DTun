@@ -18,6 +18,10 @@ namespace DTun
 
         virtual void read(char* first, char* last, const ReadCallback& callback, bool readAll);
 
+        virtual void writeTo(const char* first, const char* last, UInt32 destIp, UInt16 destPort, const WriteCallback& callback);
+
+        virtual void readFrom(char* first, char* last, const ReadFromCallback& callback);
+
         virtual void close();
 
         virtual int getPollEvents() const;
@@ -30,6 +34,8 @@ namespace DTun
         {
             const char* first;
             const char* last;
+            UInt32 destIp;
+            UInt16 destPort;
             WriteCallback callback;
         };
 
@@ -38,7 +44,11 @@ namespace DTun
             char* first;
             char* last;
             ReadCallback callback;
+            ReadFromCallback fromCallback;
         };
+
+        void handleReadNormal(ReadReq* req);
+        void handleReadFrom(ReadReq* req);
 
         mutable boost::mutex m_;
         std::list<WriteReq> writeQueue_;
