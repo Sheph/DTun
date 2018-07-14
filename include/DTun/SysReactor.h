@@ -7,6 +7,7 @@
 #include <boost/thread/condition.hpp>
 #include <boost/thread.hpp>
 #include <boost/chrono.hpp>
+#include <boost/optional.hpp>
 #include <map>
 
 namespace DTun
