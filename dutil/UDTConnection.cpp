@@ -58,14 +58,12 @@ namespace DTun
     {
         assert(false);
         LOG4CPLUS_FATAL(logger(), "writeTo not supported!");
-        return;
     }
 
     void UDTConnection::readFrom(char* first, char* last, const ReadFromCallback& callback)
     {
         assert(false);
         LOG4CPLUS_FATAL(logger(), "readFrom not supported!");
-        return;
     }
 
     void UDTConnection::close()

@@ -13,6 +13,13 @@ namespace DTun
     {
     }
 
+    LTUDPHandle::LTUDPHandle(LTUDPManager& mgr,
+        const boost::shared_ptr<SConnection>& conn, struct tcp_pcb* pcb)
+    : reactor_(mgr.reactor())
+    , impl_(boost::make_shared<LTUDPHandleImpl>(boost::ref(mgr), conn, pcb))
+    {
+    }
+
     LTUDPHandle::~LTUDPHandle()
     {
         close();
@@ -31,14 +38,12 @@ namespace DTun
 
     bool LTUDPHandle::getSockName(UInt32& ip, UInt16& port) const
     {
-        assert(false);
-        return false;
+        return impl_->getSockName(ip, port);
     }
 
     bool LTUDPHandle::getPeerName(UInt32& ip, UInt16& port) const
     {
-        assert(false);
-        return false;
+        return impl_->getPeerName(ip, port);
     }
 
     void LTUDPHandle::close()
@@ -61,7 +66,6 @@ namespace DTun
 
     boost::shared_ptr<SConnection> LTUDPHandle::createConnection()
     {
-        assert(false);
-        return boost::shared_ptr<SConnection>();
+        return boost::make_shared<LTUDPConnection>(shared_from_this());
     }
 }

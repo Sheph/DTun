@@ -16,6 +16,8 @@ namespace DTun
     {
     public:
         explicit LTUDPHandleImpl(LTUDPManager& mgr);
+        LTUDPHandleImpl(LTUDPManager& mgr,
+            const boost::shared_ptr<SConnection>& conn, struct tcp_pcb* pcb);
         ~LTUDPHandleImpl();
 
         void kill(bool sameThreadOnly);
@@ -23,6 +25,10 @@ namespace DTun
         inline LTUDPManager& mgr() { return mgr_; }
 
         bool bind(const struct sockaddr* name, int namelen);
+
+        bool getSockName(UInt32& ip, UInt16& port) const;
+
+        bool getPeerName(UInt32& ip, UInt16& port) const;
 
         void listen(int backlog, const SAcceptor::ListenCallback& callback);
 

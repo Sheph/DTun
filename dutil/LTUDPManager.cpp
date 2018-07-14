@@ -157,10 +157,22 @@ namespace DTun
         return res;
     }
 
+    boost::shared_ptr<SHandle> LTUDPManager::createStreamSocket(const boost::shared_ptr<SConnection>& conn,
+        struct tcp_pcb* pcb)
+    {
+        {
+            boost::mutex::scoped_lock lock(m_);
+            ++numAliveHandles_;
+        }
+        return boost::make_shared<LTUDPHandle>(boost::ref(*this), conn, pcb);
+    }
+
     boost::shared_ptr<SHandle> LTUDPManager::createStreamSocket()
     {
-        boost::mutex::scoped_lock lock(m_);
-        ++numAliveHandles_;
+        {
+            boost::mutex::scoped_lock lock(m_);
+            ++numAliveHandles_;
+        }
         return boost::make_shared<LTUDPHandle>(boost::ref(*this));
     }
 
@@ -218,9 +230,9 @@ namespace DTun
 
         const struct tcp_hdr* tcphdr = (const struct tcp_hdr*)(&this_->tmpBuff_[0] + iphdrLen);
 
-        LOG4CPLUS_TRACE(logger(), "LTUDPManager netifOutput(" << p->len
+        /*LOG4CPLUS_TRACE(logger(), "LTUDPManager netifOutput(" << p->len
             << ", from=" << DTun::ipPortToString(iphdr->src.addr, tcphdr->src)
-            << ", to=" << DTun::ipPortToString(iphdr->dest.addr, tcphdr->dest) << ")");
+            << ", to=" << DTun::ipPortToString(iphdr->dest.addr, tcphdr->dest) << ")");*/
 
         boost::shared_ptr<SConnection> conn = this_->getTransportConnection(tcphdr->src);
         if (!conn) {
@@ -248,7 +260,7 @@ namespace DTun
             return;
         }
 
-        LOG4CPLUS_TRACE(logger(), "LTUDPManager::onRecv(" << err << ", " << numBytes << ", " << ipPortToString(srcIp, srcPort) << ")");
+        //LOG4CPLUS_TRACE(logger(), "LTUDPManager::onRecv(" << err << ", " << numBytes << ", " << ipPortToString(srcIp, srcPort) << ")");
 
         if (err) {
             LOG4CPLUS_ERROR(logger(), "LTUDPManager::onRecv error!");
@@ -307,8 +319,6 @@ namespace DTun
 
     void LTUDPManager::onSend(int err, const boost::shared_ptr<std::vector<char> >& sndBuff)
     {
-        LOG4CPLUS_TRACE(logger(), "LTUDPManager::onSend(" << err << ")");
-
         if (err) {
             LOG4CPLUS_ERROR(logger(), "LTUDPManager::onSend error!");
         }
@@ -316,7 +326,7 @@ namespace DTun
 
     void LTUDPManager::onTcpTimeout()
     {
-        LOG4CPLUS_TRACE(logger(), "onTcpTimeout()");
+        //LOG4CPLUS_TRACE(logger(), "onTcpTimeout()");
 
         innerMgr_.reactor().post(
             watch_->wrap(boost::bind(&LTUDPManager::onTcpTimeout, this)), TCP_TMR_INTERVAL);

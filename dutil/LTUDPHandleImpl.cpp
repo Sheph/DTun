@@ -11,6 +11,16 @@ namespace DTun
     {
     }
 
+    LTUDPHandleImpl::LTUDPHandleImpl(LTUDPManager& mgr,
+        const boost::shared_ptr<SConnection>& conn, struct tcp_pcb* pcb)
+    : mgr_(mgr)
+    , pcb_(pcb)
+    , conn_(conn)
+    {
+        tcp_arg(pcb_, this);
+        tcp_err(pcb_, &LTUDPHandleImpl::errorFunc);
+    }
+
     LTUDPHandleImpl::~LTUDPHandleImpl()
     {
         assert(!pcb_);
@@ -40,6 +50,36 @@ namespace DTun
 
         conn_ = mgr_.createTransportConnection(name, namelen);
         return !!conn_;
+    }
+
+    bool LTUDPHandleImpl::getSockName(UInt32& ip, UInt16& port) const
+    {
+        if (!conn_) {
+            LOG4CPLUS_ERROR(logger(), "socket is not bound");
+            return false;
+        }
+
+        return conn_->handle()->getSockName(ip, port);
+    }
+
+    bool LTUDPHandleImpl::getPeerName(UInt32& ip, UInt16& port) const
+    {
+        if (!pcb_ || connectCallback_ || listenCallback_) {
+            LOG4CPLUS_ERROR(logger(), "socket is not connected");
+            return false;
+        }
+
+        ip_addr_t tcpAddr;
+
+        err_t err = tcp_tcp_get_tcp_addrinfo(pcb_, 0, &tcpAddr, &port);
+        if (err != ERR_OK) {
+            LOG4CPLUS_ERROR(logger(), "cannot get tcp addrinfo");
+            return false;
+        }
+
+        ip = ip_addr_get_ip4_u32(&tcpAddr);
+
+        return true;
     }
 
     void LTUDPHandleImpl::listen(int backlog, const SAcceptor::ListenCallback& callback)
@@ -166,12 +206,24 @@ namespace DTun
     {
         LOG4CPLUS_ERROR(logger(), "LTUDP accept(" << (int)err << ")");
 
-        return ERR_VAL;
+        LTUDPHandleImpl* this_ = (LTUDPHandleImpl*)arg;
+
+        assert(err == ERR_OK);
+
+        this_->listenCallback_(this_->mgr_.createStreamSocket(this_->conn_, newpcb));
+
+        return ERR_OK;
     }
 
     err_t LTUDPHandleImpl::connectFunc(void* arg, struct tcp_pcb* pcb, err_t err)
     {
         LOG4CPLUS_ERROR(logger(), "LTUDP connect(" << (int)err << ")");
+
+        LTUDPHandleImpl* this_ = (LTUDPHandleImpl*)arg;
+
+        SConnector::ConnectCallback cb = this_->connectCallback_;
+        this_->connectCallback_ = SConnector::ConnectCallback();
+        cb(err);
 
         return ERR_OK;
     }

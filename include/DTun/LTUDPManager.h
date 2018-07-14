@@ -7,6 +7,8 @@
 #include <set>
 #include <lwip/netif.h>
 
+struct tcp_pcb;
+
 namespace DTun
 {
     class LTUDPHandleImpl;
@@ -28,6 +30,9 @@ namespace DTun
         void addToKill(const boost::shared_ptr<LTUDPHandleImpl>& handle);
 
         boost::shared_ptr<SConnection> createTransportConnection(const struct sockaddr* name, int namelen);
+
+        boost::shared_ptr<SHandle> createStreamSocket(const boost::shared_ptr<SConnection>& conn,
+            struct tcp_pcb* pcb);
 
     private:
         typedef std::set<boost::shared_ptr<LTUDPHandleImpl> > HandleSet;
