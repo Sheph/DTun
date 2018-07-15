@@ -11,6 +11,7 @@
 #include <boost/noncopyable.hpp>
 #include <boost/circular_buffer.hpp>
 #include <lwip/tcp.h>
+#include <vector>
 
 namespace DTun
 {
@@ -50,6 +51,8 @@ namespace DTun
 
         int read(char* first, char* last, int& numRead);
 
+        void rendezvousPing(UInt32 destIp, UInt16 destPort);
+
     private:
         static err_t listenerAcceptFunc(void* arg, struct tcp_pcb* newpcb, err_t err);
 
@@ -60,6 +63,8 @@ namespace DTun
         static err_t sentFunc(void* arg, struct tcp_pcb* pcb, u16_t len);
 
         static void errorFunc(void* arg, err_t err);
+
+        static void onRendezvousPingSend(int err, const boost::shared_ptr<std::vector<char> >& sndBuff);
 
         void setupPCB(struct tcp_pcb* pcb);
 

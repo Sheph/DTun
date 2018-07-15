@@ -27,13 +27,34 @@ namespace DTun
 
     bool LTUDPConnector::connect(const std::string& address, const std::string& port, const ConnectCallback& callback, Mode mode)
     {
+        addrinfo hints;
+
+        memset(&hints, 0, sizeof(struct addrinfo));
+
+        hints.ai_flags = AI_PASSIVE;
+        hints.ai_family = AF_INET;
+        hints.ai_socktype = SOCK_STREAM;
+
+        addrinfo* res;
+
+        if (::getaddrinfo(address.c_str(), port.c_str(), &hints, &res) != 0) {
+            LOG4CPLUS_ERROR(logger(), "cannot resolve address/port");
+            return false;
+        }
+
+        UInt32 destIp = ((const struct sockaddr_in*)res->ai_addr)->sin_addr.s_addr;
+        UInt16 destPort = ((const struct sockaddr_in*)res->ai_addr)->sin_port;
+
+        freeaddrinfo(res);
+
         handle_->reactor().post(watch_->wrap(
-            boost::bind(&LTUDPConnector::onStartConnect, this, address, port, callback, mode)));
+            boost::bind(&LTUDPConnector::onStartConnect, this, address, port, callback, mode, destIp, destPort)));
 
         return true;
     }
 
-    void LTUDPConnector::onStartConnect(const std::string& address, const std::string& port, const ConnectCallback& callback, Mode mode)
+    void LTUDPConnector::onStartConnect(const std::string& address, const std::string& port, const ConnectCallback& callback, Mode mode,
+        UInt32 destIp, UInt16 destPort)
     {
         if (mode != ModeRendezvousAcc) {
             handle_->impl()->connect(address, port,
@@ -41,7 +62,7 @@ namespace DTun
         } else {
             handle_->impl()->listen(1,
                 watch_->wrap<boost::shared_ptr<SHandle> >(boost::bind(&LTUDPConnector::onRendezvousAccept, this, _1, callback)));
-            onRendezvousTimeout(6, 3000, callback);
+            onRendezvousTimeout(6, 3000, destIp, destPort, callback);
         }
     }
 
@@ -64,7 +85,7 @@ namespace DTun
         callback(0);
     }
 
-    void LTUDPConnector::onRendezvousTimeout(int count, int timeoutMs, const ConnectCallback& callback)
+    void LTUDPConnector::onRendezvousTimeout(int count, int timeoutMs, UInt32 destIp, UInt16 destPort, const ConnectCallback& callback)
     {
         LOG4CPLUS_TRACE(logger(), "LTUDPConnector::onRendezvousTimeout(" << count << ")");
 
@@ -76,8 +97,9 @@ namespace DTun
             handedOut_ = true;
             callback(ERR_TIMEOUT);
         } else {
+            handle_->impl()->rendezvousPing(destIp, destPort);
             handle_->reactor().post(watch_->wrap(
-                boost::bind(&LTUDPConnector::onRendezvousTimeout, this, count - 1, timeoutMs, callback)), timeoutMs);
+                boost::bind(&LTUDPConnector::onRendezvousTimeout, this, count - 1, timeoutMs, destIp, destPort, callback)), timeoutMs);
         }
     }
 }

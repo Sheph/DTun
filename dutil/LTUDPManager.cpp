@@ -275,6 +275,16 @@ namespace DTun
             } else {
                 LOG4CPLUS_ERROR(logger(), "pbuf_alloc failed");
             }
+        } else if (numBytes == 4) {
+            uint8_t a = (*rcvBuff)[sizeof(struct ip_hdr) + 4 + 0];
+            uint8_t b = (*rcvBuff)[sizeof(struct ip_hdr) + 4 + 1];
+            uint8_t c = (*rcvBuff)[sizeof(struct ip_hdr) + 4 + 2];
+            uint8_t d = (*rcvBuff)[sizeof(struct ip_hdr) + 4 + 3];
+            if ((a == 0xAA) && (b == 0xBB) && (c == 0xCC) && (d == 0xDD)) {
+                LOG4CPLUS_TRACE(logger(), "LTUDPManager::onRecv rendezvous ping");
+            } else {
+                LOG4CPLUS_WARN(logger(), "LTUDPManager::onRecv bad rendezvous ping: " << (int)a << "," << (int)b << "," << (int)c << "," << (int)d);
+            }
         } else {
             LOG4CPLUS_WARN(logger(), "LTUDPManager::onRecv too short " << numBytes);
         }

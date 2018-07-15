@@ -2,6 +2,7 @@
 #include "DTun/LTUDPManager.h"
 #include "DTun/Utils.h"
 #include "Logger.h"
+#include <boost/make_shared.hpp>
 
 namespace DTun
 {
@@ -304,6 +305,24 @@ namespace DTun
         return err;
     }
 
+    void LTUDPHandleImpl::rendezvousPing(UInt32 destIp, UInt16 destPort)
+    {
+        assert(mgr_.reactor().isSameThread());
+        assert(conn_);
+
+        boost::shared_ptr<std::vector<char> > sndBuff =
+            boost::make_shared<std::vector<char> >(4);
+
+        (*sndBuff)[0] = 0xAA;
+        (*sndBuff)[1] = 0xBB;
+        (*sndBuff)[2] = 0xCC;
+        (*sndBuff)[3] = 0xDD;
+
+        conn_->writeTo(&(*sndBuff)[0], &(*sndBuff)[0] + sndBuff->size(),
+            destIp, destPort,
+            boost::bind(&LTUDPHandleImpl::onRendezvousPingSend, _1, sndBuff));
+    }
+
     err_t LTUDPHandleImpl::listenerAcceptFunc(void* arg, struct tcp_pcb* newpcb, err_t err)
     {
         LOG4CPLUS_TRACE(logger(), "LTUDP accept(" << (int)err << ")");
@@ -401,6 +420,11 @@ namespace DTun
                 this_->readCallback_();
             }
         }
+    }
+
+    void LTUDPHandleImpl::onRendezvousPingSend(int err, const boost::shared_ptr<std::vector<char> >& sndBuff)
+    {
+        LOG4CPLUS_TRACE(logger(), "LTUDP RendezvousPingSend(" << err << ")");
     }
 
     void LTUDPHandleImpl::setupPCB(struct tcp_pcb* pcb)
