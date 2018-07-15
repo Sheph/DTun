@@ -39,7 +39,7 @@ namespace DTun
             handle_->impl()->connect(address, port,
                 watch_->wrap<int>(boost::bind(&LTUDPConnector::onConnect, this, _1, callback)));
         } else {
-            handle_->impl()->listen(10,
+            handle_->impl()->listen(1,
                 watch_->wrap<boost::shared_ptr<SHandle> >(boost::bind(&LTUDPConnector::onRendezvousAccept, this, _1, callback)));
         }
     }
@@ -52,8 +52,6 @@ namespace DTun
 
     void LTUDPConnector::onRendezvousAccept(const boost::shared_ptr<SHandle>& handle, const ConnectCallback& callback)
     {
-        LOG4CPLUS_TRACE(logger(), "LTUDPConnector::onRendezvousAccept");
-
         boost::shared_ptr<LTUDPHandle> ltudpHandle =
             boost::dynamic_pointer_cast<LTUDPHandle>(handle);
         assert(ltudpHandle);

@@ -562,7 +562,7 @@ aborted:
     /* If no matching PCB was found, send a TCP RST (reset) to the
        sender. */
     LWIP_DEBUGF(TCP_RST_DEBUG, ("tcp_input: no PCB match found, resetting.\n"));
-    if (!(TCPH_FLAGS(tcphdr) & TCP_RST)) {
+    if (!(TCPH_FLAGS(tcphdr) & TCP_RST) && ((inp->flags & NETIF_FLAG_TCP_NORST) == 0)) {
       TCP_STATS_INC(tcp.proterr);
       TCP_STATS_INC(tcp.drop);
       tcp_rst(NULL, ackno, seqno + tcplen, ip_current_dest_addr(),

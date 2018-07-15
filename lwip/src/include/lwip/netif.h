@@ -108,6 +108,7 @@ extern "C" {
 /** Whether to pretend that we are every host for TCP packets.
  * Set by netif_set_pretend_tcp. */
 #define NETIF_FLAG_PRETEND_TCP  0x100U
+#define NETIF_FLAG_TCP_NORST    0x200U
 
 /**
  * @}

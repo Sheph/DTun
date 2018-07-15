@@ -80,6 +80,8 @@ namespace DTun
 
         netif_set_default(&netif_);
 
+        netif_.flags |= NETIF_FLAG_TCP_NORST;
+
         watch_ = boost::make_shared<OpWatch>(boost::ref(innerMgr_.reactor()));
 
         innerMgr_.reactor().post(
