@@ -8,6 +8,8 @@ namespace DTun
     LTUDPHandleImpl::LTUDPHandleImpl(LTUDPManager& mgr)
     : mgr_(mgr)
     , pcb_(NULL)
+    , eof_(false)
+    , rcvBuff_(TCP_WND)
     {
     }
 
@@ -15,9 +17,13 @@ namespace DTun
         const boost::shared_ptr<SConnection>& conn, struct tcp_pcb* pcb)
     : mgr_(mgr)
     , pcb_(pcb)
+    , eof_(false)
+    , rcvBuff_(TCP_WND)
     , conn_(conn)
     {
         tcp_arg(pcb_, this);
+        tcp_recv(pcb_, &LTUDPHandleImpl::recvFunc);
+        tcp_sent(pcb_, &LTUDPHandleImpl::sentFunc);
         tcp_err(pcb_, &LTUDPHandleImpl::errorFunc);
     }
 
@@ -34,9 +40,13 @@ namespace DTun
         if (pcb_) {
             tcp_arg(pcb_, NULL);
             if (!listenCallback_) {
+                tcp_recv(pcb_, NULL);
+                tcp_sent(pcb_, NULL);
                 tcp_err(pcb_, NULL);
             }
-            tcp_close(pcb_);
+            if (tcp_close(pcb_) != ERR_OK) {
+                LOG4CPLUS_FATAL(logger(), "tcp_close failed");
+            }
             pcb_ = NULL;
         }
     }
@@ -103,6 +113,8 @@ namespace DTun
             return;
         }
 
+        setupPCB(l);
+
         if (tcp_bind(l, IP_ANY_TYPE, port) != ERR_OK) {
             LOG4CPLUS_ERROR(logger(), "tcp_bind failed");
             tcp_close(l);
@@ -157,6 +169,8 @@ namespace DTun
             return;
         }
 
+        setupPCB(pcb);
+
         err_t err = tcp_bind(pcb, IP_ANY_TYPE, localPort);
         if (err != ERR_OK) {
             LOG4CPLUS_ERROR(logger(), "tcp_bind failed");
@@ -202,13 +216,84 @@ namespace DTun
         connectCallback_ = callback;
     }
 
+    int LTUDPHandleImpl::write(const char* first, const char* last, int& numWritten)
+    {
+        assert(mgr_.reactor().isSameThread());
+
+        numWritten = 0;
+
+        if (!pcb_) {
+            return ERR_ABRT;
+        }
+
+        numWritten = std::min((int)(last - first), (int)tcp_sndbuf(pcb_));
+
+        if (numWritten == 0) {
+            return 0;
+        }
+
+        err_t err = tcp_write(pcb_, first, numWritten, TCP_WRITE_FLAG_COPY);
+        if (err != ERR_OK) {
+            LOG4CPLUS_ERROR(logger(), "tcp_write error " << (int)err);
+            numWritten = 0;
+            return err;
+        }
+
+        return 0;
+    }
+
+    int LTUDPHandleImpl::read(char* first, char* last, int& numRead)
+    {
+        assert(mgr_.reactor().isSameThread());
+
+        numRead = 0;
+
+        if (!rcvBuff_.empty()) {
+            int left = last - first;
+
+            boost::circular_buffer<char>::const_array_range arr = rcvBuff_.array_one();
+
+            int tmp = std::min(left, (int)arr.second);
+            memcpy(first, arr.first, tmp);
+
+            first += tmp;
+            left -= tmp;
+            numRead += tmp;
+
+            arr = rcvBuff_.array_two();
+
+            tmp = std::min(left, (int)arr.second);
+            memcpy(first, arr.first, tmp);
+
+            numRead += tmp;
+
+            rcvBuff_.erase_begin(numRead);
+
+            if (!eof_ && pcb_) {
+                tcp_recved(pcb_, numRead);
+            }
+        }
+
+        int err = 0;
+
+        if (eof_) {
+            err = ERR_CLSD;
+        } else if (!pcb_) {
+            err = ERR_ABRT;
+        }
+
+        return err;
+    }
+
     err_t LTUDPHandleImpl::listenerAcceptFunc(void* arg, struct tcp_pcb* newpcb, err_t err)
     {
-        LOG4CPLUS_ERROR(logger(), "LTUDP accept(" << (int)err << ")");
+        LOG4CPLUS_TRACE(logger(), "LTUDP accept(" << (int)err << ")");
 
         LTUDPHandleImpl* this_ = (LTUDPHandleImpl*)arg;
 
         assert(err == ERR_OK);
+
+        this_->setupPCB(newpcb);
 
         this_->listenCallback_(this_->mgr_.createStreamSocket(this_->conn_, newpcb));
 
@@ -217,20 +302,69 @@ namespace DTun
 
     err_t LTUDPHandleImpl::connectFunc(void* arg, struct tcp_pcb* pcb, err_t err)
     {
-        LOG4CPLUS_ERROR(logger(), "LTUDP connect(" << (int)err << ")");
+        LOG4CPLUS_TRACE(logger(), "LTUDP connect(" << (int)err << ")");
 
         LTUDPHandleImpl* this_ = (LTUDPHandleImpl*)arg;
 
         SConnector::ConnectCallback cb = this_->connectCallback_;
         this_->connectCallback_ = SConnector::ConnectCallback();
+        if (err == ERR_OK) {
+            tcp_recv(this_->pcb_, &LTUDPHandleImpl::recvFunc);
+            tcp_sent(this_->pcb_, &LTUDPHandleImpl::sentFunc);
+        }
         cb(err);
+
+        return ERR_OK;
+    }
+
+    err_t LTUDPHandleImpl::recvFunc(void* arg, struct tcp_pcb* pcb, struct pbuf* p, err_t err)
+    {
+        LOG4CPLUS_TRACE(logger(), "LTUDP recv(" << (p ? p->tot_len : -1) << ", " << (int)err << ")");
+
+        assert(err == ERR_OK);
+
+        LTUDPHandleImpl* this_ = (LTUDPHandleImpl*)arg;
+
+        if (!p) {
+            this_->eof_ = true;
+        } else {
+            if (p->tot_len > (this_->rcvBuff_.capacity() - this_->rcvBuff_.size())) {
+                pbuf_free(p);
+                LOG4CPLUS_FATAL(logger(), "too much data");
+                return ERR_MEM;
+            }
+
+            struct pbuf* tmp = p;
+            do {
+                this_->rcvBuff_.insert(this_->rcvBuff_.end(),
+                    (char*)tmp->payload, (char*)tmp->payload + tmp->len);
+            } while ((tmp = tmp->next));
+            pbuf_free(p);
+        }
+
+        if (this_->readCallback_) {
+            this_->readCallback_();
+        }
+
+        return ERR_OK;
+    }
+
+    err_t LTUDPHandleImpl::sentFunc(void* arg, struct tcp_pcb* pcb, u16_t len)
+    {
+        LOG4CPLUS_TRACE(logger(), "LTUDP sent(" << len << ")");
+
+        LTUDPHandleImpl* this_ = (LTUDPHandleImpl*)arg;
+
+        if (this_->writeCallback_) {
+            this_->writeCallback_(0, len);
+        }
 
         return ERR_OK;
     }
 
     void LTUDPHandleImpl::errorFunc(void* arg, err_t err)
     {
-        LOG4CPLUS_ERROR(logger(), "LTUDP error(" << (int)err << ")");
+        LOG4CPLUS_TRACE(logger(), "LTUDP error(" << (int)err << ")");
 
         LTUDPHandleImpl* this_ = (LTUDPHandleImpl*)arg;
 
@@ -240,6 +374,23 @@ namespace DTun
             SConnector::ConnectCallback cb = this_->connectCallback_;
             this_->connectCallback_ = SConnector::ConnectCallback();
             cb(err);
+        } else {
+            if (this_->writeCallback_) {
+                this_->writeCallback_(err, 0);
+            }
+            if (this_->readCallback_) {
+                this_->readCallback_();
+            }
         }
+    }
+
+    void LTUDPHandleImpl::setupPCB(struct tcp_pcb* pcb)
+    {
+        ip_set_option(pcb, SOF_REUSEADDR);
+        ip_set_option(pcb, SOF_KEEPALIVE);
+
+        pcb->keep_intvl = 5000;
+        pcb->keep_cnt = 4;
+        pcb->keep_idle = 10000;
     }
 }

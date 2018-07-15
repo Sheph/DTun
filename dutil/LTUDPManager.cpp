@@ -98,7 +98,7 @@ namespace DTun
             LOG4CPLUS_FATAL(logger(), "double kill!");
         }
         lock.unlock();
-        innerMgr_.reactor().dispatch(
+        innerMgr_.reactor().post(
             watch_->wrap(boost::bind(&LTUDPManager::onKillHandles, this, true)));
     }
 

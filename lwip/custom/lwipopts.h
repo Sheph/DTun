@@ -47,6 +47,7 @@
 #define LWIP_UDP 0
 #define LWIP_UDPLITE 0
 #define LWIP_TCP 1
+#define LWIP_TCP_KEEPALIVE 1
 #define LWIP_CALLBACK_API 1
 #define LWIP_NETIF_API 0
 #define LWIP_NETIF_LOOPBACK 0

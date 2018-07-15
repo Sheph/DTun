@@ -4,6 +4,7 @@
 #include "DTun/SConnection.h"
 #include "DTun/LTUDPHandle.h"
 #include "DTun/OpWatch.h"
+#include <list>
 
 namespace DTun
 {
@@ -26,8 +27,37 @@ namespace DTun
         virtual void readFrom(char* first, char* last, const ReadFromCallback& callback);
 
     private:
+        struct WriteReq
+        {
+            const char* first;
+            const char* last;
+            WriteCallback callback;
+        };
+
+        struct ReadReq
+        {
+            char* first;
+            char* last;
+            int total_read;
+            ReadCallback callback;
+            bool readAll;
+        };
+
+        typedef std::pair<const char*, const char*> WriteOutReq;
+
+        void onWrite(const char* first, const char* last, const WriteCallback& callback);
+
+        void onRead(char* first, char* last, const ReadCallback& callback, bool readAll);
+
+        void onHandleWrite(int err, int numBytes);
+
+        void onHandleRead();
+
         boost::shared_ptr<LTUDPHandle> handle_;
         boost::shared_ptr<OpWatch> watch_;
+        std::list<WriteReq> writeQueue_;
+        std::list<ReadReq> readQueue_;
+        std::list<WriteOutReq> writeOutQueue_;
     };
 }
 
