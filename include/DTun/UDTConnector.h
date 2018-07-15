@@ -12,7 +12,7 @@ namespace DTun
         UDTConnector(UDTReactor& reactor, const boost::shared_ptr<UDTHandle>& handle);
         ~UDTConnector();
 
-        virtual bool connect(const std::string& address, const std::string& port, const ConnectCallback& callback, bool rendezvous);
+        virtual bool connect(const std::string& address, const std::string& port, const ConnectCallback& callback, Mode mode);
 
         virtual void close();
 

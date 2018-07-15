@@ -17,11 +17,12 @@ namespace DTun
 
         virtual void close();
 
-        virtual bool connect(const std::string& address, const std::string& port, const ConnectCallback& callback, bool rendezvous);
+        virtual bool connect(const std::string& address, const std::string& port, const ConnectCallback& callback, Mode mode);
 
     private:
-        void onStartConnect(const std::string& address, const std::string& port, const ConnectCallback& callback, bool rendezvous);
+        void onStartConnect(const std::string& address, const std::string& port, const ConnectCallback& callback, Mode mode);
         void onConnect(int err, const ConnectCallback& callback);
+        void onRendezvousAccept(const boost::shared_ptr<SHandle>& handle, const ConnectCallback& callback);
 
         bool handedOut_;
         boost::shared_ptr<LTUDPHandle> handle_;

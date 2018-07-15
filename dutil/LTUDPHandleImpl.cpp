@@ -147,7 +147,7 @@ namespace DTun
         listenCallback_ = callback;
     }
 
-    void LTUDPHandleImpl::connect(const std::string& address, const std::string& port, const SConnector::ConnectCallback& callback, bool rendezvous)
+    void LTUDPHandleImpl::connect(const std::string& address, const std::string& port, const SConnector::ConnectCallback& callback)
     {
         assert(mgr_.reactor().isSameThread());
         assert(!pcb_);

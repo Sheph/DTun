@@ -12,7 +12,7 @@ namespace DTun
         SysConnector(SysReactor& reactor, const boost::shared_ptr<SysHandle>& handle);
         ~SysConnector();
 
-        virtual bool connect(const std::string& address, const std::string& port, const ConnectCallback& callback, bool rendezvous);
+        virtual bool connect(const std::string& address, const std::string& port, const ConnectCallback& callback, Mode mode);
 
         virtual void close();
 

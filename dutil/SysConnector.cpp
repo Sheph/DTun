@@ -23,10 +23,10 @@ namespace DTun
         close();
     }
 
-    bool SysConnector::connect(const std::string& address, const std::string& port, const ConnectCallback& callback, bool rendezvous)
+    bool SysConnector::connect(const std::string& address, const std::string& port, const ConnectCallback& callback, Mode mode)
     {
-        assert(!rendezvous);
-        if (rendezvous) {
+        assert(mode == ModeNormal);
+        if (mode != ModeNormal) {
             LOG4CPLUS_FATAL(logger(), "rendezvous not supported!");
             return false;
         }

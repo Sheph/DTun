@@ -44,7 +44,7 @@ namespace DTun
 
         void listen(int backlog, const SAcceptor::ListenCallback& callback);
 
-        void connect(const std::string& address, const std::string& port, const SConnector::ConnectCallback& callback, bool rendezvous);
+        void connect(const std::string& address, const std::string& port, const SConnector::ConnectCallback& callback);
 
         int write(const char* first, const char* last, int& numWritten);
 

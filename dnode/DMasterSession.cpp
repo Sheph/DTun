@@ -83,7 +83,7 @@ namespace DNode
         std::ostringstream os;
         os << port_;
 
-        if (!connector_->connect(address_, os.str(), boost::bind(&DMasterSession::onConnect, this, _1), false)) {
+        if (!connector_->connect(address_, os.str(), boost::bind(&DMasterSession::onConnect, this, _1), DTun::SConnector::ModeNormal)) {
             return false;
         }
 

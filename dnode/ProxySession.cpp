@@ -44,7 +44,7 @@ namespace DNode
         remoteConnector_ = remoteHandle->createConnector();
 
         if (!remoteConnector_->connect(DTun::ipToString(remoteIp), DTun::portToString(remotePort),
-            boost::bind(&ProxySession::onRemoteConnect, this, _1), true)) {
+            boost::bind(&ProxySession::onRemoteConnect, this, _1), DTun::SConnector::ModeRendezvousAcc)) {
             lock.unlock();
             remoteConnector_.reset();
             return false;
@@ -60,7 +60,7 @@ namespace DNode
         localConnector_ = localHandle->createConnector();
 
         if (!localConnector_->connect(DTun::ipToString(localIp), DTun::portToString(localPort),
-            boost::bind(&ProxySession::onLocalConnect, this, _1), false)) {
+            boost::bind(&ProxySession::onLocalConnect, this, _1), DTun::SConnector::ModeNormal)) {
             lock.unlock();
             localConnector_.reset();
             remoteConnector_.reset();

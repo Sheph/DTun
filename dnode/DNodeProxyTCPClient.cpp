@@ -206,7 +206,7 @@ namespace DNode
             connector_ = handle->createConnector();
 
             if (!connector_->connect(DTun::ipToString(remoteIp), DTun::portToString(remotePort),
-                boost::bind(&ProxyTCPClient::onConnect, this, _1), true)) {
+                boost::bind(&ProxyTCPClient::onConnect, this, _1), DTun::SConnector::ModeRendezvousConn)) {
                 state_ = STATE_ERR;
                 signalReactor();
                 return;
