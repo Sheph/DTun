@@ -99,6 +99,7 @@ namespace DTun
         }
 
         ip = ip_addr_get_ip4_u32(&tcpAddr);
+        port = lwip_htons(port);
 
         return true;
     }

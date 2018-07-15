@@ -223,7 +223,7 @@ namespace DTun
             return;
         }
 
-        //LOG4CPLUS_TRACE(logger(), "LTUDPManager::onRecv(" << err << ", " << numBytes << ", " << ipPortToString(srcIp, srcPort) << ")");
+        //LOG4CPLUS_TRACE(logger(), "LTUDPManager::onRecv(" << err << ", " << numBytes << ", src=" << ipPortToString(srcIp, srcPort) << ", dst=" << portToString(dstPort) << ")");
 
         if (err) {
             LOG4CPLUS_ERROR(logger(), "LTUDPManager::onRecv error!");
