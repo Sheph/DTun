@@ -465,6 +465,8 @@ namespace DNode
                 boost::bind(&DMasterClient::onProxyDone, this, boost::weak_ptr<ProxySession>(proxySess)))) {
                 proxySessions_.insert(proxySess);
             }
+        } else {
+            DTun::closeSysSocketChecked(boundSock);
         }
 
         lock.unlock();

@@ -37,6 +37,7 @@
 #define LWIP_ARP 0
 #define ARP_QUEUEING 0
 #define IP_FORWARD 0
+#define SO_REUSE 1
 #define LWIP_ICMP 1
 #define LWIP_RAW 0
 #define LWIP_DHCP 0

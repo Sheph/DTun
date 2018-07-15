@@ -768,7 +768,7 @@ tcp_listen_with_backlog_and_err(struct tcp_pcb *pcb, u8_t backlog, err_t *err)
     goto done;
   }
 #if SO_REUSE
-  if (ip_get_option(pcb, SOF_REUSEADDR) && !pcb->have_local_netif) {
+  if (ip_get_option(pcb, SOF_REUSEADDR)) {
     /* Since SOF_REUSEADDR allows reusing a local address before the pcb's usage
        is declared (listen-/connection-pcb), we have to make sure now that
        this port is only used once for every local IP. */
