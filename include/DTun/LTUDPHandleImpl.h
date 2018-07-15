@@ -27,7 +27,7 @@ namespace DTun
             const boost::shared_ptr<SConnection>& conn, struct tcp_pcb* pcb);
         ~LTUDPHandleImpl();
 
-        void kill(bool sameThreadOnly);
+        boost::shared_ptr<SConnection> kill(bool sameThreadOnly);
 
         inline LTUDPManager& mgr() { return mgr_; }
 

@@ -33,9 +33,10 @@ namespace DTun
         assert(!conn_);
     }
 
-    void LTUDPHandleImpl::kill(bool sameThreadOnly)
+    boost::shared_ptr<SConnection> LTUDPHandleImpl::kill(bool sameThreadOnly)
     {
         assert(!sameThreadOnly || mgr_.reactor().isSameThread());
+        boost::shared_ptr<SConnection> res = conn_;
         conn_.reset();
         if (pcb_) {
             tcp_arg(pcb_, NULL);
@@ -49,6 +50,7 @@ namespace DTun
             }
             pcb_ = NULL;
         }
+        return res;
     }
 
     bool LTUDPHandleImpl::bind(SYSSOCKET s)
@@ -249,6 +251,11 @@ namespace DTun
             LOG4CPLUS_ERROR(logger(), "tcp_write error " << (int)err);
             numWritten = 0;
             return err;
+        }
+
+        err = tcp_output(pcb_);
+        if (err != ERR_OK) {
+            LOG4CPLUS_ERROR(logger(), "tcp_output error " << (int)err);
         }
 
         return 0;

@@ -57,6 +57,8 @@ namespace DTun
 
         void onKillHandles(bool sameThreadOnly);
 
+        void onTransportConnectionKill(const boost::shared_ptr<SConnection>& conn);
+
         void reapConnCache();
 
         boost::shared_ptr<SConnection> getTransportConnection(UInt16 port);

@@ -434,6 +434,7 @@ namespace DTun
 
             lock.unlock();
             cb();
+            cb = Callback();
             lock.lock();
         }
     }

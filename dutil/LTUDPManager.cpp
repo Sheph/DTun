@@ -199,6 +199,7 @@ namespace DTun
 
         boost::shared_ptr<SConnection> conn = this_->getTransportConnection(tcphdr->src);
         if (!conn) {
+            LOG4CPLUS_TRACE(logger(), "No transport");
             return ERR_OK;
         }
 
@@ -323,8 +324,17 @@ namespace DTun
         }
 
         for (HandleSet::iterator it = toKillHandles.begin(); it != toKillHandles.end(); ++it) {
-            (*it)->kill(sameThreadOnly);
+            boost::shared_ptr<SConnection> conn = (*it)->kill(sameThreadOnly);
+            if (sameThreadOnly && conn) {
+                innerMgr_.reactor().post(
+                    watch_->wrap(boost::bind(&LTUDPManager::onTransportConnectionKill, this, conn)), 1000);
+            }
         }
+    }
+
+    void LTUDPManager::onTransportConnectionKill(const boost::shared_ptr<SConnection>& conn)
+    {
+        //LOG4CPLUS_TRACE(logger(), "onTransportConnectionKill(" << conn.get() << ")");
     }
 
     void LTUDPManager::reapConnCache()
