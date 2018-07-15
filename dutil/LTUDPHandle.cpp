@@ -27,8 +27,7 @@ namespace DTun
 
     bool LTUDPHandle::bind(SYSSOCKET s)
     {
-        assert(false);
-        return false;
+        return impl_->bind(s);
     }
 
     bool LTUDPHandle::bind(const struct sockaddr* name, int namelen)

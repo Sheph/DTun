@@ -51,6 +51,17 @@ namespace DTun
         }
     }
 
+    bool LTUDPHandleImpl::bind(SYSSOCKET s)
+    {
+        assert(!conn_);
+        if (conn_) {
+            return false;
+        }
+
+        conn_ = mgr_.createTransportConnection(s);
+        return !!conn_;
+    }
+
     bool LTUDPHandleImpl::bind(const struct sockaddr* name, int namelen)
     {
         assert(!conn_);

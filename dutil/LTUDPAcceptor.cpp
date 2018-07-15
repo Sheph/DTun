@@ -25,7 +25,7 @@ namespace DTun
 
     bool LTUDPAcceptor::listen(int backlog, const ListenCallback& callback)
     {
-        handle_->reactor().dispatch(watch_->wrap(
+        handle_->reactor().post(watch_->wrap(
             boost::bind(&LTUDPAcceptor::onStartListen, this, backlog, callback)));
 
         return true;

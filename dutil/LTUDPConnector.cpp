@@ -26,7 +26,7 @@ namespace DTun
 
     bool LTUDPConnector::connect(const std::string& address, const std::string& port, const ConnectCallback& callback, bool rendezvous)
     {
-        handle_->reactor().dispatch(watch_->wrap(
+        handle_->reactor().post(watch_->wrap(
             boost::bind(&LTUDPConnector::onStartConnect, this, address, port, callback, rendezvous)));
 
         return true;

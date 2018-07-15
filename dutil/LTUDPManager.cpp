@@ -104,57 +104,20 @@ namespace DTun
 
     boost::shared_ptr<SConnection> LTUDPManager::createTransportConnection(const struct sockaddr* name, int namelen)
     {
-        assert(name->sa_family == AF_INET);
-        if (name->sa_family != AF_INET) {
+        return createTransportConnectionInternal(name, namelen, SYS_INVALID_SOCKET);
+    }
+
+    boost::shared_ptr<SConnection> LTUDPManager::createTransportConnection(SYSSOCKET s)
+    {
+        struct sockaddr_in addr;
+        socklen_t addrLen = sizeof(addr);
+
+        if (::getsockname(s, (struct sockaddr*)&addr, &addrLen) == SYS_SOCKET_ERROR) {
+            LOG4CPLUS_ERROR(logger(), "Cannot get sys sock name: " << strerror(errno));
             return boost::shared_ptr<SConnection>();
         }
 
-        const struct sockaddr_in* name4 = (const struct sockaddr_in*)name;
-
-        if (name4->sin_addr.s_addr != htonl(INADDR_ANY)) {
-            LOG4CPLUS_ERROR(logger(), "Binding to something other than INADDR_ANY is not supported");
-            return boost::shared_ptr<SConnection>();
-        }
-
-        bool isAny = (name4->sin_port == 0);
-
-        boost::shared_ptr<SConnection> res;
-
-        boost::mutex::scoped_lock lock(m_);
-        if (!isAny) {
-            ConnectionCache::iterator it = connCache_.find(name4->sin_port);
-            if (it != connCache_.end()) {
-                res = it->second.lock();
-                if (!res) {
-                    connCache_.erase(it);
-                }
-            }
-        }
-
-        if (!res) {
-            boost::shared_ptr<SHandle> handle = innerMgr_.createDatagramSocket();
-            if (!handle) {
-                return res;
-            }
-            if (!handle->bind(name, namelen)) {
-                return res;
-            }
-            UInt32 ip = 0;
-            UInt16 port = name4->sin_port;
-            if (isAny && !handle->getSockName(ip, port)) {
-                return res;
-            }
-
-            res = handle->createConnection();
-            connCache_.insert(std::make_pair(port, res));
-
-            boost::shared_ptr<std::vector<char> > rcvBuff =
-                boost::make_shared<std::vector<char> >(8192);
-            res->readFrom(&(*rcvBuff)[0] + sizeof(struct ip_hdr) + 4, &(*rcvBuff)[0] + rcvBuff->size() - (sizeof(struct ip_hdr) + 4),
-                boost::bind(&LTUDPManager::onRecv, this, _1, _2, _3, _4, port, boost::weak_ptr<SConnection>(res), rcvBuff));
-        }
-
-        return res;
+        return createTransportConnectionInternal((const struct sockaddr*)&addr, addrLen, s);
     }
 
     boost::shared_ptr<SHandle> LTUDPManager::createStreamSocket(const boost::shared_ptr<SConnection>& conn,
@@ -176,7 +139,7 @@ namespace DTun
         return boost::make_shared<LTUDPHandle>(boost::ref(*this));
     }
 
-    boost::shared_ptr<SHandle> LTUDPManager::createDatagramSocket()
+    boost::shared_ptr<SHandle> LTUDPManager::createDatagramSocket(SYSSOCKET s)
     {
         assert(false);
         return boost::shared_ptr<SHandle>();
@@ -384,5 +347,69 @@ namespace DTun
             return boost::shared_ptr<SConnection>();
         }
         return it->second.lock();
+    }
+
+    boost::shared_ptr<SConnection> LTUDPManager::createTransportConnectionInternal(const struct sockaddr* name, int namelen, SYSSOCKET s)
+    {
+        assert(name->sa_family == AF_INET);
+        if (name->sa_family != AF_INET) {
+            return boost::shared_ptr<SConnection>();
+        }
+
+        const struct sockaddr_in* name4 = (const struct sockaddr_in*)name;
+
+        if (name4->sin_addr.s_addr != htonl(INADDR_ANY)) {
+            LOG4CPLUS_ERROR(logger(), "Binding to something other than INADDR_ANY is not supported");
+            return boost::shared_ptr<SConnection>();
+        }
+
+        bool isAny = (name4->sin_port == 0);
+
+        boost::shared_ptr<SConnection> res;
+
+        boost::mutex::scoped_lock lock(m_);
+        if (!isAny) {
+            ConnectionCache::iterator it = connCache_.find(name4->sin_port);
+            if (it != connCache_.end()) {
+                res = it->second.lock();
+                if (!res) {
+                    connCache_.erase(it);
+                }
+            }
+        }
+
+        if (!res) {
+            boost::shared_ptr<SHandle> handle = innerMgr_.createDatagramSocket(s);
+            if (!handle) {
+                return res;
+            }
+
+            UInt16 port = name4->sin_port;
+
+            if (s == SYS_INVALID_SOCKET) {
+                if (!handle->bind(name, namelen)) {
+                    return res;
+                }
+
+                UInt32 ip = 0;
+                if (isAny && !handle->getSockName(ip, port)) {
+                    return res;
+                }
+            }
+
+            res = handle->createConnection();
+            connCache_.insert(std::make_pair(port, res));
+
+            boost::shared_ptr<std::vector<char> > rcvBuff =
+                boost::make_shared<std::vector<char> >(8192);
+            res->readFrom(&(*rcvBuff)[0] + sizeof(struct ip_hdr) + 4, &(*rcvBuff)[0] + rcvBuff->size() - (sizeof(struct ip_hdr) + 4),
+                boost::bind(&LTUDPManager::onRecv, this, _1, _2, _3, _4, port, boost::weak_ptr<SConnection>(res), rcvBuff));
+        } else {
+            if (s != SYS_INVALID_SOCKET) {
+                closeSysSocketChecked(s);
+            }
+        }
+
+        return res;
     }
 }

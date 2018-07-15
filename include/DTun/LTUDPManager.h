@@ -25,11 +25,14 @@ namespace DTun
 
         virtual boost::shared_ptr<SHandle> createStreamSocket();
 
-        virtual boost::shared_ptr<SHandle> createDatagramSocket();
+        virtual boost::shared_ptr<SHandle> createDatagramSocket(SYSSOCKET s = SYS_INVALID_SOCKET);
 
         void addToKill(const boost::shared_ptr<LTUDPHandleImpl>& handle);
 
         boost::shared_ptr<SConnection> createTransportConnection(const struct sockaddr* name, int namelen);
+
+        // 's' is consumed.
+        boost::shared_ptr<SConnection> createTransportConnection(SYSSOCKET s);
 
         boost::shared_ptr<SHandle> createStreamSocket(const boost::shared_ptr<SConnection>& conn,
             struct tcp_pcb* pcb);
@@ -57,6 +60,9 @@ namespace DTun
         void reapConnCache();
 
         boost::shared_ptr<SConnection> getTransportConnection(UInt16 port);
+
+        // 's' is consumed.
+        boost::shared_ptr<SConnection> createTransportConnectionInternal(const struct sockaddr* name, int namelen, SYSSOCKET s);
 
         SManager& innerMgr_;
         boost::shared_ptr<OpWatch> watch_;

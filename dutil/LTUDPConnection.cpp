@@ -30,13 +30,13 @@ namespace DTun
 
     void LTUDPConnection::write(const char* first, const char* last, const WriteCallback& callback)
     {
-        handle_->reactor().dispatch(watch_->wrap(
+        handle_->reactor().post(watch_->wrap(
             boost::bind(&LTUDPConnection::onWrite, this, first, last, callback)));
     }
 
     void LTUDPConnection::read(char* first, char* last, const ReadCallback& callback, bool readAll)
     {
-        handle_->reactor().dispatch(watch_->wrap(
+        handle_->reactor().post(watch_->wrap(
             boost::bind(&LTUDPConnection::onRead, this, first, last, callback, readAll)));
     }
 

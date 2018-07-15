@@ -34,6 +34,8 @@ namespace DTun
         inline void setWriteCallback(const WriteCallback& cb) { writeCallback_ = cb; }
         inline void setReadCallback(const ReadCallback& cb) { readCallback_ = cb; }
 
+        bool bind(SYSSOCKET s);
+
         bool bind(const struct sockaddr* name, int namelen);
 
         bool getSockName(UInt32& ip, UInt16& port) const;

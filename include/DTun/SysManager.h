@@ -16,7 +16,7 @@ namespace DTun
 
         virtual boost::shared_ptr<SHandle> createStreamSocket();
 
-        virtual boost::shared_ptr<SHandle> createDatagramSocket();
+        virtual boost::shared_ptr<SHandle> createDatagramSocket(SYSSOCKET s = SYS_INVALID_SOCKET);
 
     private:
         SysReactor& reactor_;

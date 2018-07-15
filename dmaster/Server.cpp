@@ -223,7 +223,7 @@ namespace DMaster
         if (sess->type() == Session::TypePersistent) {
             for (Sessions::const_iterator it = sessions_.begin(); it != sessions_.end(); ++it) {
                 boost::shared_ptr<Session> other = *it;
-                if (other->type() == Session::TypePersistent) {
+                if ((other->type() == Session::TypePersistent) && (other != sess)) {
                     other->setAllConnRequestsErr(sess->nodeId(), DPROTOCOL_ERR_UNKNOWN);
                 }
             }

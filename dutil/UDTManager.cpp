@@ -29,7 +29,7 @@ namespace DTun
         return boost::make_shared<UDTHandle>(boost::ref(reactor_), sock);
     }
 
-    boost::shared_ptr<SHandle> UDTManager::createDatagramSocket()
+    boost::shared_ptr<SHandle> UDTManager::createDatagramSocket(SYSSOCKET s)
     {
         assert(false);
         return boost::shared_ptr<SHandle>();
