@@ -221,7 +221,7 @@ namespace DTun
         freeaddrinfo(res);
 
         if (err != ERR_OK) {
-            LOG4CPLUS_ERROR(logger(), "tcp_connect failed");
+            LOG4CPLUS_ERROR(logger(), "tcp_connect failed: " << (int)err);
             tcp_close(pcb);
             callback(err);
             return;
