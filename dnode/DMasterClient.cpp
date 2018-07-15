@@ -457,19 +457,23 @@ namespace DNode
 
         accMasterSessions_.erase(it);
 
+        lock.unlock();
+
+        sess_shared.reset();
+
         if (!err) {
             boost::shared_ptr<ProxySession> proxySess =
                 boost::make_shared<ProxySession>(boost::ref(remoteMgr_), boost::ref(localMgr_));
 
+            lock.lock();
             if (proxySess->start(boundSock, localIp, localPort, remoteIp, remotePort,
                 boost::bind(&DMasterClient::onProxyDone, this, boost::weak_ptr<ProxySession>(proxySess)))) {
                 proxySessions_.insert(proxySess);
             }
+            lock.unlock();
         } else {
             DTun::closeSysSocketChecked(boundSock);
         }
-
-        lock.unlock();
     }
 
     void DMasterClient::onProxyDone(const boost::weak_ptr<ProxySession>& sess)
