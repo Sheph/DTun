@@ -147,8 +147,6 @@ namespace DTun
 
             if (it->first >= it->second) {
                 writeOutQueue_.erase(it++);
-            } else {
-                ++it;
             }
         }
     }
