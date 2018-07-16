@@ -177,7 +177,14 @@ namespace DTun
                 ReadCallback cb = req->callback;
                 int total_read = req->total_read;
                 readQueue_.pop_front();
-                cb(err, total_read);
+                if (err && total_read) {
+                    cb(0, total_read);
+                    if (handle->impl()) {
+                        cb(err, 0);
+                    }
+                } else {
+                    cb(err, total_read);
+                }
             }
         }
     }
