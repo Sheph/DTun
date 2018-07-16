@@ -236,11 +236,14 @@ namespace DNode
             }
 
             if (!err) {
-                state_ = STATE_UP;
                 conn_ = handle->createConnection();
+                boost::shared_ptr<std::vector<char> > rcvBuff =
+                    boost::make_shared<std::vector<char> >(1);
+                conn_->read(&(*rcvBuff)[0], &(*rcvBuff)[0] + rcvBuff->size(),
+                    boost::bind(&ProxyTCPClient::onHandshakeRecv, this, _1, _2, rcvBuff), true);
+            } else {
+                signalReactor();
             }
-
-            signalReactor();
         }
 
         void onSend(int err, int numBytes)
@@ -270,6 +273,24 @@ namespace DNode
 
             if (err) {
                 state_ = STATE_ERR;
+            }
+
+            signalReactor();
+        }
+
+        void onHandshakeRecv(int err, int numBytes, const boost::shared_ptr<std::vector<char> >& rcvBuff)
+        {
+            LOG4CPLUS_TRACE(logger(), "ProxyTCPClient::onHandshakeRecv(" << err << ", " << numBytes << ")");
+
+            boost::mutex::scoped_lock lock(m_);
+
+            if (err) {
+                state_ = STATE_ERR;
+            } else if ((uint8_t)(*rcvBuff)[0] != 0xE1) {
+                LOG4CPLUS_ERROR(logger(), "invalid handshake: " << (int)(uint8_t)(*rcvBuff)[0]);
+                state_ = STATE_ERR;
+            } else {
+                state_ = STATE_UP;
             }
 
             signalReactor();

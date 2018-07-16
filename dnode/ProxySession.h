@@ -44,6 +44,8 @@ namespace DNode
         void recvRemote();
         void sendRemote(int numBytes);
 
+        void onHandshakeSend(int err, const boost::shared_ptr<std::vector<char> >& sndBuff);
+
         DTun::SManager& remoteMgr_;
         DTun::SManager& localMgr_;
         DoneCallback callback_;

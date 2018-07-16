@@ -252,6 +252,14 @@ namespace DNode
     {
         LOG4CPLUS_TRACE(logger(), "ProxySession::onBothConnected()");
 
+        boost::shared_ptr<std::vector<char> > sndBuff =
+            boost::make_shared<std::vector<char> >(1);
+
+        (*sndBuff)[0] = 0xE1;
+
+        remoteConn_->write(&(*sndBuff)[0], &(*sndBuff)[0] + sndBuff->size(),
+            boost::bind(&ProxySession::onHandshakeSend, this, _1, sndBuff));
+
         recvLocal();
         recvRemote();
     }
@@ -321,5 +329,22 @@ namespace DNode
         }
 
         remoteSndBuff_.erase_begin(numBytes);
+    }
+
+    void ProxySession::onHandshakeSend(int err, const boost::shared_ptr<std::vector<char> >& sndBuff)
+    {
+        LOG4CPLUS_TRACE(logger(), "ProxySession::onHandshakeSend(" << err << ")");
+
+        boost::mutex::scoped_lock lock(m_);
+        if (done_) {
+            return;
+        }
+
+        if (err) {
+            done_ = true;
+            lock.unlock();
+            callback_();
+            return;
+        }
     }
 }
