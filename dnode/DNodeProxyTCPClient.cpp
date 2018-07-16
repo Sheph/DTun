@@ -23,7 +23,8 @@ namespace DNode
     {
     public:
         explicit ProxyTCPClient(BThreadSignal* reactorSignal)
-        : reactorSignal_(reactorSignal)
+        : eof_(false)
+        , reactorSignal_(reactorSignal)
         , state_(STATE_CONNECTING)
         , sending_(0)
         , receiving_(0)
@@ -170,6 +171,8 @@ namespace DNode
             reactorSignal_ = NULL;
         }
 
+        inline bool isEOF() const { return eof_; }
+
     private:
         void onConnectionRegister(int err, DTun::UInt32 remoteIp, DTun::UInt16 remotePort)
         {
@@ -272,6 +275,9 @@ namespace DNode
             bytesReceived_ = numBytes;
 
             if (err) {
+                if (err == DTUN_ERR_CONN_CLOSED) {
+                    eof_ = true;
+                }
                 state_ = STATE_ERR;
             }
 
@@ -306,6 +312,7 @@ namespace DNode
             }
         }
 
+        bool eof_;
         mutable boost::mutex m_;
         BThreadSignal* reactorSignal_;
         int state_;
@@ -395,7 +402,8 @@ extern "C" void DNodeProxyTCPClient_SignalHandler(BThreadSignal* reactor_signal)
                 BReactor_PendingGroup(reactor_signal->reactor));
             dtcp_client->base.handler(dtcp_client->base.handler_data, DNODE_TCPCLIENT_EVENT_UP);
         } else if (dtcp_client->state == STATE_ERR) {
-            dtcp_client->base.handler(dtcp_client->base.handler_data, DNODE_TCPCLIENT_EVENT_ERROR);
+            dtcp_client->base.handler(dtcp_client->base.handler_data,
+                dtcp_client->client->isEOF() ? DNODE_TCPCLIENT_EVENT_ERROR_CLOSED : DNODE_TCPCLIENT_EVENT_ERROR);
         }
     }
 

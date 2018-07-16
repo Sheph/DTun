@@ -6,6 +6,8 @@
 
 namespace DTun
 {
+    #define DTUN_ERR_CONN_CLOSED -9999
+
     class DTUN_API SConnection : public virtual SHandler
     {
     public:

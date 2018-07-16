@@ -297,7 +297,7 @@ namespace DTun
         int err = 0;
 
         if (eof_) {
-            err = ERR_CLSD;
+            err = DTUN_ERR_CONN_CLOSED;
         } else if (!pcb_) {
             err = ERR_ABRT;
         }
