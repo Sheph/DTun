@@ -74,6 +74,10 @@ namespace DTun
 
     void LTUDPConnector::onRendezvousAccept(const boost::shared_ptr<SHandle>& handle, const ConnectCallback& callback)
     {
+        if (handedOut_) {
+            return;
+        }
+
         boost::shared_ptr<LTUDPHandle> ltudpHandle =
             boost::dynamic_pointer_cast<LTUDPHandle>(handle);
         assert(ltudpHandle);
