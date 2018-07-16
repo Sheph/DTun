@@ -347,7 +347,7 @@ namespace DNode
 
         ConnMasterSessionMap::iterator it = connMasterSessions_.find(msg.connId);
         if (it == connMasterSessions_.end()) {
-            LOG4CPLUS_ERROR(logger(), "connId " << msg.connId << " not found");
+            LOG4CPLUS_WARN(logger(), "connId " << msg.connId << " not found");
             buff_.resize(sizeof(DTun::DProtocolHeader));
             conn_->read(&buff_[0], &buff_[0] + buff_.size(),
                 boost::bind(&DMasterClient::onRecvHeader, this, _1, _2),
@@ -390,7 +390,7 @@ namespace DNode
 
         ConnMasterSessionMap::iterator it = connMasterSessions_.find(msg.connId);
         if (it == connMasterSessions_.end()) {
-            LOG4CPLUS_ERROR(logger(), "connId " << msg.connId << " not found");
+            LOG4CPLUS_WARN(logger(), "connId " << msg.connId << " not found");
             buff_.resize(sizeof(DTun::DProtocolHeader));
             conn_->read(&buff_[0], &buff_[0] + buff_.size(),
                 boost::bind(&DMasterClient::onRecvHeader, this, _1, _2),
