@@ -14,6 +14,7 @@ namespace DTun
     , inPoll_(false)
     , pollIteration_(0)
     , currentlyHandling_(NULL)
+    , nextTokenId_(0)
     {
     }
 
