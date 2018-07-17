@@ -480,7 +480,7 @@ extern "C" struct DNodeTCPClient* DNodeProxyTCPClient_Create(BAddr dest_addr, DN
     dtcp_client->bytes_sent = 0;
     dtcp_client->bytes_received = 0;
 
-    BTimer_Init(&dtcp_client->conn_timer, 30000, (BTimer_handler)&DNodeProxyTCPClient_ConnTimerHandler, dtcp_client);
+    BTimer_Init(&dtcp_client->conn_timer, 3000000, (BTimer_handler)&DNodeProxyTCPClient_ConnTimerHandler, dtcp_client);
     BReactor_SetTimer(reactor, &dtcp_client->conn_timer);
 
     dtcp_client->client = new DNode::ProxyTCPClient(&dtcp_client->reactor_signal);

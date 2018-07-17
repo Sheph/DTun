@@ -652,7 +652,7 @@ tcp_bind_to_netif(struct tcp_pcb *pcb, const char ifname[3])
 {
   int i;
   struct tcp_pcb *cpcb;
-  
+
   LWIP_ERROR("tcp_bind_to_netif: can only bind in state CLOSED", pcb->state == CLOSED, return ERR_VAL);
 
   /* Check if the interface is already in use (in tcp_listen_pcbs and tcp_bound_pcbs) */
@@ -1187,7 +1187,11 @@ tcp_slowtmr_start:
 
             /* The following needs to be called AFTER cwnd is set to one
                mss - STJ */
-            tcp_rexmit_rto_commit(pcb);
+            if (pcb->state == SYN_SENT) {
+                tcp_output(pcb);
+            } else {
+                tcp_rexmit_rto_commit(pcb);
+            }
           }
         }
       }
@@ -1723,7 +1727,7 @@ tcp_alloc(u8_t prio)
     /* As initial send MSS, we use TCP_MSS but limit it to 536.
        The send MSS is updated when an MSS option is received. */
     pcb->mss = INITIAL_MSS;
-    pcb->rto = 3000 / TCP_SLOW_INTERVAL;
+    pcb->rto = 250 / TCP_SLOW_INTERVAL;
     pcb->sv = 3000 / TCP_SLOW_INTERVAL;
     pcb->rtime = -1;
     pcb->cwnd = 1;

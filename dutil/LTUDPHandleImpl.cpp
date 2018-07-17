@@ -318,6 +318,8 @@ namespace DTun
         (*sndBuff)[2] = 0xCC;
         (*sndBuff)[3] = 0xDD;
 
+        LOG4CPLUS_TRACE(logger(), "Rendezvous ping to " << ipPortToString(destIp, destPort));
+
         conn_->writeTo(&(*sndBuff)[0], &(*sndBuff)[0] + sndBuff->size(),
             destIp, destPort,
             boost::bind(&LTUDPHandleImpl::onRendezvousPingSend, _1, sndBuff));

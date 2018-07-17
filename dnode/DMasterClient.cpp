@@ -167,6 +167,7 @@ namespace DNode
 
     void DMasterClient::dump()
     {
+        return;
         int fdMax = static_cast<int>(::sysconf(_SC_OPEN_MAX));
         int numFds = 0;
         for (int i = 0; i < fdMax; ++i) {
