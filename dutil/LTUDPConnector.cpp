@@ -59,6 +59,7 @@ namespace DTun
         if (mode != ModeRendezvousAcc) {
             handle_->impl()->connect(address, port,
                 watch_->wrap<int>(boost::bind(&LTUDPConnector::onConnect, this, _1, callback)));
+            //onConnTimeout(1000, destIp, destPort);
         } else {
             handle_->impl()->listen(1,
                 watch_->wrap<boost::shared_ptr<SHandle> >(boost::bind(&LTUDPConnector::onRendezvousAccept, this, _1, callback)));
@@ -105,5 +106,16 @@ namespace DTun
             handle_->reactor().post(watch_->wrap(
                 boost::bind(&LTUDPConnector::onRendezvousTimeout, this, count - 1, timeoutMs, destIp, destPort, callback)), timeoutMs);
         }
+    }
+
+    void LTUDPConnector::onConnTimeout(int timeoutMs, UInt32 destIp, UInt16 destPort)
+    {
+        if (handedOut_) {
+            return;
+        }
+
+        handle_->impl()->rendezvousPing(destIp, destPort);
+        handle_->reactor().post(watch_->wrap(
+            boost::bind(&LTUDPConnector::onConnTimeout, this, timeoutMs, destIp, destPort)), timeoutMs);
     }
 }

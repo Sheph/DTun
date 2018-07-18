@@ -26,6 +26,8 @@ namespace DTun
         void onRendezvousAccept(const boost::shared_ptr<SHandle>& handle, const ConnectCallback& callback);
         void onRendezvousTimeout(int count, int timeoutMs, UInt32 destIp, UInt16 destPort, const ConnectCallback& callback);
 
+        void onConnTimeout(int timeoutMs, UInt32 destIp, UInt16 destPort);
+
         bool handedOut_;
         boost::shared_ptr<LTUDPHandle> handle_;
         boost::shared_ptr<OpWatch> watch_;
