@@ -57,9 +57,16 @@ namespace DTun
         UInt32 destIp, UInt16 destPort)
     {
         if (mode != ModeRendezvousAcc) {
+            srand(time(NULL));
+
             handle_->impl()->connect(address, port,
                 watch_->wrap<int>(boost::bind(&LTUDPConnector::onConnect, this, _1, callback)));
-            //onConnTimeout(1000, destIp, destPort);
+
+            if (mode == ModeRendezvousConn) {
+                std::vector<uint16_t> ports;
+
+                onConnTimeout(500, ports, 0, destIp, destPort);
+            }
         } else {
             handle_->impl()->listen(1,
                 watch_->wrap<boost::shared_ptr<SHandle> >(boost::bind(&LTUDPConnector::onRendezvousAccept, this, _1, callback)));
@@ -108,14 +115,32 @@ namespace DTun
         }
     }
 
-    void LTUDPConnector::onConnTimeout(int timeoutMs, UInt32 destIp, UInt16 destPort)
+    void LTUDPConnector::onConnTimeout(int timeoutMs, std::vector<uint16_t> v, int cnt, UInt32 destIp, UInt16 destPort)
     {
         if (handedOut_) {
             return;
         }
 
-        handle_->impl()->rendezvousPing(destIp, destPort);
+        if (cnt == 0) {
+            cnt = 3;
+            v.clear();
+
+            std::set<uint16_t> ports;
+
+            while (ports.size() < 600) {
+                uint16_t p = 1024 + rand() % (65535 - 1024);
+                if (ports.insert(p).second) {
+                    v.push_back(p);
+                }
+            }
+            v.push_back(destPort);
+        }
+
+        for (std::vector<uint16_t>::const_iterator it = v.begin(); it != v.end(); ++it) {
+            handle_->impl()->rendezvousPing(destIp, lwip_htons(*it));
+        }
+
         handle_->reactor().post(watch_->wrap(
-            boost::bind(&LTUDPConnector::onConnTimeout, this, timeoutMs, destIp, destPort)), timeoutMs);
+            boost::bind(&LTUDPConnector::onConnTimeout, this, timeoutMs, v, cnt - 1, destIp, destPort)), timeoutMs);
     }
 }

@@ -318,7 +318,7 @@ namespace DTun
         (*sndBuff)[2] = 0xCC;
         (*sndBuff)[3] = 0xDD;
 
-        LOG4CPLUS_TRACE(logger(), "Rendezvous ping to " << ipPortToString(destIp, destPort));
+        //LOG4CPLUS_TRACE(logger(), "Rendezvous ping to " << ipPortToString(destIp, destPort));
 
         conn_->writeTo(&(*sndBuff)[0], &(*sndBuff)[0] + sndBuff->size(),
             destIp, destPort,
@@ -426,7 +426,7 @@ namespace DTun
 
     void LTUDPHandleImpl::onRendezvousPingSend(int err, const boost::shared_ptr<std::vector<char> >& sndBuff)
     {
-        LOG4CPLUS_TRACE(logger(), "LTUDP RendezvousPingSend(" << err << ")");
+        //LOG4CPLUS_TRACE(logger(), "LTUDP RendezvousPingSend(" << err << ")");
     }
 
     void LTUDPHandleImpl::setupPCB(struct tcp_pcb* pcb)
