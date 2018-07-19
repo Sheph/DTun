@@ -318,6 +318,14 @@ namespace DTun
         (*sndBuff)[2] = 0xCC;
         (*sndBuff)[3] = 0xDD;
 
+        UInt32 fromIp;
+        UInt16 fromPort;
+
+        bool res = conn_->handle()->getSockName(fromIp, fromPort);
+        assert(res);
+
+        //LOG4CPLUS_TRACE(logger(), "RDZV from " << ipPortToString(fromIp, fromPort) << " to " << ipPortToString(destIp, destPort));
+
         conn_->writeTo(&(*sndBuff)[0], &(*sndBuff)[0] + sndBuff->size(),
             destIp, destPort,
             boost::bind(&LTUDPHandleImpl::onRendezvousPingSend, _1, sndBuff));
@@ -424,7 +432,9 @@ namespace DTun
 
     void LTUDPHandleImpl::onRendezvousPingSend(int err, const boost::shared_ptr<std::vector<char> >& sndBuff)
     {
-        LOG4CPLUS_TRACE(logger(), "LTUDP RendezvousPingSend(" << err << ")");
+        if (err) {
+            LOG4CPLUS_TRACE(logger(), "LTUDP RendezvousPingSend(" << err << ")");
+        }
     }
 
     void LTUDPHandleImpl::setupPCB(struct tcp_pcb* pcb)

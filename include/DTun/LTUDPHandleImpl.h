@@ -53,6 +53,8 @@ namespace DTun
 
         void rendezvousPing(UInt32 destIp, UInt16 destPort);
 
+        inline const boost::shared_ptr<SConnection>& conn() const { return conn_; }
+
     private:
         static err_t listenerAcceptFunc(void* arg, struct tcp_pcb* newpcb, err_t err);
 
