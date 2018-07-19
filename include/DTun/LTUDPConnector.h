@@ -2,6 +2,7 @@
 #define _DTUN_LTUDPCONNECTOR_H_
 
 #include "DTun/SConnector.h"
+#include "DTun/SConnection.h"
 #include "DTun/LTUDPHandle.h"
 #include "DTun/OpWatch.h"
 #include <set>
@@ -32,6 +33,7 @@ namespace DTun
         bool handedOut_;
         boost::shared_ptr<LTUDPHandle> handle_;
         boost::shared_ptr<OpWatch> watch_;
+        std::vector<boost::shared_ptr<SConnection> > conns_;
     };
 }
 

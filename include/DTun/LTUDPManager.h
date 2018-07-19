@@ -37,6 +37,8 @@ namespace DTun
         boost::shared_ptr<SHandle> createStreamSocket(const boost::shared_ptr<SConnection>& conn,
             struct tcp_pcb* pcb);
 
+        inline SManager& innerMgr() { return innerMgr_; }
+
     private:
         typedef std::set<boost::shared_ptr<LTUDPHandleImpl> > HandleSet;
         typedef std::map<UInt16, boost::weak_ptr<SConnection> > ConnectionCache;

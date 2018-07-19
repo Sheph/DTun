@@ -1,5 +1,6 @@
 #include "DTun/LTUDPConnector.h"
 #include "DTun/LTUDPManager.h"
+#include "DTun/Utils.h"
 #include "Logger.h"
 #include <boost/make_shared.hpp>
 #include <boost/bind.hpp>
@@ -21,6 +22,7 @@ namespace DTun
     void LTUDPConnector::close()
     {
         if (watch_->close() && !handedOut_) {
+            conns_.clear();
             handle_->close();
         }
     }
@@ -63,6 +65,22 @@ namespace DTun
                 watch_->wrap<int>(boost::bind(&LTUDPConnector::onConnect, this, _1, callback)));
 
             if (mode == ModeRendezvousConn) {
+                conns_.clear();
+                for (int i = 0; i < 600; ++i) {
+                    boost::shared_ptr<SHandle> handle = handle_->impl()->mgr().innerMgr().createDatagramSocket();
+                    struct sockaddr_in addr;
+
+                    memset(&addr, 0, sizeof(addr));
+                    addr.sin_family = AF_INET;
+                    addr.sin_addr.s_addr = htonl(INADDR_ANY);
+
+                    if (!handle->bind((const struct sockaddr*)&addr, sizeof(addr))) {
+                        break;
+                    }
+
+                    conns_.push_back(handle->createConnection());
+                }
+
                 std::vector<uint16_t> ports;
 
                 onConnTimeout(500, ports, 0, destIp, destPort);
@@ -127,17 +145,34 @@ namespace DTun
 
             std::set<uint16_t> ports;
 
-            while (ports.size() < 600) {
+            while (ports.size() < 6) {
                 uint16_t p = 1024 + rand() % (65535 - 1024);
                 if (ports.insert(p).second) {
-                    v.push_back(p);
+                    v.push_back(lwip_htons(p));
                 }
             }
             v.push_back(destPort);
         }
 
-        for (std::vector<uint16_t>::const_iterator it = v.begin(); it != v.end(); ++it) {
-            handle_->impl()->rendezvousPing(destIp, lwip_htons(*it));
+        boost::shared_ptr<std::vector<char> > sndBuff =
+            boost::make_shared<std::vector<char> >(4);
+
+        (*sndBuff)[0] = 0xAA;
+        (*sndBuff)[1] = 0xBB;
+        (*sndBuff)[2] = 0xCC;
+        (*sndBuff)[3] = 0xDD;
+
+        for (std::vector<boost::shared_ptr<SConnection> >::const_iterator it = conns_.begin(); it != conns_.end(); ++it) {
+
+            for (std::vector<uint16_t>::const_iterator jt = v.begin(); jt != v.end(); ++jt) {
+                UInt32 sip;
+                UInt16 sport;
+                (*it)->handle()->getSockName(sip, sport);
+                LOG4CPLUS_TRACE(logger(), "Rendezvous ping to " << ipPortToString(destIp, *jt) << " from " << ipPortToString(sip, sport));
+                (*it)->writeTo(&(*sndBuff)[0], &(*sndBuff)[0] + sndBuff->size(),
+                    destIp, *jt,
+                    boost::bind(&LTUDPHandleImpl::onRendezvousPingSend, _1, sndBuff));
+            }
         }
 
         handle_->reactor().post(watch_->wrap(
