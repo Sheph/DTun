@@ -1,5 +1,6 @@
 #include "Session.h"
 #include "Logger.h"
+#include "DTun/Utils.h"
 #include <boost/bind.hpp>
 #include <boost/make_shared.hpp>
 
@@ -16,6 +17,14 @@ namespace DMaster
         if (!conn->handle()->getPeerName(peerIp_, peerPort_)) {
             peerIp_ = 0;
             peerPort_ = 0;
+        }
+
+        DTun::UInt32 tmp;
+        DTun::stringToIp("127.0.0.1", tmp);
+
+        if (peerIp_ == tmp) {
+            DTun::stringToIp("178.159.254.17", peerIp_);
+            peerPort_ = htons(12346);
         }
     }
 

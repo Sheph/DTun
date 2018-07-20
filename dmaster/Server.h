@@ -45,6 +45,7 @@ namespace DMaster
 
         int port_;
         DTun::SManager& mgr_;
+        std::set<uint16_t> ports_;
         Sessions sessions_;
         boost::shared_ptr<DTun::SAcceptor> acceptor_;
     };

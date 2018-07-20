@@ -19,6 +19,7 @@ namespace DMaster
 
     Server::~Server()
     {
+        LOG4CPLUS_INFO(logger(), "NUM PORTS: " << ports_.size());
     }
 
     bool Server::start()
@@ -87,6 +88,11 @@ namespace DMaster
         LOG4CPLUS_TRACE(logger(), "Server::onAccept(" << handle << ")");
 
         boost::shared_ptr<Session> session = boost::make_shared<Session>(handle->createConnection());
+
+        if (!ports_.insert(session->peerPort()).second) {
+             LOG4CPLUS_ERROR(logger(), "DUP: " << ports_.size());
+             abort();
+        }
 
         sessions_.insert(session);
 
