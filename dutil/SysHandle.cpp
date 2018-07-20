@@ -26,11 +26,11 @@ namespace DTun
 
     bool SysHandle::bind(const struct sockaddr* name, int namelen)
     {
-        int optval = 1;
+        /*int optval = 1;
         if (::setsockopt(sock_, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) < 0) {
             LOG4CPLUS_ERROR(logger(), "cannot set sock reuse addr");
             return false;
-        }
+        }*/
 
         if (::bind(sock_, name, namelen) == SYS_SOCKET_ERROR) {
             LOG4CPLUS_ERROR(logger(), "Cannot bind sys socket: " << strerror(errno));

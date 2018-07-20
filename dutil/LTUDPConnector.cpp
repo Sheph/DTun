@@ -91,18 +91,26 @@ namespace DTun
                 LOG4CPLUS_ERROR(logger(), "cannot set rcvb");
             }
 
-            int ttl = 3; //15 (3)
+            int ttl = 6; //15 (3)
             if (::setsockopt(conn2->sysHandle()->sock(), IPPROTO_IP, IP_TTL, &ttl, sizeof(ttl)) == SYS_SOCKET_ERROR) {
                 LOG4CPLUS_ERROR(logger(), "cannot set ttl");
             }
 
             srand(time(NULL));
 
+            std::vector<uint16_t> v;
+
+            for (int i = 1024; i <= 65535; ++i) {
+                v.push_back(i);
+            }
+
+            std::random_shuffle(v.begin(), v.end());
+
             handle_->impl()->listen(1,
                 watch_->wrap<boost::shared_ptr<SHandle> >(boost::bind(&LTUDPConnector::onRendezvousAccept, this, _1, callback)));
             //onRendezvousTimeout(120, 100, destIp, destPort, callback);
             handle_->reactor().post(watch_->wrap(
-                boost::bind(&LTUDPConnector::onRendezvousTimeout, this, 6500, 10, destIp, destPort, callback)), 0);
+                boost::bind(&LTUDPConnector::onRendezvousTimeout, this, 120, 1000, v, destIp, destPort, callback)), 0);
         }
     }
 
@@ -129,7 +137,7 @@ namespace DTun
         callback(0);
     }
 
-    void LTUDPConnector::onRendezvousTimeout(int count, int timeoutMs, UInt32 destIp, UInt16 destPort, const ConnectCallback& callback)
+    void LTUDPConnector::onRendezvousTimeout(int count, int timeoutMs, const std::vector<uint16_t>& v, UInt32 destIp, UInt16 destPort, const ConnectCallback& callback)
     {
         //LOG4CPLUS_TRACE(logger(), "LTUDPConnector::onRendezvousTimeout(" << count << ")");
 
@@ -155,12 +163,13 @@ namespace DTun
             //LOG4CPLUS_TRACE(logger(), "RDZV from " << ipPortToString(fromIp, fromPort) << " to " << ipPortToString(destIp, destPort));
 
             destPort = 0;
-            for (int probe = (int)lwip_ntohs(destPort) + 10 * (6500 - count); probe < (int)lwip_ntohs(destPort) + 10 * (6500 - count + 1); ++probe) {
-                if ((probe >= 1024) && (probe <= 65535) && (probe != 5351) && (probe != 51413)) {
-                    handle_->impl()->rendezvousPing(destIp, lwip_htons(probe));
+            for (int probe = (int)lwip_ntohs(destPort) + 600 * (120 - count); probe < (int)lwip_ntohs(destPort) + 600 * (120 - count + 1); ++probe) {
+                //if ((probe >= 1024) && (probe <= 65535) && (probe != 5351) && (probe != 51413)) {
+                    int probe2 = v[probe % v.size()];
+                    handle_->impl()->rendezvousPing(destIp, lwip_htons(probe2));
                     //LOG4CPLUS_TRACE(logger(), "RDZV from " << ipPortToString(fromIp, fromPort) << " to " << ipPortToString(destIp, lwip_htons(probe)));
                     //handle_->impl()->rendezvousPing(destIp, lwip_htons(60000 - probe));
-                }
+                //}
             }
 
             //destPort = 0;
@@ -196,14 +205,14 @@ namespace DTun
             } else {
                 if ((count % 100) == 0) {
                     //timeoutMs = 1000;
-                    timeoutMs = 1;
+                    //timeoutMs = 5;
                 } else {
-                    timeoutMs = 1;
+                    //timeoutMs = 5;
                 }
             }
 
             handle_->reactor().post(watch_->wrap(
-                boost::bind(&LTUDPConnector::onRendezvousTimeout, this, count - 1, timeoutMs, destIp, destPort, callback)), timeoutMs);
+                boost::bind(&LTUDPConnector::onRendezvousTimeout, this, count - 1, timeoutMs, v, destIp, destPort, callback)), timeoutMs);
         }
     }
 }

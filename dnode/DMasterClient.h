@@ -100,10 +100,12 @@ namespace DNode
         Routes routes_;
 
         boost::mutex m_;
+        int iii_;
         bool closing_;
         DTun::UInt32 nextConnId_;
         int numOutConnections_;
         std::vector<char> buff_;
+        std::vector<boost::shared_ptr<DTun::SHandle> > handles_;
         ConnMasterSessionMap connMasterSessions_;
         AccMasterSessions accMasterSessions_;
         ProxySessions proxySessions_;

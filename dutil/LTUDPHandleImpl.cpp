@@ -440,10 +440,10 @@ namespace DTun
     void LTUDPHandleImpl::setupPCB(struct tcp_pcb* pcb)
     {
         ip_set_option(pcb, SOF_REUSEADDR);
-        ip_set_option(pcb, SOF_KEEPALIVE);
+//        ip_set_option(pcb, SOF_KEEPALIVE);
 
-        pcb->keep_intvl = 5000;
-        pcb->keep_cnt = 4;
-        pcb->keep_idle = 10000;
+//        pcb->keep_intvl = 5000;
+//        pcb->keep_cnt = 4;
+//        pcb->keep_idle = 10000;
     }
 }

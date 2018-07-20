@@ -37,6 +37,7 @@ namespace DNode
     , closing_(false)
     , nextConnId_(0)
     , numOutConnections_(0)
+    , iii_(0)
     {
         address_ = appConfig->getString("server.address");
         port_ = appConfig->getUInt32("server.port");
@@ -211,9 +212,53 @@ namespace DNode
         if (err) {
             LOG4CPLUS_ERROR(logger(), "No connection to server");
 
-            handle->close();
+            handles_.push_back(handle);
+
+            //usleep(100000);
+
+            boost::shared_ptr<DTun::SHandle> handle = remoteMgr_.createStreamSocket();
+            if (!handle) {
+               return;
+            }
+
+            connector_ = handle->createConnector();
+
+            std::ostringstream os;
+            os << port_;
+
+            if (!connector_->connect(address_, os.str(), boost::bind(&DMasterClient::onConnect, this, _1), DTun::SConnector::ModeNormal)) {
+                return;
+            }
+
+            return;
         } else {
             LOG4CPLUS_INFO(logger(), "Connected to server");
+
+            handles_.push_back(handle);
+
+            //usleep(100000);
+
+            if (++iii_ >= 10000) {
+                LOG4CPLUS_INFO(logger(), "DONE!!!!!!");
+                abort();
+                return;
+            }
+
+            boost::shared_ptr<DTun::SHandle> handle = remoteMgr_.createStreamSocket();
+            if (!handle) {
+               return;
+            }
+
+            connector_ = handle->createConnector();
+
+            std::ostringstream os;
+            os << port_;
+
+            if (!connector_->connect(address_, os.str(), boost::bind(&DMasterClient::onConnect, this, _1), DTun::SConnector::ModeNormal)) {
+                return;
+            }
+
+            return;
 
             conn_ = handle->createConnection();
 

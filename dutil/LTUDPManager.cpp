@@ -195,9 +195,9 @@ namespace DTun
 
         const struct tcp_hdr* tcphdr = (const struct tcp_hdr*)(&this_->tmpBuff_[0] + iphdrLen);
 
-        LOG4CPLUS_TRACE(logger(), "LTUDPManager netifOutput(" << p->len
+        /*LOG4CPLUS_TRACE(logger(), "LTUDPManager netifOutput(" << p->len
             << ", from=" << DTun::ipPortToString(iphdr->src.addr, tcphdr->src)
-            << ", to=" << DTun::ipPortToString(iphdr->dest.addr, tcphdr->dest) << ")");
+            << ", to=" << DTun::ipPortToString(iphdr->dest.addr, tcphdr->dest) << ")");*/
 
         boost::shared_ptr<SConnection> conn = this_->getTransportConnection(tcphdr->src);
         if (!conn) {
@@ -226,7 +226,7 @@ namespace DTun
             return;
         }
 
-        LOG4CPLUS_TRACE(logger(), "LTUDPManager::onRecv(" << err << ", " << numBytes << ", src=" << ipPortToString(srcIp, srcPort) << ", dst=" << portToString(dstPort) << ")");
+        //LOG4CPLUS_TRACE(logger(), "LTUDPManager::onRecv(" << err << ", " << numBytes << ", src=" << ipPortToString(srcIp, srcPort) << ", dst=" << portToString(dstPort) << ")");
 
         if (err) {
             LOG4CPLUS_ERROR(logger(), "LTUDPManager::onRecv error!");
@@ -417,10 +417,14 @@ namespace DTun
                 if (isAny && !handle->getSockName(ip, port)) {
                     return res;
                 }
+                LOG4CPLUS_INFO(logger(), "ip = " << ipPortToString(ip, port));
             }
 
             res = handle->createConnection();
-            connCache_.insert(std::make_pair(port, res));
+            bool rr = connCache_.insert(std::make_pair(port, res)).second;
+            if (!rr) {
+                LOG4CPLUS_INFO(logger(), "DUP BIND!!!");
+            }
 
             boost::shared_ptr<std::vector<char> > rcvBuff =
                 boost::make_shared<std::vector<char> >(8192);
