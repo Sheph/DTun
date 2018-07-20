@@ -5,18 +5,17 @@
 
 namespace DTun
 {
-    #define DPROTOCOL_MSG_PROBE 0x0
-    #define DPROTOCOL_MSG_HELLO 0x1
+    #define DPROTOCOL_MSG_HELLO 0x0
+    #define DPROTOCOL_MSG_HELLO_PROBE 0x1
     #define DPROTOCOL_MSG_HELLO_CONN 0x2
     #define DPROTOCOL_MSG_HELLO_ACC 0x3
     #define DPROTOCOL_MSG_HELLO_SYMM_NEXT 0x4
-    #define DPROTOCOL_MSG_SYMM_DONE_OUT 0x5
-    #define DPROTOCOL_MSG_PROBE_RESULT 0x6
-    #define DPROTOCOL_MSG_CONN 0x7
-    #define DPROTOCOL_MSG_CONN_ERR 0x8
-    #define DPROTOCOL_MSG_CONN_OK 0x9
-    #define DPROTOCOL_MSG_SYMM_NEXT 0x10
-    #define DPROTOCOL_MSG_SYMM_DONE_IN 0x11
+    #define DPROTOCOL_MSG_PROBE 0x5
+    #define DPROTOCOL_MSG_CONN 0x6
+    #define DPROTOCOL_MSG_CONN_ERR 0x7
+    #define DPROTOCOL_MSG_CONN_OK 0x8
+    #define DPROTOCOL_MSG_SYMM_NEXT 0x9
+    #define DPROTOCOL_MSG_SYMM_DONE 0xA
 
     #define DPROTOCOL_ERR_NONE 0x0
     #define DPROTOCOL_ERR_UNKNOWN 0x1
@@ -43,11 +42,6 @@ namespace DTun
 
     // OUT MSGS
 
-    struct DProtocolMsgProbe
-    {
-        UInt8 dummy;
-    };
-
     struct DProtocolMsgHello
     {
         UInt32 nodeId;
@@ -73,21 +67,13 @@ namespace DTun
 
     struct DProtocolMsgHelloSymmNext
     {
-        UInt32 srcNodeId;
-        UInt32 dstNodeId;
-        UInt32 connId;
+        UInt32 rId;
         UInt8 failed;
-    };
-
-    struct DProtocolMsgSymmDoneOut
-    {
-        UInt32 dstNodeId;
-        UInt32 connId;
     };
 
     // IN MSGS
 
-    struct DProtocolMsgProbeResult
+    struct DProtocolMsgProbe
     {
         UInt32 srcIp;
         UInt16 srcPort;
@@ -102,6 +88,7 @@ namespace DTun
         UInt32 ip;
         UInt16 port;
         UInt8 role;
+        UInt32 rId;
     };
 
     struct DProtocolMsgConnErr
@@ -116,18 +103,20 @@ namespace DTun
         UInt32 dstNodeIp;
         UInt16 dstNodePort;
         UInt8 role;
+        UInt32 rId;
     };
 
     struct DProtocolMsgSymmNext
     {
-        UInt32 connId;
+        UInt32 rId;
         UInt16 port;
     };
 
-    struct DProtocolMsgSymmDoneIn
+    // IN/OUT MSGS
+
+    struct DProtocolMsgSymmDone
     {
-        UInt32 srcNodeId;
-        UInt32 connId;
+        UInt32 rId;
     };
     #pragma pack()
 }

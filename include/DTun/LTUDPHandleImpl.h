@@ -43,6 +43,8 @@ namespace DTun
 
         bool getPeerName(UInt32& ip, UInt16& port) const;
 
+        SYSSOCKET duplicate();
+
         void listen(int backlog, const SAcceptor::ListenCallback& callback);
 
         void connect(const std::string& address, const std::string& port, const SConnector::ConnectCallback& callback);

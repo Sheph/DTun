@@ -71,6 +71,9 @@ namespace DNode
         typedef std::map<boost::shared_ptr<DMasterSession>, boost::shared_ptr<SysSocketHolder> > AccMasterSessions;
         typedef std::set<boost::shared_ptr<ProxySession> > ProxySessions;
 
+        void onProbeConnect(int err);
+        void onProbeSend(int err);
+        void onProbeRecv(int err, int numBytes);
         void onConnect(int err);
         void onSend(int err);
         void onRecvHeader(int err, int numBytes);
@@ -103,6 +106,8 @@ namespace DNode
 
         boost::mutex m_;
         bool closing_;
+        DTun::UInt32 probedIp_;
+        DTun::UInt16 probedPort_;
         DTun::UInt32 nextConnId_;
         int numOutConnections_;
         std::vector<char> buff_;

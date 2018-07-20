@@ -35,6 +35,8 @@ namespace DNode
     : remoteMgr_(remoteMgr)
     , localMgr_(localMgr)
     , closing_(false)
+    , probedIp_(0)
+    , probedPort_(0)
     , nextConnId_(0)
     , numOutConnections_(0)
     {
@@ -105,11 +107,20 @@ namespace DNode
 
         connector_ = handle->createConnector();
 
-        std::ostringstream os;
-        os << port_;
+        if (probeAddress_.empty()) {
+            std::ostringstream os;
+            os << port_;
 
-        if (!connector_->connect(address_, os.str(), boost::bind(&DMasterClient::onConnect, this, _1), DTun::SConnector::ModeNormal)) {
-            return false;
+            if (!connector_->connect(address_, os.str(), boost::bind(&DMasterClient::onConnect, this, _1), DTun::SConnector::ModeNormal)) {
+                return false;
+            }
+        } else {
+            std::ostringstream os;
+            os << probePort_;
+
+            if (!connector_->connect(probeAddress_, os.str(), boost::bind(&DMasterClient::onProbeConnect, this, _1), DTun::SConnector::ModeNormal)) {
+                return false;
+            }
         }
 
         return true;
@@ -209,6 +220,91 @@ namespace DNode
             }
         }
         return false;
+    }
+
+    void DMasterClient::onProbeConnect(int err)
+    {
+        LOG4CPLUS_TRACE(logger(), "DMasterClient::onProbeConnect(" << err << ")");
+
+        boost::mutex::scoped_lock lock(m_);
+
+        boost::shared_ptr<DTun::SHandle> handle = connector_->handle();
+
+        connector_->close();
+
+        if (err) {
+            LOG4CPLUS_ERROR(logger(), "No connection to probe server");
+
+            handle->close();
+        } else {
+            LOG4CPLUS_INFO(logger(), "Connected to probe server");
+
+            conn_ = handle->createConnection();
+
+            DTun::DProtocolHeader header;
+
+            header.msgCode = DPROTOCOL_MSG_HELLO_PROBE;
+
+            buff_.resize(sizeof(header));
+            memcpy(&buff_[0], &header, sizeof(header));
+
+            conn_->write(&buff_[0], &buff_[0] + buff_.size(),
+                boost::bind(&DMasterClient::onProbeSend, this, _1));
+        }
+    }
+
+    void DMasterClient::onProbeSend(int err)
+    {
+        LOG4CPLUS_TRACE(logger(), "DMasterClient::onProbeSend(" << err << ")");
+
+        boost::mutex::scoped_lock lock(m_);
+
+        if (err) {
+            boost::shared_ptr<DTun::SConnection> tmp = conn_;
+            conn_.reset();
+            lock.unlock();
+            LOG4CPLUS_ERROR(logger(), "Connection to probe server lost");
+            return;
+        }
+
+        buff_.resize(sizeof(DTun::DProtocolHeader) + sizeof(DTun::DProtocolMsgProbe));
+        conn_->read(&buff_[0], &buff_[0] + buff_.size(),
+            boost::bind(&DMasterClient::onProbeRecv, this, _1, _2),
+            true);
+    }
+
+    void DMasterClient::onProbeRecv(int err, int numBytes)
+    {
+        LOG4CPLUS_TRACE(logger(), "DMasterClient::onProbeRecv(" << err << ", " << numBytes << ")");
+
+        boost::mutex::scoped_lock lock(m_);
+
+        if (err) {
+            boost::shared_ptr<DTun::SConnection> tmp = conn_;
+            conn_.reset();
+            lock.unlock();
+            LOG4CPLUS_ERROR(logger(), "Connection to probe server lost");
+            return;
+        }
+
+        DTun::DProtocolHeader header;
+        DTun::DProtocolMsgProbe msg;
+        assert(numBytes == (sizeof(header) + sizeof(msg)));
+        memcpy(&header, &buff_[0], sizeof(header));
+        memcpy(&msg, &buff_[0] + sizeof(header), sizeof(msg));
+
+        if (header.msgCode != DPROTOCOL_MSG_PROBE) {
+            boost::shared_ptr<DTun::SConnection> tmp = conn_;
+            conn_.reset();
+            lock.unlock();
+            LOG4CPLUS_ERROR(logger(), "Bad probe response");
+            return;
+        }
+
+        probedIp_ = msg.srcIp;
+        probedPort_ = msg.srcPort;
+
+        LOG4CPLUS_INFO(logger(), "Probed addr = " << DTun::ipPortToString(probedIp_, probedPort_));
     }
 
     void DMasterClient::onConnect(int err)

@@ -45,6 +45,11 @@ namespace DTun
         return impl_->getPeerName(ip, port);
     }
 
+    SYSSOCKET LTUDPHandle::duplicate()
+    {
+        return impl_->duplicate();
+    }
+
     void LTUDPHandle::close()
     {
         if (impl_) {

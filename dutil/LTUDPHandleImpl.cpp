@@ -107,6 +107,15 @@ namespace DTun
         return true;
     }
 
+    SYSSOCKET LTUDPHandleImpl::duplicate()
+    {
+        assert(conn_);
+        if (!conn_) {
+            return SYS_INVALID_SOCKET;
+        }
+        return conn_->handle()->duplicate();
+    }
+
     void LTUDPHandleImpl::listen(int backlog, const SAcceptor::ListenCallback& callback)
     {
         assert(mgr_.reactor().isSameThread());

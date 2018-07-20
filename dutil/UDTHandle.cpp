@@ -77,6 +77,12 @@ namespace DTun
         return true;
     }
 
+    SYSSOCKET UDTHandle::duplicate()
+    {
+        assert(false);
+        return SYS_INVALID_SOCKET;
+    }
+
     void UDTHandle::close()
     {
         if (sock_ != UDT::INVALID_SOCK) {

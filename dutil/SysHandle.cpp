@@ -75,6 +75,11 @@ namespace DTun
         return true;
     }
 
+    SYSSOCKET SysHandle::duplicate()
+    {
+        return dup(sock_);
+    }
+
     void SysHandle::close()
     {
         if (sock_ != SYS_INVALID_SOCKET) {

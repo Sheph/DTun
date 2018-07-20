@@ -30,6 +30,8 @@ namespace DTun
 
         virtual bool getPeerName(UInt32& ip, UInt16& port) const;
 
+        virtual SYSSOCKET duplicate();
+
         virtual void close();
 
         virtual boost::shared_ptr<SConnector> createConnector();
