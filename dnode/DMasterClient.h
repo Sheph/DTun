@@ -96,6 +96,8 @@ namespace DNode
         DTun::SManager& localMgr_;
         std::string address_;
         int port_;
+        std::string probeAddress_;
+        int probePort_;
         DTun::UInt32 nodeId_;
         Routes routes_;
 

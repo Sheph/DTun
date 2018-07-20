@@ -40,6 +40,20 @@ namespace DNode
     {
         address_ = appConfig->getString("server.address");
         port_ = appConfig->getUInt32("server.port");
+        if (!appConfig->isPresent("server.probeAddress") || !appConfig->isPresent("server.probePort")) {
+            LOG4CPLUS_WARN(logger(), "No probe server, assuming we're behind non-symmetrical NAT");
+            probePort_ = 0;
+        } else {
+            probeAddress_ = appConfig->getString("server.probeAddress");
+            probePort_ = appConfig->getUInt32("server.probePort");
+            if (probeAddress_ == address_) {
+                LOG4CPLUS_WARN(logger(), "Probe server is the same as master server, assuming we're behind non-symmetrical NAT");
+                probeAddress_.clear();
+                probePort_ = 0;
+            } else {
+                LOG4CPLUS_INFO(logger(), "Probe server used: " << probeAddress_ << ":" << probePort_);
+            }
+        }
         nodeId_ = appConfig->getUInt32("node.id");
 
         LOG4CPLUS_INFO(logger(), "Server used: " << address_ << ":" << port_ << ", this nodeId: " << nodeId_);
