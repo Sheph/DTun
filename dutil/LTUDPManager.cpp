@@ -420,7 +420,12 @@ namespace DTun
             }
 
             res = handle->createConnection();
-            connCache_.insert(std::make_pair(port, res));
+            bool inserted = connCache_.insert(std::make_pair(port, res)).second;
+            assert(inserted);
+            if (!inserted) {
+                LOG4CPLUS_FATAL(logger(), "double port, WTF???");
+                return boost::shared_ptr<SConnection>();
+            }
 
             boost::shared_ptr<std::vector<char> > rcvBuff =
                 boost::make_shared<std::vector<char> >(8192);

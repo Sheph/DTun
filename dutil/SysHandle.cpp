@@ -26,10 +26,13 @@ namespace DTun
 
     bool SysHandle::bind(const struct sockaddr* name, int namelen)
     {
-        int optval = 1;
-        if (::setsockopt(sock_, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) < 0) {
-            LOG4CPLUS_ERROR(logger(), "cannot set sock reuse addr");
-            return false;
+        if ((name->sa_family != AF_INET) ||
+            (((const struct sockaddr_in*)name)->sin_addr.s_addr != htonl(INADDR_ANY))) {
+            int optval = 1;
+            if (::setsockopt(sock_, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) < 0) {
+                LOG4CPLUS_ERROR(logger(), "cannot set sock reuse addr");
+                return false;
+            }
         }
 
         if (::bind(sock_, name, namelen) == SYS_SOCKET_ERROR) {
