@@ -23,7 +23,18 @@ namespace DMaster
         void stop();
 
     private:
+        struct Rendezvous
+        {
+            Rendezvous()
+            : srcNodeId(0)
+            , dstNodeId(0) {}
+
+            DTun::UInt32 srcNodeId;
+            DTun::UInt32 dstNodeId;
+        };
+
         typedef std::set<boost::shared_ptr<Session> > Sessions;
+        typedef std::map<DTun::UInt32, Rendezvous> RendezvousMap;
 
         void onAccept(const boost::shared_ptr<DTun::SHandle>& handle);
 
@@ -45,6 +56,8 @@ namespace DMaster
 
         int port_;
         DTun::SManager& mgr_;
+        DTun::UInt32 nextRendezvousId_;
+        RendezvousMap rendezvousMap_;
         Sessions sessions_;
         boost::shared_ptr<DTun::SAcceptor> acceptor_;
     };

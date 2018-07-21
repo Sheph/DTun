@@ -39,7 +39,18 @@ namespace DMaster
             return;
         }
 
-        connRequests_[connId] = dstNodeId;
+        connRequests_[connId] = ConnRequest(dstNodeId);
+    }
+
+    void Session::setConnRendezvousData(DTun::UInt32 connId, DTun::UInt8 role, DTun::UInt32 rId)
+    {
+        ConnRequestMap::iterator it = connRequests_.find(connId);
+        if (it == connRequests_.end()) {
+            LOG4CPLUS_ERROR(logger(), "connId " << connId << " not found");
+            return;
+        }
+        it->second.role = role;
+        it->second.rId = rId;
     }
 
     void Session::setConnRequestErr(DTun::UInt32 connId,
@@ -67,7 +78,7 @@ namespace DMaster
         DTun::DProtocolMsgConnErr msg;
 
         for (ConnRequestMap::iterator it = connRequests_.begin(); it != connRequests_.end();) {
-            if (it->second == dstNodeId) {
+            if (it->second.dstNodeId == dstNodeId) {
                 msg.connId = it->first;
                 msg.errCode = errCode;
 
@@ -89,13 +100,15 @@ namespace DMaster
             return;
         }
 
-        connRequests_.erase(it);
-
         DTun::DProtocolMsgConnOK msg;
 
         msg.connId = connId;
         msg.dstNodeIp = dstNodeIp;
         msg.dstNodePort = dstNodePort;
+        msg.role = it->second.role;
+        msg.rId = it->second.rId;
+
+        connRequests_.erase(it);
 
         sendMsg(DPROTOCOL_MSG_CONN_OK, &msg, sizeof(msg));
     }
@@ -105,7 +118,9 @@ namespace DMaster
         DTun::UInt16 srcNodePort,
         DTun::UInt32 connId,
         DTun::UInt32 ip,
-        DTun::UInt16 port)
+        DTun::UInt16 port,
+        DTun::UInt8 role,
+        DTun::UInt32 rId)
     {
         DTun::DProtocolMsgConn msg;
 
@@ -115,6 +130,8 @@ namespace DMaster
         msg.connId = connId;
         msg.ip = ip;
         msg.port = port;
+        msg.role = role;
+        msg.rId = rId;
 
         sendMsg(DPROTOCOL_MSG_CONN, &msg, sizeof(msg));
     }

@@ -27,12 +27,18 @@ namespace DTun
 
     // Normal connector, always try single port
     #define DPROTOCOL_ROLE_CONN 0x0
-    // Symmetrical NAT connector, use spread connect, use port update
+    // Symmetrical NAT connector, use spread connect, wait for port updates
     #define DPROTOCOL_ROLE_CONN_SYMM 0x1
     // Normal acceptor, send pings, wait for connect
     #define DPROTOCOL_ROLE_ACC 0x2
-    // Symmetrical NAT acceptor, use window ping, use port update
+    // Symmetrical NAT acceptor, use window ping, send port updates
     #define DPROTOCOL_ROLE_ACC_SYMM 0x3
+
+    // Symmetrical-NAT punching status
+
+    #define DPROTOCOL_SYMM_STATUS_WORKING 0x0
+    #define DPROTOCOL_SYMM_STATUS_FAILED 0x1
+    #define DPROTOCOL_SYMM_STATUS_SUCCESS 0x2
 
     #pragma pack(1)
     struct DProtocolHeader
@@ -68,7 +74,6 @@ namespace DTun
     struct DProtocolMsgHelloSymmNext
     {
         UInt32 rId;
-        UInt8 failed;
     };
 
     // IN MSGS
@@ -106,13 +111,14 @@ namespace DTun
         UInt32 rId;
     };
 
+    // IN/OUT MSGS
+
     struct DProtocolMsgSymmNext
     {
         UInt32 rId;
         UInt16 port;
+        UInt8 status;
     };
-
-    // IN/OUT MSGS
 
     struct DProtocolMsgSymmDone
     {

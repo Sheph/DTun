@@ -13,7 +13,7 @@ namespace DTun
         {
             ModeNormal = 0,
             ModeRendezvousConn,
-            ModeRendezvousAcc
+            ModeRendezvousAcc,
         };
 
         typedef boost::function<void (int)> ConnectCallback;

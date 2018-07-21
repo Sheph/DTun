@@ -47,6 +47,8 @@ namespace DMaster
 
         void registerConnRequest(DTun::UInt32 connId, DTun::UInt32 dstNodeId);
 
+        void setConnRendezvousData(DTun::UInt32 connId, DTun::UInt8 role, DTun::UInt32 rId);
+
         void setConnRequestErr(DTun::UInt32 connId,
             DTun::UInt32 errCode);
 
@@ -62,10 +64,29 @@ namespace DMaster
             DTun::UInt16 srcNodePort,
             DTun::UInt32 connId,
             DTun::UInt32 ip,
-            DTun::UInt16 port);
+            DTun::UInt16 port,
+            DTun::UInt8 role,
+            DTun::UInt32 rId);
 
     private:
-        typedef std::map<DTun::UInt32, DTun::UInt32> ConnRequestMap;
+        struct ConnRequest
+        {
+            ConnRequest()
+            : dstNodeId(0)
+            , role(DPROTOCOL_ROLE_CONN)
+            , rId(0) {}
+
+            explicit ConnRequest(DTun::UInt32 dstNodeId)
+            : dstNodeId(dstNodeId)
+            , role(DPROTOCOL_ROLE_CONN)
+            , rId(0) {}
+
+            DTun::UInt32 dstNodeId;
+            DTun::UInt8 role;
+            DTun::UInt32 rId;
+        };
+
+        typedef std::map<DTun::UInt32, ConnRequest> ConnRequestMap;
 
         void onSend(int err, const boost::shared_ptr<std::vector<char> >& sndBuff);
         void onRecvHeader(int err, int numBytes);

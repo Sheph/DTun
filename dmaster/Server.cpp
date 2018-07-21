@@ -14,6 +14,7 @@ namespace DMaster
     Server::Server(DTun::SManager& mgr, int port)
     : port_(port)
     , mgr_(mgr)
+    , nextRendezvousId_(0)
     {
     }
 
@@ -159,8 +160,45 @@ namespace DMaster
             return;
         }
 
+        if (srcSess->isSymm() && dstSess->isSymm()) {
+            LOG4CPLUS_ERROR(logger(), "both peers behind symmetrical NAT, cannot proceed");
+            srcSess->setConnRequestErr(connId, DPROTOCOL_ERR_SYMM);
+            return;
+        }
+
+        DTun::UInt32 rId = 0;
+        DTun::UInt8 dstRole = DPROTOCOL_ROLE_ACC;
+
+        if (srcSess->isSymm() || dstSess->isSymm()) {
+            ++nextRendezvousId_;
+            if (nextRendezvousId_ == 0) {
+                ++nextRendezvousId_;
+            }
+
+            rId = nextRendezvousId_;
+
+            Rendezvous r;
+            DTun::UInt8 srcRole;
+
+            if (srcSess->isSymm()) {
+                r.srcNodeId = srcSess->nodeId();
+                r.dstNodeId = dstSess->nodeId();
+                srcRole = DPROTOCOL_ROLE_CONN_SYMM;
+                dstRole = DPROTOCOL_ROLE_ACC_SYMM;
+            } else {
+                r.srcNodeId = dstSess->nodeId();
+                r.dstNodeId = srcSess->nodeId();
+                srcRole = DPROTOCOL_ROLE_ACC_SYMM;
+                dstRole = DPROTOCOL_ROLE_CONN_SYMM;
+            }
+
+            rendezvousMap_[rId] = r;
+
+            srcSess->setConnRendezvousData(connId, srcRole, rId);
+        }
+
         dstSess->sendConnRequest(sess_shared->nodeId(), sess_shared->peerIp(), sess_shared->peerPort(),
-            connId, remoteIp, remotePort);
+            connId, remoteIp, remotePort, dstRole, rId);
     }
 
     void Server::onSessionStartAcceptor(const boost::weak_ptr<Session>& sess, DTun::UInt32 srcNodeId, DTun::UInt32 connId)
@@ -225,6 +263,15 @@ namespace DMaster
                 boost::shared_ptr<Session> other = *it;
                 if ((other->type() == Session::TypePersistent) && (other != sess)) {
                     other->setAllConnRequestsErr(sess->nodeId(), DPROTOCOL_ERR_UNKNOWN);
+                }
+            }
+
+            for (RendezvousMap::iterator it = rendezvousMap_.begin(); it != rendezvousMap_.end();) {
+                if ((it->second.srcNodeId == sess->nodeId()) ||
+                    (it->second.dstNodeId == sess->nodeId())) {
+                    rendezvousMap_.erase(it++);
+                } else {
+                    ++it;
                 }
             }
         }
