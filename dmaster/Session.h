@@ -16,6 +16,7 @@ namespace DMaster
         {
             TypeUnknown = 0,
             TypePersistent,
+            TypeProbe,
             TypeConnector,
             TypeAcceptor
         };
@@ -36,6 +37,8 @@ namespace DMaster
         inline Type type() const { return type_; }
 
         inline DTun::UInt32 nodeId() const { return nodeId_; }
+
+        inline bool isSymm() const { return symm_; }
 
         inline DTun::UInt32 peerIp() const { return peerIp_; }
         inline DTun::UInt16 peerPort() const { return peerPort_; }
@@ -67,6 +70,7 @@ namespace DMaster
         void onSend(int err, const boost::shared_ptr<std::vector<char> >& sndBuff);
         void onRecvHeader(int err, int numBytes);
         void onRecvMsgHello(int err, int numBytes);
+        void onRecvMsgHelloProbe();
         void onRecvMsgHelloConn(int err, int numBytes);
         void onRecvMsgHelloAcc(int err, int numBytes);
         void onRecvAny(int err, int numBytes);
@@ -82,6 +86,7 @@ namespace DMaster
 
         Type type_;
         DTun::UInt32 nodeId_;
+        bool symm_;
 
         ConnRequestMap connRequests_;
         std::vector<char> buff_;

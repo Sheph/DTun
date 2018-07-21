@@ -305,6 +305,36 @@ namespace DNode
         probedPort_ = msg.srcPort;
 
         LOG4CPLUS_INFO(logger(), "Probed addr = " << DTun::ipPortToString(probedIp_, probedPort_));
+
+        SYSSOCKET sock = conn_->handle()->duplicate();
+        if (sock == SYS_INVALID_SOCKET) {
+            boost::shared_ptr<DTun::SConnection> tmp = conn_;
+            conn_.reset();
+            lock.unlock();
+            return;
+        }
+
+        conn_->close();
+
+        boost::shared_ptr<DTun::SHandle> handle = remoteMgr_.createStreamSocket();
+        if (!handle) {
+            DTun::closeSysSocketChecked(sock);
+            return;
+        }
+
+        if (!handle->bind(sock)) {
+            DTun::closeSysSocketChecked(sock);
+            return;
+        }
+
+        connector_ = handle->createConnector();
+
+        std::ostringstream os;
+        os << port_;
+
+        if (!connector_->connect(address_, os.str(), boost::bind(&DMasterClient::onConnect, this, _1), DTun::SConnector::ModeNormal)) {
+            return;
+        }
     }
 
     void DMasterClient::onConnect(int err)
@@ -331,6 +361,8 @@ namespace DNode
 
             header.msgCode = DPROTOCOL_MSG_HELLO;
             msg.nodeId = nodeId_;
+            msg.probeIp = probedIp_;
+            msg.probePort = probedPort_;
 
             buff_.resize(sizeof(header) + sizeof(msg));
             memcpy(&buff_[0], &header, sizeof(header));

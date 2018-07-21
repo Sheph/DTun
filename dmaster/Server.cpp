@@ -117,7 +117,7 @@ namespace DMaster
         }
 
         LOG4CPLUS_INFO(logger(), "client " << DTun::ipPortToString(sess_shared->peerIp(), sess_shared->peerPort())
-            << ", nodeId = " << sess_shared->nodeId() << " connected");
+            << ", nodeId = " << sess_shared->nodeId() << ", symm = " << sess_shared->isSymm() << " connected");
     }
 
     void Server::onSessionStartConnector(const boost::weak_ptr<Session>& sess,

@@ -8,6 +8,7 @@ namespace DMaster
     Session::Session(const boost::shared_ptr<DTun::SConnection>& conn)
     : type_(TypeUnknown)
     , nodeId_(0)
+    , symm_(false)
     , conn_(conn)
     {
         // Another UDT crap, if we do this later after receiving
@@ -152,6 +153,9 @@ namespace DMaster
                 boost::bind(&Session::onRecvMsgHello, this, _1, _2),
                 true);
             break;
+        case DPROTOCOL_MSG_HELLO_PROBE:
+            onRecvMsgHelloProbe();
+            break;
         case DPROTOCOL_MSG_HELLO_CONN:
             buff_.resize(sizeof(DTun::DProtocolMsgHelloConn));
             conn_->read(&buff_[0], &buff_[0] + buff_.size(),
@@ -190,12 +194,29 @@ namespace DMaster
 
         type_ = TypePersistent;
         nodeId_ = msg.nodeId;
+        symm_ = msg.probePort && (msg.probePort != peerPort_);
 
         startRecvAny();
 
         if (startPersistentCallback_) {
             startPersistentCallback_();
         }
+    }
+
+    void Session::onRecvMsgHelloProbe()
+    {
+        LOG4CPLUS_TRACE(logger(), "Session::onRecvMsgHelloProbe()");
+
+        type_ = TypeProbe;
+
+        DTun::DProtocolMsgProbe msg;
+
+        msg.srcIp = peerIp_;
+        msg.srcPort = peerPort_;
+
+        sendMsg(DPROTOCOL_MSG_PROBE, &msg, sizeof(msg));
+
+        startRecvAny();
     }
 
     void Session::onRecvMsgHelloConn(int err, int numBytes)
