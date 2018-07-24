@@ -18,12 +18,14 @@ namespace DTun
     #define DPROTOCOL_MSG_SYMM 0xA
     #define DPROTOCOL_MSG_SYMM_NEXT 0xB
 
-    #define DPROTOCOL_ERR_NONE 0x0
-    #define DPROTOCOL_ERR_UNKNOWN 0x1
-    #define DPROTOCOL_ERR_CLOSED 0x2
-    #define DPROTOCOL_ERR_NOTFOUND 0x3
+    #define DPROTOCOL_STATUS_NONE 0x0
+    #define DPROTOCOL_STATUS_PENDING 0x1
+    #define DPROTOCOL_STATUS_ESTABLISHED 0x2
+    #define DPROTOCOL_STATUS_ERR_CANCELED 0x10
+    #define DPROTOCOL_STATUS_ERR_UNKNOWN 0x11
+    #define DPROTOCOL_STATUS_ERR_NOTFOUND 0x12
     // Both peers behind a symmetrical NAT, no way to connect (at least for now)
-    #define DPROTOCOL_ERR_SYMM 0x4
+    #define DPROTOCOL_STATUS_ERR_SYMM 0x13
 
     // Rendezvous modes
 
@@ -57,11 +59,13 @@ namespace DTun
 
     struct DProtocolMsgHelloFast
     {
+        UInt32 nodeId;
         DProtocolConnId connId;
     };
 
     struct DProtocolMsgHelloSymm
     {
+        UInt32 nodeId;
         DProtocolConnId connId;
     };
 
@@ -77,6 +81,7 @@ namespace DTun
     struct DProtocolMsgConnClose
     {
         DProtocolConnId connId;
+        UInt8 established;
     };
 
     // IN MSGS
@@ -99,7 +104,7 @@ namespace DTun
     {
         DProtocolConnId connId;
         UInt8 mode;
-        UInt32 errCode;
+        UInt8 statusCode;
     };
 
     struct DProtocolMsgFast
@@ -123,6 +128,21 @@ namespace DTun
         DProtocolConnId connId;
     };
     #pragma pack()
+
+    inline DProtocolConnId toProtocolConnId(const ConnId& connId)
+    {
+        DProtocolConnId res;
+
+        res.nodeId = connId.nodeId;
+        res.connIdx = connId.connIdx;
+
+        return res;
+    }
+
+    inline ConnId fromProtocolConnId(const DProtocolConnId& connId)
+    {
+        return ConnId(connId.nodeId, connId.connIdx);
+    }
 }
 
 #endif

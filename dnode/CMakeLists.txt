@@ -9,6 +9,10 @@ set(SOURCES
     DNodeDirectTCPClient.c
     DNodeProxyTCPClient.cpp
     ProxySession.cpp
+    RendezvousSession.h
+    RendezvousFastSession.cpp
+    RendezvousSymmConnSession.cpp
+    RendezvousSymmAccSession.cpp
     base/DebugObject.c
     base/BLog.c
     base/BPending.c

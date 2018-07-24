@@ -24,8 +24,7 @@ namespace DNode
         ProxySession(DTun::SManager& remoteMgr, DTun::SManager& localMgr);
         ~ProxySession();
 
-        // 's' will be closed even in case of failure!
-        bool start(SYSSOCKET s, DTun::UInt32 localIp, DTun::UInt16 localPort,
+        bool start(const boost::shared_ptr<DTun::SHandle>& remoteHandle, DTun::UInt32 localIp, DTun::UInt16 localPort,
             DTun::UInt32 remoteIp, DTun::UInt16 remotePort, const DoneCallback& callback);
 
     private:

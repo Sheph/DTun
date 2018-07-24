@@ -30,26 +30,23 @@ namespace DNode
         , receiving_(0)
         , bytesSent_(0)
         , bytesReceived_(0)
-        , connId_(0)
-        , debugConnId_(0)
-        , boundSock_(SYS_INVALID_SOCKET)
         {
-            theMasterClient->changeNumOutConnections(1);
         }
 
         ~ProxyTCPClient()
         {
-            DTun::UInt32 connId;
+            DTun::ConnId connId;
 
             {
                 boost::mutex::scoped_lock lock(m_);
                 connId = connId_;
-                connId_ = 0;
+                connId_ = DTun::ConnId();
                 reactorSignal_ = NULL;
             }
 
             if (connId) {
-                theMasterClient->cancelConnection(connId);
+                theMasterClient->closeConnection(connId);
+                LOG4CPLUS_INFO(logger(), "conn done, id = " << connId);
             }
 
             if (connector_) {
@@ -59,62 +56,19 @@ namespace DNode
             if (conn_) {
                 conn_->close();
             }
-
-            if (boundSock_ != SYS_INVALID_SOCKET) {
-                DTun::closeSysSocketChecked(boundSock_);
-                boundSock_ = SYS_INVALID_SOCKET;
-            }
-
-            theMasterClient->changeNumOutConnections(-1);
-
-            if (debugConnId_) {
-                LOG4CPLUS_INFO(logger(), "conn done, id = " << debugConnId_);
-            }
         }
 
         bool start(DTun::UInt32 remoteIp, DTun::UInt16 remotePort)
         {
-            SYSSOCKET s = ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-            if (s == SYS_INVALID_SOCKET) {
-                LOG4CPLUS_ERROR(logger(), "Cannot create UDP socket");
-                return false;
-            }
-
-            SYSSOCKET boundSock = dup(s);
-            if (boundSock == -1) {
-                LOG4CPLUS_ERROR(logger(), "Cannot dup UDP socket");
-                DTun::closeSysSocketChecked(s);
-                return false;
-            }
-
-            struct sockaddr_in addr;
-
-            memset(&addr, 0, sizeof(addr));
-            addr.sin_family = AF_INET;
-            addr.sin_addr.s_addr = htonl(INADDR_ANY);
-
-            int res = ::bind(s, (const struct sockaddr*)&addr, sizeof(addr));
-
-            if (res == SYS_SOCKET_ERROR) {
-                LOG4CPLUS_ERROR(logger(), "Cannot bind UDP socket");
-                DTun::closeSysSocketChecked(s);
-                DTun::closeSysSocketChecked(boundSock);
-                return false;
-            }
-
             boost::mutex::scoped_lock lock(m_);
 
-            connId_ = theMasterClient->registerConnection(s, remoteIp, remotePort,
-                boost::bind(&ProxyTCPClient::onConnectionRegister, this, _1, _2, _3));
+            connId_ = theMasterClient->registerConnection(remoteIp, remotePort,
+                boost::bind(&ProxyTCPClient::onConnectionRegister, this, _1, _2, _3, _4));
             if (!connId_) {
-                DTun::closeSysSocketChecked(boundSock);
                 return false;
             }
 
             LOG4CPLUS_INFO(logger(), "new conn to " << DTun::ipPortToString(remoteIp, remotePort) << ", id = " << connId_);
-            debugConnId_ = connId_;
-
-            boundSock_ = boundSock;
 
             return true;
         }
@@ -174,7 +128,7 @@ namespace DNode
         inline bool isEOF() const { return eof_; }
 
     private:
-        void onConnectionRegister(int err, DTun::UInt32 remoteIp, DTun::UInt16 remotePort)
+        void onConnectionRegister(int err, const boost::shared_ptr<DTun::SHandle>& handle, DTun::UInt32 remoteIp, DTun::UInt16 remotePort)
         {
             LOG4CPLUS_TRACE(logger(), "ProxyTCPClient::onConnectionRegister(" << err << ", " << DTun::ipPortToString(remoteIp, remotePort) << ")");
 
@@ -183,28 +137,11 @@ namespace DNode
                 return;
             }
 
-            connId_ = 0;
-
             if (err) {
                 state_ = STATE_ERR;
                 signalReactor();
                 return;
             }
-
-            boost::shared_ptr<DTun::SHandle> handle = theRemoteMgr->createStreamSocket();
-            if (!handle) {
-                state_ = STATE_ERR;
-                signalReactor();
-                return;
-            }
-
-            if (!handle->bind(boundSock_)) {
-                state_ = STATE_ERR;
-                signalReactor();
-                return;
-            }
-
-            boundSock_ = SYS_INVALID_SOCKET;
 
             connector_ = handle->createConnector();
 
@@ -320,9 +257,7 @@ namespace DNode
         int receiving_;
         int bytesSent_;
         int bytesReceived_;
-        DTun::UInt32 connId_;
-        DTun::UInt32 debugConnId_;
-        SYSSOCKET boundSock_;
+        DTun::ConnId connId_;
         boost::shared_ptr<DTun::SConnection> conn_;
         boost::shared_ptr<DTun::SConnector> connector_;
     };

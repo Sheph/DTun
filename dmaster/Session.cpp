@@ -26,114 +26,70 @@ namespace DMaster
 
     void Session::start()
     {
-        buff_.resize(sizeof(DTun::DProtocolHeader));
-        conn_->read(&buff_[0], &buff_[0] + buff_.size(),
-            boost::bind(&Session::onRecvHeader, this, _1, _2),
-            true);
+        startRecvHeader();
     }
 
-    void Session::registerConnRequest(DTun::UInt32 connId, DTun::UInt32 dstNodeId)
-    {
-        if (connRequests_.count(connId) > 0) {
-            LOG4CPLUS_ERROR(logger(), "connId " << connId << " already exists");
-            return;
-        }
-
-        connRequests_[connId] = ConnRequest(dstNodeId);
-    }
-
-    void Session::setConnRendezvousData(DTun::UInt32 connId, DTun::UInt8 role, DTun::UInt32 rId)
-    {
-        ConnRequestMap::iterator it = connRequests_.find(connId);
-        if (it == connRequests_.end()) {
-            LOG4CPLUS_ERROR(logger(), "connId " << connId << " not found");
-            return;
-        }
-        it->second.role = role;
-        it->second.rId = rId;
-    }
-
-    void Session::setConnRequestErr(DTun::UInt32 connId,
-        DTun::UInt32 errCode)
-    {
-        ConnRequestMap::iterator it = connRequests_.find(connId);
-        if (it == connRequests_.end()) {
-            LOG4CPLUS_ERROR(logger(), "connId " << connId << " not found");
-            return;
-        }
-
-        connRequests_.erase(it);
-
-        DTun::DProtocolMsgConnErr msg;
-
-        msg.connId = connId;
-        msg.errCode = errCode;
-
-        sendMsg(DPROTOCOL_MSG_CONN_ERR, &msg, sizeof(msg));
-    }
-
-    void Session::setAllConnRequestsErr(DTun::UInt32 dstNodeId,
-        DTun::UInt32 errCode)
-    {
-        DTun::DProtocolMsgConnErr msg;
-
-        for (ConnRequestMap::iterator it = connRequests_.begin(); it != connRequests_.end();) {
-            if (it->second.dstNodeId == dstNodeId) {
-                msg.connId = it->first;
-                msg.errCode = errCode;
-
-                sendMsg(DPROTOCOL_MSG_CONN_ERR, &msg, sizeof(msg));
-                connRequests_.erase(it++);
-            } else {
-                ++it;
-            }
-        }
-    }
-
-    void Session::setConnRequestOk(DTun::UInt32 connId,
-        DTun::UInt32 dstNodeIp,
-        DTun::UInt16 dstNodePort)
-    {
-        ConnRequestMap::iterator it = connRequests_.find(connId);
-        if (it == connRequests_.end()) {
-            LOG4CPLUS_ERROR(logger(), "connId " << connId << " not found");
-            return;
-        }
-
-        DTun::DProtocolMsgConnOK msg;
-
-        msg.connId = connId;
-        msg.dstNodeIp = dstNodeIp;
-        msg.dstNodePort = dstNodePort;
-        msg.role = it->second.role;
-        msg.rId = it->second.rId;
-
-        connRequests_.erase(it);
-
-        sendMsg(DPROTOCOL_MSG_CONN_OK, &msg, sizeof(msg));
-    }
-
-    void Session::sendConnRequest(DTun::UInt32 srcNodeId,
-        DTun::UInt32 srcNodeIp,
-        DTun::UInt16 srcNodePort,
-        DTun::UInt32 connId,
+    void Session::sendConnRequest(const DTun::ConnId& connId,
         DTun::UInt32 ip,
         DTun::UInt16 port,
-        DTun::UInt8 role,
-        DTun::UInt32 rId)
+        DTun::UInt8 mode)
     {
         DTun::DProtocolMsgConn msg;
 
-        msg.srcNodeId = srcNodeId;
-        msg.srcNodeIp = srcNodeIp;
-        msg.srcNodePort= srcNodePort;
-        msg.connId = connId;
+        msg.connId = DTun::toProtocolConnId(connId);
         msg.ip = ip;
         msg.port = port;
-        msg.role = role;
-        msg.rId = rId;
+        msg.mode = mode;
 
         sendMsg(DPROTOCOL_MSG_CONN, &msg, sizeof(msg));
+    }
+
+    void Session::sendConnStatus(const DTun::ConnId& connId,
+        DTun::UInt8 statusCode,
+        DTun::UInt8 mode)
+    {
+        DTun::DProtocolMsgConnStatus msg;
+
+        msg.connId = DTun::toProtocolConnId(connId);
+        msg.mode = mode;
+        msg.statusCode = statusCode;
+
+        sendMsg(DPROTOCOL_MSG_CONN_STATUS, &msg, sizeof(msg));
+    }
+
+    void Session::sendFast(const DTun::ConnId& connId,
+        DTun::UInt32 nodeIp,
+        DTun::UInt16 nodePort)
+    {
+        DTun::DProtocolMsgFast msg;
+
+        msg.connId = DTun::toProtocolConnId(connId);
+        msg.nodeIp = nodeIp;
+        msg.nodePort = nodePort;
+
+        sendMsg(DPROTOCOL_MSG_FAST, &msg, sizeof(msg));
+    }
+
+    void Session::sendSymm(const DTun::ConnId& connId,
+        DTun::UInt32 nodeIp,
+        DTun::UInt16 nodePort)
+    {
+        DTun::DProtocolMsgSymm msg;
+
+        msg.connId = DTun::toProtocolConnId(connId);
+        msg.nodeIp = nodeIp;
+        msg.nodePort = nodePort;
+
+        sendMsg(DPROTOCOL_MSG_SYMM, &msg, sizeof(msg));
+    }
+
+    void Session::sendSymmNext(const DTun::ConnId& connId)
+    {
+        DTun::DProtocolMsgSymmNext msg;
+
+        msg.connId = DTun::toProtocolConnId(connId);
+
+        sendMsg(DPROTOCOL_MSG_SYMM_NEXT, &msg, sizeof(msg));
     }
 
     void Session::onSend(int err, const boost::shared_ptr<std::vector<char> >& sndBuff)
@@ -173,16 +129,34 @@ namespace DMaster
         case DPROTOCOL_MSG_HELLO_PROBE:
             onRecvMsgHelloProbe();
             break;
-        case DPROTOCOL_MSG_HELLO_CONN:
-            buff_.resize(sizeof(DTun::DProtocolMsgHelloConn));
+        case DPROTOCOL_MSG_HELLO_FAST:
+            buff_.resize(sizeof(DTun::DProtocolMsgHelloFast));
             conn_->read(&buff_[0], &buff_[0] + buff_.size(),
-                boost::bind(&Session::onRecvMsgHelloConn, this, _1, _2),
+                boost::bind(&Session::onRecvMsgHelloFast, this, _1, _2),
                 true);
             break;
-        case DPROTOCOL_MSG_HELLO_ACC:
-            buff_.resize(sizeof(DTun::DProtocolMsgHelloAcc));
+        case DPROTOCOL_MSG_HELLO_SYMM:
+            buff_.resize(sizeof(DTun::DProtocolMsgHelloSymm));
             conn_->read(&buff_[0], &buff_[0] + buff_.size(),
-                boost::bind(&Session::onRecvMsgHelloAcc, this, _1, _2),
+                boost::bind(&Session::onRecvMsgHelloSymm, this, _1, _2),
+                true);
+            break;
+        case DPROTOCOL_MSG_CONN_CREATE:
+            buff_.resize(sizeof(DTun::DProtocolMsgConnCreate));
+            conn_->read(&buff_[0], &buff_[0] + buff_.size(),
+                boost::bind(&Session::onRecvMsgOther, this, _1, _2, header.msgCode),
+                true);
+            break;
+        case DPROTOCOL_MSG_CONN_CLOSE:
+            buff_.resize(sizeof(DTun::DProtocolMsgConnClose));
+            conn_->read(&buff_[0], &buff_[0] + buff_.size(),
+                boost::bind(&Session::onRecvMsgOther, this, _1, _2, header.msgCode),
+                true);
+            break;
+        case DPROTOCOL_MSG_SYMM_NEXT:
+            buff_.resize(sizeof(DTun::DProtocolMsgSymmNext));
+            conn_->read(&buff_[0], &buff_[0] + buff_.size(),
+                boost::bind(&Session::onRecvMsgOther, this, _1, _2, header.msgCode),
                 true);
             break;
         default:
@@ -213,7 +187,7 @@ namespace DMaster
         nodeId_ = msg.nodeId;
         symm_ = msg.probePort && (msg.probePort != peerPort_);
 
-        startRecvAny();
+        startRecvHeader();
 
         if (startPersistentCallback_) {
             startPersistentCallback_();
@@ -233,12 +207,12 @@ namespace DMaster
 
         sendMsg(DPROTOCOL_MSG_PROBE, &msg, sizeof(msg));
 
-        startRecvAny();
+        startRecvHeader();
     }
 
-    void Session::onRecvMsgHelloConn(int err, int numBytes)
+    void Session::onRecvMsgHelloFast(int err, int numBytes)
     {
-        LOG4CPLUS_TRACE(logger(), "Session::onRecvMsgHelloConn(" << err << ", " << numBytes << ")");
+        LOG4CPLUS_TRACE(logger(), "Session::onRecvMsgHelloFast(" << err << ", " << numBytes << ")");
 
         if (err) {
             if (errorCallback_) {
@@ -247,23 +221,23 @@ namespace DMaster
             return;
         }
 
-        DTun::DProtocolMsgHelloConn msg;
+        DTun::DProtocolMsgHelloFast msg;
         assert(numBytes == sizeof(msg));
         memcpy(&msg, &buff_[0], numBytes);
 
-        type_ = TypeConnector;
-        nodeId_ = msg.srcNodeId;
+        type_ = TypeFast;
+        nodeId_ = msg.nodeId;
 
-        startRecvAny();
+        startRecvHeader();
 
-        if (startConnectorCallback_) {
-            startConnectorCallback_(msg.dstNodeId, msg.connId, msg.remoteIp, msg.remotePort);
+        if (startFastCallback_) {
+            startFastCallback_(DTun::fromProtocolConnId(msg.connId));
         }
     }
 
-    void Session::onRecvMsgHelloAcc(int err, int numBytes)
+    void Session::onRecvMsgHelloSymm(int err, int numBytes)
     {
-        LOG4CPLUS_TRACE(logger(), "Session::onRecvMsgHelloAcc(" << err << ", " << numBytes << ")");
+        LOG4CPLUS_TRACE(logger(), "Session::onRecvMsgHelloSymm(" << err << ", " << numBytes << ")");
 
         if (err) {
             if (errorCallback_) {
@@ -272,35 +246,44 @@ namespace DMaster
             return;
         }
 
-        DTun::DProtocolMsgHelloAcc msg;
+        DTun::DProtocolMsgHelloSymm msg;
         assert(numBytes == sizeof(msg));
         memcpy(&msg, &buff_[0], numBytes);
 
-        type_ = TypeAcceptor;
-        nodeId_ = msg.dstNodeId;
+        type_ = TypeSymm;
+        nodeId_ = msg.nodeId;
 
-        startRecvAny();
+        startRecvHeader();
 
-        if (startAcceptorCallback_) {
-            startAcceptorCallback_(msg.srcNodeId, msg.connId);
+        if (startSymmCallback_) {
+            startSymmCallback_(DTun::fromProtocolConnId(msg.connId));
         }
     }
 
-    void Session::onRecvAny(int err, int numBytes)
+    void Session::onRecvMsgOther(int err, int numBytes, DTun::UInt8 msgCode)
     {
-        LOG4CPLUS_TRACE(logger(), "Session::onRecvAny(" << err << ", " << numBytes << ")");
+        LOG4CPLUS_TRACE(logger(), "Session::onRecvMsgOther(" << err << ", " << numBytes << ", " << msgCode << ")");
 
-        if (errorCallback_) {
-            errorCallback_(err ? err : 1);
+        if (err) {
+            if (errorCallback_) {
+                errorCallback_(err ? err : 1);
+            }
+            return;
         }
+
+        if (messageCallback_) {
+            messageCallback_(msgCode, &buff_[0]);
+        }
+
+        startRecvHeader();
     }
 
-    void Session::startRecvAny()
+    void Session::startRecvHeader()
     {
-        buff_.resize(1);
+        buff_.resize(sizeof(DTun::DProtocolHeader));
         conn_->read(&buff_[0], &buff_[0] + buff_.size(),
-            boost::bind(&Session::onRecvAny, this, _1, _2),
-            false);
+            boost::bind(&Session::onRecvHeader, this, _1, _2),
+            true);
     }
 
     void Session::sendMsg(DTun::UInt8 msgCode, const void* msg, int msgSize)

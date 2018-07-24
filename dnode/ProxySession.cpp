@@ -25,21 +25,10 @@ namespace DNode
     {
     }
 
-    bool ProxySession::start(SYSSOCKET s, DTun::UInt32 localIp, DTun::UInt16 localPort,
+    bool ProxySession::start(const boost::shared_ptr<DTun::SHandle>& remoteHandle, DTun::UInt32 localIp, DTun::UInt16 localPort,
         DTun::UInt32 remoteIp, DTun::UInt16 remotePort, const DoneCallback& callback)
     {
         boost::mutex::scoped_lock lock(m_);
-
-        boost::shared_ptr<DTun::SHandle> remoteHandle = remoteMgr_.createStreamSocket();
-        if (!remoteHandle) {
-            DTun::closeSysSocketChecked(s);
-            return false;
-        }
-
-        if (!remoteHandle->bind(s)) {
-            DTun::closeSysSocketChecked(s);
-            return false;
-        }
 
         remoteConnector_ = remoteHandle->createConnector();
 

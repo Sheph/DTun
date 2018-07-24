@@ -19,22 +19,15 @@ namespace DNode
     {
     }
 
-    bool DMasterSession::startConnector(SYSSOCKET s, DTun::UInt32 srcNodeId,
-        DTun::UInt32 dstNodeId,
-        DTun::UInt32 connId,
-        DTun::UInt32 remoteIp,
-        DTun::UInt16 remotePort,
+    bool DMasterSession::startFast(SYSSOCKET s, DTun::UInt32 nodeId, const DTun::ConnId& connId,
         const Callback& callback)
     {
         DTun::DProtocolHeader header;
-        DTun::DProtocolMsgHelloConn msg;
+        DTun::DProtocolMsgHelloFast msg;
 
-        header.msgCode = DPROTOCOL_MSG_HELLO_CONN;
-        msg.srcNodeId = srcNodeId;
-        msg.dstNodeId = dstNodeId;
-        msg.connId = connId;
-        msg.remoteIp = remoteIp;
-        msg.remotePort = remotePort;
+        header.msgCode = DPROTOCOL_MSG_HELLO_FAST;
+        msg.nodeId = nodeId;
+        msg.connId = DTun::toProtocolConnId(connId);
 
         buff_.resize(sizeof(header) + sizeof(msg));
         memcpy(&buff_[0], &header, sizeof(header));
@@ -43,18 +36,15 @@ namespace DNode
         return start(s, callback);
     }
 
-    bool DMasterSession::startAcceptor(SYSSOCKET s, DTun::UInt32 srcNodeId,
-        DTun::UInt32 dstNodeId,
-        DTun::UInt32 connId,
+    bool DMasterSession::startSymm(SYSSOCKET s, DTun::UInt32 nodeId, const DTun::ConnId& connId,
         const Callback& callback)
     {
         DTun::DProtocolHeader header;
-        DTun::DProtocolMsgHelloAcc msg;
+        DTun::DProtocolMsgHelloSymm msg;
 
-        header.msgCode = DPROTOCOL_MSG_HELLO_ACC;
-        msg.srcNodeId = srcNodeId;
-        msg.dstNodeId = dstNodeId;
-        msg.connId = connId;
+        header.msgCode = DPROTOCOL_MSG_HELLO_SYMM;
+        msg.nodeId = nodeId;
+        msg.connId = DTun::toProtocolConnId(connId);
 
         buff_.resize(sizeof(header) + sizeof(msg));
         memcpy(&buff_[0], &header, sizeof(header));

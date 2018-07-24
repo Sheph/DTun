@@ -2,6 +2,7 @@
 #define _DTUN_TYPES_H_
 
 #include <string>
+#include <ostream>
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -41,6 +42,58 @@ namespace DTun
     typedef signed long long SInt64;
     typedef UInt8 Byte;
     typedef char Char;
+
+    struct DTUN_API ConnId
+    {
+        ConnId()
+        : nodeId(0)
+        , connIdx(0) {}
+
+        ConnId(UInt32 nodeId, UInt32 connIdx)
+        : nodeId(nodeId)
+        , connIdx(connIdx) {}
+
+        inline bool operator<(const ConnId& rhs) const
+        {
+            return (nodeId == rhs.nodeId) ? (connIdx < rhs.connIdx) : (nodeId < rhs.nodeId);
+        }
+
+        inline bool operator==(const ConnId& rhs) const
+        {
+            return (nodeId == rhs.nodeId) && (connIdx == rhs.connIdx);
+        }
+
+        inline bool operator!=(const ConnId& rhs) const
+        {
+            return !(*this == rhs);
+        }
+
+        typedef void (*unspecified_bool_type)();
+        static void unspecified_bool_true() {}
+
+        operator unspecified_bool_type() const
+        {
+            return ((nodeId == 0) && (connIdx == 0)) ? 0 : unspecified_bool_true;
+        }
+
+        bool operator!() const
+        {
+            return (nodeId == 0) && (connIdx == 0);
+        }
+
+        UInt32 nodeId;
+        UInt32 connIdx;
+    };
+}
+
+namespace std
+{
+    DTUN_API inline ostream& operator<<(ostream& os, const ::DTun::ConnId& value)
+    {
+        os << "[node=" << value.nodeId << ",idx=" << value.connIdx << "]";
+
+        return os;
+    }
 }
 
 #endif

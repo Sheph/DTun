@@ -4,6 +4,7 @@
 #include "DTun/DProtocol.h"
 #include "DTun/SConnection.h"
 #include <boost/noncopyable.hpp>
+#include <boost/optional.hpp>
 #include <map>
 #include <vector>
 
@@ -17,21 +18,23 @@ namespace DMaster
             TypeUnknown = 0,
             TypePersistent,
             TypeProbe,
-            TypeConnector,
-            TypeAcceptor
+            TypeFast,
+            TypeSymm
         };
 
         typedef boost::function<void ()> StartPersistentCallback;
-        typedef boost::function<void (DTun::UInt32, DTun::UInt32, DTun::UInt32, DTun::UInt16)> StartConnectorCallback;
-        typedef boost::function<void (DTun::UInt32, DTun::UInt32)> StartAcceptorCallback;
+        typedef boost::function<void (const DTun::ConnId&)> StartFastCallback;
+        typedef boost::function<void (const DTun::ConnId&)> StartSymmCallback;
+        typedef boost::function<void (DTun::UInt8, const void*)> MessageCallback;
         typedef boost::function<void (int)> ErrorCallback;
 
         explicit Session(const boost::shared_ptr<DTun::SConnection>& conn);
         ~Session();
 
         inline void setStartPersistentCallback(const StartPersistentCallback& cb) { startPersistentCallback_ = cb; }
-        inline void setStartConnectorCallback(const StartConnectorCallback& cb) { startConnectorCallback_ = cb; }
-        inline void setStartAcceptorCallback(const StartAcceptorCallback& cb) { startAcceptorCallback_ = cb; }
+        inline void setStartFastCallback(const StartFastCallback& cb) { startFastCallback_ = cb; }
+        inline void setStartSymmCallback(const StartSymmCallback& cb) { startSymmCallback_ = cb; }
+        inline void setMessageCallback(const MessageCallback& cb) { messageCallback_ = cb; }
         inline void setErrorCallback(const ErrorCallback& cb) { errorCallback_ = cb; }
 
         inline Type type() const { return type_; }
@@ -45,71 +48,48 @@ namespace DMaster
 
         void start();
 
-        void registerConnRequest(DTun::UInt32 connId, DTun::UInt32 dstNodeId);
-
-        void setConnRendezvousData(DTun::UInt32 connId, DTun::UInt8 role, DTun::UInt32 rId);
-
-        void setConnRequestErr(DTun::UInt32 connId,
-            DTun::UInt32 errCode);
-
-        void setAllConnRequestsErr(DTun::UInt32 dstNodeId,
-            DTun::UInt32 errCode);
-
-        void setConnRequestOk(DTun::UInt32 connId,
-            DTun::UInt32 dstNodeIp,
-            DTun::UInt16 dstNodePort);
-
-        void sendConnRequest(DTun::UInt32 srcNodeId,
-            DTun::UInt32 srcNodeIp,
-            DTun::UInt16 srcNodePort,
-            DTun::UInt32 connId,
+        void sendConnRequest(const DTun::ConnId& connId,
             DTun::UInt32 ip,
             DTun::UInt16 port,
-            DTun::UInt8 role,
-            DTun::UInt32 rId);
+            DTun::UInt8 mode);
+
+        void sendConnStatus(const DTun::ConnId& connId,
+            DTun::UInt8 statusCode,
+            DTun::UInt8 mode = DPROTOCOL_RMODE_FAST);
+
+        void sendFast(const DTun::ConnId& connId,
+            DTun::UInt32 nodeIp,
+            DTun::UInt16 nodePort);
+
+        void sendSymm(const DTun::ConnId& connId,
+            DTun::UInt32 nodeIp,
+            DTun::UInt16 nodePort);
+
+        void sendSymmNext(const DTun::ConnId& connId);
 
     private:
-        struct ConnRequest
-        {
-            ConnRequest()
-            : dstNodeId(0)
-            , role(DPROTOCOL_ROLE_CONN)
-            , rId(0) {}
-
-            explicit ConnRequest(DTun::UInt32 dstNodeId)
-            : dstNodeId(dstNodeId)
-            , role(DPROTOCOL_ROLE_CONN)
-            , rId(0) {}
-
-            DTun::UInt32 dstNodeId;
-            DTun::UInt8 role;
-            DTun::UInt32 rId;
-        };
-
-        typedef std::map<DTun::UInt32, ConnRequest> ConnRequestMap;
-
         void onSend(int err, const boost::shared_ptr<std::vector<char> >& sndBuff);
         void onRecvHeader(int err, int numBytes);
         void onRecvMsgHello(int err, int numBytes);
         void onRecvMsgHelloProbe();
-        void onRecvMsgHelloConn(int err, int numBytes);
-        void onRecvMsgHelloAcc(int err, int numBytes);
-        void onRecvAny(int err, int numBytes);
+        void onRecvMsgHelloFast(int err, int numBytes);
+        void onRecvMsgHelloSymm(int err, int numBytes);
+        void onRecvMsgOther(int err, int numBytes, DTun::UInt8 msgCode);
 
-        void startRecvAny();
+        void startRecvHeader();
 
         void sendMsg(DTun::UInt8 msgCode, const void* msg, int msgSize);
 
         StartPersistentCallback startPersistentCallback_;
-        StartConnectorCallback startConnectorCallback_;
-        StartAcceptorCallback startAcceptorCallback_;
+        StartFastCallback startFastCallback_;
+        StartSymmCallback startSymmCallback_;
+        MessageCallback messageCallback_;
         ErrorCallback errorCallback_;
 
         Type type_;
         DTun::UInt32 nodeId_;
         bool symm_;
 
-        ConnRequestMap connRequests_;
         std::vector<char> buff_;
 
         DTun::UInt32 peerIp_;

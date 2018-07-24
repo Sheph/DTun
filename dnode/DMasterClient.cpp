@@ -1,5 +1,8 @@
 #include "DMasterClient.h"
 #include "Logger.h"
+#include "RendezvousFastSession.h"
+#include "RendezvousSymmConnSession.h"
+#include "RendezvousSymmAccSession.h"
 #include "DTun/Utils.h"
 #include "DTun/SConnector.h"
 #include "DTun/SConnection.h"
@@ -12,24 +15,6 @@ namespace DNode
 {
     DMasterClient* theMasterClient = NULL;
 
-    DMasterClient::SysSocketHolder::SysSocketHolder()
-    : sock(SYS_INVALID_SOCKET)
-    {
-    }
-
-    DMasterClient::SysSocketHolder::SysSocketHolder(SYSSOCKET sock)
-    : sock(sock)
-    {
-    }
-
-    DMasterClient::SysSocketHolder::~SysSocketHolder()
-    {
-        if (sock != SYS_INVALID_SOCKET) {
-            DTun::closeSysSocketChecked(sock);
-            sock = SYS_INVALID_SOCKET;
-        }
-    }
-
     DMasterClient::DMasterClient(DTun::SManager& remoteMgr, DTun::SManager& localMgr,
         const boost::shared_ptr<DTun::AppConfig>& appConfig)
     : remoteMgr_(remoteMgr)
@@ -37,8 +22,7 @@ namespace DNode
     , closing_(false)
     , probedIp_(0)
     , probedPort_(0)
-    , nextConnId_(0)
-    , numOutConnections_(0)
+    , nextConnIdx_(0)
     {
         address_ = appConfig->getString("server.address");
         port_ = appConfig->getUInt32("server.port");
@@ -126,14 +110,7 @@ namespace DNode
         return true;
     }
 
-    void DMasterClient::changeNumOutConnections(int diff)
-    {
-        boost::mutex::scoped_lock lock(m_);
-        numOutConnections_ += diff;
-    }
-
-    DTun::UInt32 DMasterClient::registerConnection(SYSSOCKET s,
-        DTun::UInt32 remoteIp,
+    DTun::ConnId DMasterClient::registerConnection(DTun::UInt32 remoteIp,
         DTun::UInt16 remotePort,
         const RegisterConnectionCallback& callback)
     {
@@ -141,36 +118,58 @@ namespace DNode
 
         if (!getDstNodeId(remoteIp, dstNodeId)) {
             LOG4CPLUS_ERROR(logger(), "No route to " << DTun::ipToString(remoteIp));
-            return 0;
+            return DTun::ConnId();
         }
 
         boost::mutex::scoped_lock lock(m_);
 
         if (!conn_ || closing_) {
-            DTun::closeSysSocketChecked(s);
-            return 0;
+            return DTun::ConnId();
         }
 
-        boost::shared_ptr<DMasterSession> sess =
-            boost::make_shared<DMasterSession>(boost::ref(remoteMgr_), address_, port_);
+        boost::shared_ptr<ConnState> connState =
+            boost::make_shared<ConnState>();
 
-        DTun::UInt32 connId = nextConnId_++;
-        if (connId == 0) {
-            connId = nextConnId_++;
+        DTun::UInt32 connIdx = nextConnIdx_++;
+        if (connIdx == 0) {
+            connIdx = nextConnIdx_++;
         }
 
-        if (!sess->startConnector(s, nodeId_, dstNodeId, connId, remoteIp, remotePort,
-            boost::bind(&DMasterClient::onRegisterConnection, this, _1, connId))) {
-            return 0;
+        connState->connId = DTun::ConnId(nodeId_, connIdx);
+        connState->remoteIp = remoteIp;
+        connState->remotePort = remotePort;
+        connState->callback = callback;
+
+        connStates_[connState->connId] = connState;
+        rendezvousConnIds_.push_back(connState->connId);
+
+        bool running = false;
+
+        for (ConnStateMap::const_iterator it = connStates_.begin(); it != connStates_.end(); ++it) {
+            if (it->second->rSess) {
+                running = true;
+                break;
+            }
         }
 
-        connMasterSessions_[connId].sess = sess;
-        connMasterSessions_[connId].callback = callback;
+        if (!running && (rendezvousConnIds_.size() == 1)) {
+            connState->status = ConnStatusPending;
 
-        return connId;
+            DTun::DProtocolMsgConnCreate msg;
+
+            msg.connId = DTun::toProtocolConnId(connState->connId);
+            msg.dstNodeId = dstNodeId;
+            msg.remoteIp = remoteIp;
+            msg.remotePort = remotePort;
+            msg.fastOnly = 0;
+
+            sendMsg(DPROTOCOL_MSG_CONN_CREATE, &msg, sizeof(msg));
+        }
+
+        return connState->connId;
     }
 
-    void DMasterClient::cancelConnection(DTun::UInt32 connId)
+    void DMasterClient::closeConnection(const DTun::ConnId& connId)
     {
         boost::mutex::scoped_lock lock(m_);
 
@@ -178,14 +177,26 @@ namespace DNode
             return;
         }
 
-        ConnMasterSessionMap::iterator it = connMasterSessions_.find(connId);
-        if (it == connMasterSessions_.end()) {
+        ConnStateMap::iterator it = connStates_.find(connId);
+        if (it == connStates_.end()) {
             return;
         }
 
-        ConnMasterSession tmp = it->second;
+        boost::shared_ptr<ConnState> tmp = it->second;
 
-        connMasterSessions_.erase(it);
+        connStates_.erase(it);
+        rendezvousConnIds_.remove(connId);
+
+        assert(!tmp->proxySession);
+
+        if ((tmp->status == ConnStatusPending) && (tmp->mode != RendezvousModeUnknown)) {
+            DTun::DProtocolMsgConnClose msg;
+
+            msg.connId = DTun::toProtocolConnId(connId);
+            msg.established = 0;
+
+            sendMsg(DPROTOCOL_MSG_CONN_CLOSE, &msg, sizeof(msg));
+        }
 
         lock.unlock();
     }
@@ -201,8 +212,30 @@ namespace DNode
         }
 
         boost::mutex::scoped_lock lock(m_);
-        LOG4CPLUS_INFO(logger(), "connSess=" << connMasterSessions_.size()
-            << ", accSess=" << accMasterSessions_.size() << ", prx=" << proxySessions_.size() << ", numOut=" << numOutConnections_
+
+        int totStates = connStates_.size();
+        int connSess = 0;
+        int accSess = 0;
+        int prx = 0;
+        int numOut = 0;
+        for (ConnStateMap::const_iterator it = connStates_.begin(); it != connStates_.end(); ++it) {
+            if (it->second->rSess) {
+                if (it->second->callback) {
+                    ++connSess;
+                } else {
+                    ++accSess;
+                }
+            }
+            if (it->second->proxySession) {
+                ++prx;
+            }
+            if (it->second->callback) {
+                ++numOut;
+            }
+        }
+
+        LOG4CPLUS_INFO(logger(), "totStates=" << totStates << ", connSess=" << connSess
+            << ", accSess=" << accSess << ", prx=" << prx << ", numOut=" << numOut
             << ", " << remoteMgr_.reactor().dump()
             << ", numFds=" << numFds << ", maxFds=" << fdMax);
     }
@@ -369,13 +402,13 @@ namespace DNode
             memcpy(&buff_[0] + sizeof(header), &msg, sizeof(msg));
 
             conn_->write(&buff_[0], &buff_[0] + buff_.size(),
-                boost::bind(&DMasterClient::onSend, this, _1));
+                boost::bind(&DMasterClient::onHelloSend, this, _1));
         }
     }
 
-    void DMasterClient::onSend(int err)
+    void DMasterClient::onHelloSend(int err)
     {
-        LOG4CPLUS_TRACE(logger(), "DMasterClient::onSend(" << err << ")");
+        LOG4CPLUS_TRACE(logger(), "DMasterClient::onHelloSend(" << err << ")");
 
         boost::mutex::scoped_lock lock(m_);
 
@@ -391,6 +424,20 @@ namespace DNode
         conn_->read(&buff_[0], &buff_[0] + buff_.size(),
             boost::bind(&DMasterClient::onRecvHeader, this, _1, _2),
             true);
+    }
+
+    void DMasterClient::onSend(int err, const boost::shared_ptr<std::vector<char> >& sndBuff)
+    {
+        LOG4CPLUS_TRACE(logger(), "DMasterClient::onSend(" << err << ")");
+
+        boost::mutex::scoped_lock lock(m_);
+
+        if (err && conn_) {
+            boost::shared_ptr<DTun::SConnection> tmp = conn_;
+            conn_.reset();
+            lock.unlock();
+            LOG4CPLUS_ERROR(logger(), "Connection to server lost");
+        }
     }
 
     void DMasterClient::onRecvHeader(int err, int numBytes)
@@ -418,16 +465,28 @@ namespace DNode
                 boost::bind(&DMasterClient::onRecvMsgConn, this, _1, _2),
                 true);
             break;
-        case DPROTOCOL_MSG_CONN_OK:
-            buff_.resize(sizeof(DTun::DProtocolMsgConnOK));
+        case DPROTOCOL_MSG_CONN_STATUS:
+            buff_.resize(sizeof(DTun::DProtocolMsgConnStatus));
             conn_->read(&buff_[0], &buff_[0] + buff_.size(),
-                boost::bind(&DMasterClient::onRecvMsgConnOK, this, _1, _2),
+                boost::bind(&DMasterClient::onRecvMsgConnStatus, this, _1, _2),
                 true);
             break;
-        case DPROTOCOL_MSG_CONN_ERR:
-            buff_.resize(sizeof(DTun::DProtocolMsgConnErr));
+        case DPROTOCOL_MSG_FAST:
+            buff_.resize(sizeof(DTun::DProtocolMsgFast));
             conn_->read(&buff_[0], &buff_[0] + buff_.size(),
-                boost::bind(&DMasterClient::onRecvMsgConnErr, this, _1, _2),
+                boost::bind(&DMasterClient::onRecvMsgOther, this, _1, _2, header.msgCode),
+                true);
+            break;
+        case DPROTOCOL_MSG_SYMM:
+            buff_.resize(sizeof(DTun::DProtocolMsgSymm));
+            conn_->read(&buff_[0], &buff_[0] + buff_.size(),
+                boost::bind(&DMasterClient::onRecvMsgOther, this, _1, _2, header.msgCode),
+                true);
+            break;
+        case DPROTOCOL_MSG_SYMM_NEXT:
+            buff_.resize(sizeof(DTun::DProtocolMsgSymmNext));
+            conn_->read(&buff_[0], &buff_[0] + buff_.size(),
+                boost::bind(&DMasterClient::onRecvMsgOther, this, _1, _2, header.msgCode),
                 true);
             break;
         default:
@@ -457,183 +516,189 @@ namespace DNode
         assert(numBytes == sizeof(msg));
         memcpy(&msg, &buff_[0], numBytes);
 
-        LOG4CPLUS_TRACE(logger(), "Proxy request: src = " << msg.srcNodeId
-            << ", src_addr = " << DTun::ipPortToString(msg.srcNodeIp, msg.srcNodePort)
-            << ", connId = " << msg.connId << ", remote_addr = " << DTun::ipPortToString(msg.ip, msg.port));
+        LOG4CPLUS_TRACE(logger(), "Proxy request: connId = " << DTun::fromProtocolConnId(msg.connId) << ", remote_addr = " << DTun::ipPortToString(msg.ip, msg.port)
+            << ", mode = " << msg.mode);
 
-        startAccMasterSession(msg.srcNodeId, msg.connId, msg.ip, msg.port, msg.srcNodeIp, msg.srcNodePort);
+        boost::shared_ptr<ConnState> connState =
+            boost::make_shared<ConnState>();
 
-        buff_.resize(sizeof(DTun::DProtocolHeader));
-        conn_->read(&buff_[0], &buff_[0] + buff_.size(),
-            boost::bind(&DMasterClient::onRecvHeader, this, _1, _2),
-            true);
-    }
+        connState->connId = DTun::fromProtocolConnId(msg.connId);
+        connState->remoteIp = msg.ip;
+        connState->remotePort = msg.port;
 
-    void DMasterClient::onRecvMsgConnOK(int err, int numBytes)
-    {
-        LOG4CPLUS_TRACE(logger(), "DMasterClient::onRecvMsgConnOK(" << err << ", " << numBytes << ")");
-
-        boost::mutex::scoped_lock lock(m_);
-
-        if (err) {
-            boost::shared_ptr<DTun::SConnection> tmp = conn_;
-            conn_.reset();
-            lock.unlock();
-            LOG4CPLUS_ERROR(logger(), "Connection to server lost");
-            return;
+        switch (msg.mode) {
+        case DPROTOCOL_RMODE_FAST:
+            connState->mode = RendezvousModeFast;
+            break;
+        case DPROTOCOL_RMODE_SYMM_CONN:
+            connState->mode = RendezvousModeSymmConn;
+            break;
+        case DPROTOCOL_RMODE_SYMM_ACC:
+            connState->mode = RendezvousModeSymmAcc;
+            break;
+        default:
+            LOG4CPLUS_ERROR(logger(), "Bad rmode = " << msg.mode);
+            connState->mode = RendezvousModeFast;
+            break;
         }
 
-        DTun::DProtocolMsgConnOK msg;
-        assert(numBytes == sizeof(msg));
-        memcpy(&msg, &buff_[0], numBytes);
+        connState->status = ConnStatusPending;
 
-        ConnMasterSessionMap::iterator it = connMasterSessions_.find(msg.connId);
-        if (it == connMasterSessions_.end()) {
-            LOG4CPLUS_WARN(logger(), "connId " << msg.connId << " not found");
+        if (connStates_.count(connState->connId) > 0) {
+            LOG4CPLUS_ERROR(logger(), "Conn " << connState->connId << " already exists");
+
             buff_.resize(sizeof(DTun::DProtocolHeader));
             conn_->read(&buff_[0], &buff_[0] + buff_.size(),
                 boost::bind(&DMasterClient::onRecvHeader, this, _1, _2),
                 true);
-            return;
-        }
-
-        ConnMasterSession tmp = it->second;
-
-        connMasterSessions_.erase(it);
-
-        buff_.resize(sizeof(DTun::DProtocolHeader));
-        conn_->read(&buff_[0], &buff_[0] + buff_.size(),
-            boost::bind(&DMasterClient::onRecvHeader, this, _1, _2),
-            true);
-
-        lock.unlock();
-
-        tmp.sess.reset();
-        tmp.callback(0, msg.dstNodeIp, msg.dstNodePort);
-    }
-
-    void DMasterClient::onRecvMsgConnErr(int err, int numBytes)
-    {
-        LOG4CPLUS_TRACE(logger(), "DMasterClient::onRecvMsgConnErr(" << err << ", " << numBytes << ")");
-
-        boost::mutex::scoped_lock lock(m_);
-
-        if (err) {
-            boost::shared_ptr<DTun::SConnection> tmp = conn_;
-            conn_.reset();
-            lock.unlock();
-            LOG4CPLUS_ERROR(logger(), "Connection to server lost");
-            return;
-        }
-
-        DTun::DProtocolMsgConnErr msg;
-        assert(numBytes == sizeof(msg));
-        memcpy(&msg, &buff_[0], numBytes);
-
-        ConnMasterSessionMap::iterator it = connMasterSessions_.find(msg.connId);
-        if (it == connMasterSessions_.end()) {
-            LOG4CPLUS_WARN(logger(), "connId " << msg.connId << " not found");
-            buff_.resize(sizeof(DTun::DProtocolHeader));
-            conn_->read(&buff_[0], &buff_[0] + buff_.size(),
-                boost::bind(&DMasterClient::onRecvHeader, this, _1, _2),
-                true);
-            return;
-        }
-
-        ConnMasterSession tmp = it->second;
-
-        connMasterSessions_.erase(it);
-
-        buff_.resize(sizeof(DTun::DProtocolHeader));
-        conn_->read(&buff_[0], &buff_[0] + buff_.size(),
-            boost::bind(&DMasterClient::onRecvHeader, this, _1, _2),
-            true);
-
-        lock.unlock();
-
-        tmp.sess.reset();
-        LOG4CPLUS_ERROR(logger(), "connId " << msg.connId << " failed with errCode " << msg.errCode);
-        tmp.callback(msg.errCode, 0, 0);
-    }
-
-    void DMasterClient::onRegisterConnection(int err, DTun::UInt32 connId)
-    {
-        boost::mutex::scoped_lock lock(m_);
-
-        ConnMasterSessionMap::iterator it = connMasterSessions_.find(connId);
-        if (it == connMasterSessions_.end()) {
-            return;
-        }
-
-        ConnMasterSession tmp = it->second;
-
-        it->second.sess.reset();
-
-        if (err) {
-            connMasterSessions_.erase(it);
-        }
-
-        lock.unlock();
-
-        if (err) {
-            tmp.sess.reset();
-            tmp.callback(err, 0, 0);
-        }
-    }
-
-    void DMasterClient::onAcceptConnection(int err, const boost::weak_ptr<DMasterSession>& sess,
-        DTun::UInt32 localIp,
-        DTun::UInt16 localPort,
-        DTun::UInt32 remoteIp,
-        DTun::UInt16 remotePort)
-    {
-        LOG4CPLUS_TRACE(logger(), "DMasterClient::onAcceptConnection(" << err << ")");
-
-        boost::shared_ptr<DMasterSession> sess_shared = sess.lock();
-        if (!sess_shared) {
-            return;
-        }
-
-        boost::mutex::scoped_lock lock(m_);
-
-        AccMasterSessions::iterator it = accMasterSessions_.find(sess_shared);
-        if (it == accMasterSessions_.end()) {
-            assert(false);
-            return;
-        }
-
-        SYSSOCKET boundSock = it->second->sock;
-        it->second->sock = SYS_INVALID_SOCKET;
-
-        accMasterSessions_.erase(it);
-
-        lock.unlock();
-
-        sess_shared.reset();
-
-        if (!err) {
-            boost::shared_ptr<ProxySession> proxySess =
-                boost::make_shared<ProxySession>(boost::ref(remoteMgr_), boost::ref(localMgr_));
-
-            lock.lock();
-            if (proxySess->start(boundSock, localIp, localPort, remoteIp, remotePort,
-                boost::bind(&DMasterClient::onProxyDone, this, boost::weak_ptr<ProxySession>(proxySess)))) {
-                proxySessions_.insert(proxySess);
-            }
-            lock.unlock();
         } else {
-            DTun::closeSysSocketChecked(boundSock);
+            connStates_[connState->connId] = connState;
+            rendezvousConnIds_.push_back(connState->connId);
+
+            buff_.resize(sizeof(DTun::DProtocolHeader));
+            conn_->read(&buff_[0], &buff_[0] + buff_.size(),
+                boost::bind(&DMasterClient::onRecvHeader, this, _1, _2),
+                true);
+
+            while (processRendezvous(lock)) {}
         }
     }
 
-    void DMasterClient::onProxyDone(const boost::weak_ptr<ProxySession>& sess)
+    void DMasterClient::onRecvMsgConnStatus(int err, int numBytes)
     {
-        LOG4CPLUS_TRACE(logger(), "DMasterClient::onProxyDone()");
+        LOG4CPLUS_TRACE(logger(), "DMasterClient::onRecvMsgConnStatus(" << err << ", " << numBytes << ")");
 
-        boost::shared_ptr<ProxySession> sess_shared = sess.lock();
-        if (!sess_shared) {
+        boost::mutex::scoped_lock lock(m_);
+
+        if (err) {
+            boost::shared_ptr<DTun::SConnection> tmp = conn_;
+            conn_.reset();
+            lock.unlock();
+            LOG4CPLUS_ERROR(logger(), "Connection to server lost");
             return;
         }
+
+        DTun::DProtocolMsgConnStatus msg;
+        assert(numBytes == sizeof(msg));
+        memcpy(&msg, &buff_[0], numBytes);
+
+        DTun::ConnId connId = DTun::fromProtocolConnId(msg.connId);
+
+        buff_.resize(sizeof(DTun::DProtocolHeader));
+        conn_->read(&buff_[0], &buff_[0] + buff_.size(),
+            boost::bind(&DMasterClient::onRecvHeader, this, _1, _2),
+            true);
+
+        ConnStateMap::iterator it = connStates_.find(connId);
+        if (it == connStates_.end()) {
+            LOG4CPLUS_WARN(logger(), "Conn " << connId << " not found");
+            return;
+        }
+
+        switch (msg.statusCode) {
+        case DPROTOCOL_STATUS_NONE:
+            // fastOnly response in case of symm rmode, no connection created.
+            assert(it->second->mode == RendezvousModeUnknown);
+            assert(it->second->status == ConnStatusPending);
+            assert(it->second->triedFastOnly);
+            it->second->status = ConnStatusNone;
+            break;
+        case DPROTOCOL_STATUS_PENDING:
+            // connection created, set mode.
+            assert(it->second->mode == RendezvousModeUnknown);
+            assert(it->second->status == ConnStatusPending);
+            switch (msg.mode) {
+            case DPROTOCOL_RMODE_FAST:
+                it->second->mode = RendezvousModeFast;
+                break;
+            case DPROTOCOL_RMODE_SYMM_CONN:
+                it->second->mode = RendezvousModeSymmConn;
+                break;
+            case DPROTOCOL_RMODE_SYMM_ACC:
+                it->second->mode = RendezvousModeSymmAcc;
+                break;
+            default:
+                LOG4CPLUS_ERROR(logger(), "Bad rmode = " << msg.mode);
+                it->second->mode = RendezvousModeFast;
+                break;
+            }
+            break;
+        case DPROTOCOL_STATUS_ESTABLISHED:
+            if (it->second->rSess) {
+                assert(it->second->mode != RendezvousModeUnknown);
+                it->second->status = ConnStatusEstablished;
+                boost::shared_ptr<RendezvousSession> rSess = it->second->rSess;
+                lock.unlock();
+                rSess->onEstablished();
+                lock.lock();
+            }
+            break;
+        default: {
+            boost::shared_ptr<ConnState> tmp = it->second;
+            connStates_.erase(it);
+            rendezvousConnIds_.remove(connId);
+            lock.unlock();
+            RegisterConnectionCallback cb = tmp->callback;
+            tmp.reset();
+            if (cb) {
+                cb(msg.statusCode, boost::shared_ptr<DTun::SHandle>(), 0, 0);
+                cb = RegisterConnectionCallback();
+            }
+            lock.lock();
+            break;
+        }
+        }
+
+        while (processRendezvous(lock)) {}
+    }
+
+    void DMasterClient::onRecvMsgOther(int err, int numBytes, DTun::UInt8 msgId)
+    {
+        LOG4CPLUS_TRACE(logger(), "DMasterClient::onRecvMsgOther(" << err << ", " << numBytes << ", " << msgId << ")");
+
+        boost::mutex::scoped_lock lock(m_);
+
+        if (err) {
+            boost::shared_ptr<DTun::SConnection> tmp = conn_;
+            conn_.reset();
+            lock.unlock();
+            LOG4CPLUS_ERROR(logger(), "Connection to server lost");
+            return;
+        }
+
+        DTun::DProtocolConnId dConnId;
+        assert(numBytes >= (int)sizeof(dConnId));
+        memcpy(&dConnId, &buff_[0], sizeof(dConnId));
+
+        DTun::ConnId connId = DTun::fromProtocolConnId(dConnId);
+
+        ConnStateMap::iterator it = connStates_.find(connId);
+        if (it == connStates_.end()) {
+            LOG4CPLUS_WARN(logger(), "Conn " << connId << " not found");
+            buff_.resize(sizeof(DTun::DProtocolHeader));
+            conn_->read(&buff_[0], &buff_[0] + buff_.size(),
+                boost::bind(&DMasterClient::onRecvHeader, this, _1, _2),
+                true);
+            return;
+        }
+
+        if (it->second->rSess && (it->second->status != ConnStatusEstablished)) {
+            boost::shared_ptr<RendezvousSession> rSess = it->second->rSess;
+            lock.unlock();
+            rSess->onMsg(msgId, &buff_[0]);
+            lock.lock();
+            if (conn_) {
+                buff_.resize(sizeof(DTun::DProtocolHeader));
+                conn_->read(&buff_[0], &buff_[0] + buff_.size(),
+                    boost::bind(&DMasterClient::onRecvHeader, this, _1, _2),
+                    true);
+            }
+        }
+    }
+
+    void DMasterClient::onProxyDone(const DTun::ConnId& connId)
+    {
+        LOG4CPLUS_TRACE(logger(), "DMasterClient::onProxyDone(" << connId << ")");
 
         boost::mutex::scoped_lock lock(m_);
 
@@ -641,56 +706,230 @@ namespace DNode
             return;
         }
 
-        proxySessions_.erase(sess_shared);
+        ConnStateMap::iterator it = connStates_.find(connId);
+        if (it == connStates_.end()) {
+            return;
+        }
+
+        boost::shared_ptr<ConnState> tmp = it->second;
+
+        connStates_.erase(it);
 
         lock.unlock();
     }
 
-    void DMasterClient::startAccMasterSession(DTun::UInt32 srcNodeId,
-        DTun::UInt32 srcConnId,
-        DTun::UInt32 localIp,
-        DTun::UInt16 localPort,
-        DTun::UInt32 remoteIp,
-        DTun::UInt16 remotePort)
+    void DMasterClient::onRendezvous(const DTun::ConnId& connId, int err, SYSSOCKET s, DTun::UInt32 ip, DTun::UInt16 port)
     {
-        SYSSOCKET s = ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-        if (s == SYS_INVALID_SOCKET) {
-            LOG4CPLUS_ERROR(logger(), "Cannot create UDP socket");
+        LOG4CPLUS_TRACE(logger(), "DMasterClient::onRendezvous(" << connId << ", err=" << err << ", s=" << s << ", " << DTun::ipPortToString(ip, port) << ")");
+
+        boost::mutex::scoped_lock lock(m_);
+
+        if (closing_) {
+            if (s != SYS_INVALID_SOCKET) {
+                DTun::closeSysSocketChecked(s);
+            }
             return;
         }
 
-        SYSSOCKET boundSock = dup(s);
-        if (boundSock == -1) {
-            LOG4CPLUS_ERROR(logger(), "Cannot dup UDP socket");
-            DTun::closeSysSocketChecked(s);
+        ConnStateMap::iterator it = connStates_.find(connId);
+        assert(it != connStates_.end());
+        if (it == connStates_.end()) {
+            if (s != SYS_INVALID_SOCKET) {
+                DTun::closeSysSocketChecked(s);
+            }
             return;
         }
 
-        struct sockaddr_in addr;
+        boost::shared_ptr<ConnState> tmp = it->second;
 
-        memset(&addr, 0, sizeof(addr));
-        addr.sin_family = AF_INET;
-        addr.sin_addr.s_addr = htonl(INADDR_ANY);
+        it->second->rSess.reset();
 
-        int res = ::bind(s, (const struct sockaddr*)&addr, sizeof(addr));
+        bool sendClose = true;
 
-        if (res == SYS_SOCKET_ERROR) {
-            LOG4CPLUS_ERROR(logger(), "Cannot bind UDP socket");
-            DTun::closeSysSocketChecked(s);
-            DTun::closeSysSocketChecked(boundSock);
-            return;
+        boost::shared_ptr<DTun::SHandle> handle;
+
+        if (!err) {
+            handle = remoteMgr_.createStreamSocket();
+            if (!handle || !handle->bind(s)) {
+                err = DPROTOCOL_STATUS_ERR_UNKNOWN;
+                if (s != SYS_INVALID_SOCKET) {
+                    DTun::closeSysSocketChecked(s);
+                    s = SYS_INVALID_SOCKET;
+                }
+            }
         }
 
-        boost::shared_ptr<DMasterSession> sess =
-            boost::make_shared<DMasterSession>(boost::ref(remoteMgr_), address_, port_);
-
-        if (!sess->startAcceptor(s, srcNodeId, nodeId_, srcConnId,
-            boost::bind(&DMasterClient::onAcceptConnection, this, _1, boost::weak_ptr<DMasterSession>(sess),
-                localIp, localPort, remoteIp, remotePort))) {
-            DTun::closeSysSocketChecked(boundSock);
-            return;
+        if (err) {
+            connStates_.erase(it);
+        } else {
+            sendClose = (it->second->status != ConnStatusEstablished);
+            tmp->status = it->second->status = ConnStatusEstablished;
+            it->second->boundHandle = handle;
         }
 
-        accMasterSessions_.insert(std::make_pair(sess, boost::make_shared<SysSocketHolder>(boundSock)));
+        if (sendClose) {
+            DTun::DProtocolMsgConnClose msg;
+
+            msg.connId = DTun::toProtocolConnId(connId);
+            msg.established = (tmp->status == ConnStatusEstablished);
+
+            sendMsg(DPROTOCOL_MSG_CONN_CLOSE, &msg, sizeof(msg));
+        }
+
+        lock.unlock();
+
+        tmp->rSess.reset();
+
+        if (tmp->callback) {
+            tmp->callback(err, handle, ip, port);
+            tmp->callback = RegisterConnectionCallback();
+        } else if (!err) {
+            boost::shared_ptr<ProxySession> proxySession =
+                boost::make_shared<ProxySession>(boost::ref(remoteMgr_), boost::ref(localMgr_));
+            bool res = proxySession->start(handle, tmp->remoteIp, tmp->remotePort, ip, port,
+                boost::bind(&DMasterClient::onProxyDone, this, connId));
+            lock.lock();
+            it = connStates_.find(connId);
+            if (it != connStates_.end()) {
+                if (res) {
+                    it->second->proxySession = proxySession;
+                } else {
+                    connStates_.erase(it);
+                }
+            }
+            lock.unlock();
+            proxySession.reset();
+        }
+
+        lock.lock();
+
+        while (processRendezvous(lock)) {}
+    }
+
+    void DMasterClient::sendMsg(DTun::UInt8 msgCode, const void* msg, int msgSize)
+    {
+        DTun::DProtocolHeader header;
+
+        header.msgCode = msgCode;
+
+        boost::shared_ptr<std::vector<char> > sndBuff =
+            boost::make_shared<std::vector<char> >(sizeof(header) + msgSize);
+
+        memcpy(&(*sndBuff)[0], &header, sizeof(header));
+        memcpy(&(*sndBuff)[0] + sizeof(header), msg, msgSize);
+
+        conn_->write(&(*sndBuff)[0], &(*sndBuff)[0] + sndBuff->size(),
+            boost::bind(&DMasterClient::onSend, this, _1, sndBuff));
+    }
+
+    bool DMasterClient::processRendezvous(boost::mutex::scoped_lock& lock)
+    {
+        bool running = false;
+
+        for (ConnStateMap::const_iterator it = connStates_.begin(); it != connStates_.end(); ++it) {
+            if (it->second->rSess) {
+                if (it->second->mode > RendezvousModeFast) {
+                    // Symm rendezvous session is in progress, don't do anything until its done.
+                    return false;
+                } else {
+                    assert(it->second->mode == RendezvousModeFast);
+                    running = true;
+                    break;
+                }
+            }
+        }
+
+        for (ConnIdList::iterator it = rendezvousConnIds_.begin(); it != rendezvousConnIds_.end();) {
+            DTun::ConnId connId = *it;
+            ConnStateMap::iterator jt = connStates_.find(connId);
+            if (jt == connStates_.end()) {
+                rendezvousConnIds_.erase(it++);
+                continue;
+            }
+
+            assert(!jt->second->rSess);
+            assert(jt->second->status != ConnStatusEstablished);
+            assert(!jt->second->boundHandle);
+            assert(!jt->second->proxySession);
+
+            if ((jt->second->mode == RendezvousModeUnknown) && (jt->second->status == ConnStatusNone)) {
+                if (running) {
+                    if (jt->second->triedFastOnly) {
+                        break;
+                    } else {
+                        jt->second->triedFastOnly = true;
+                    }
+                }
+
+                jt->second->status = ConnStatusPending;
+
+                DTun::DProtocolMsgConnCreate msg;
+
+                msg.connId = DTun::toProtocolConnId(connId);
+                bool res = getDstNodeId(jt->second->remoteIp, msg.dstNodeId);
+                assert(res);
+                msg.remoteIp = jt->second->remoteIp;
+                msg.remotePort = jt->second->remotePort;
+                msg.fastOnly = running ? 1 : 0;
+
+                sendMsg(DPROTOCOL_MSG_CONN_CREATE, &msg, sizeof(msg));
+                break;
+            } else if (jt->second->mode >= RendezvousModeFast) {
+                assert(jt->second->status == ConnStatusPending);
+                rendezvousConnIds_.erase(it++);
+
+                bool res = false;
+
+                switch (jt->second->mode) {
+                case RendezvousModeFast: {
+                    boost::shared_ptr<RendezvousFastSession> rSess =
+                        boost::make_shared<RendezvousFastSession>(boost::ref(localMgr_), boost::ref(remoteMgr_), nodeId_, connId);
+                    jt->second->rSess = rSess;
+                    res = rSess->start(address_, port_, boost::bind(&DMasterClient::onRendezvous, this, connId, _1, _2, _3, _4));
+                    break;
+                }
+                case RendezvousModeSymmConn: {
+                    /*boost::shared_ptr<RendezvousSymmConnSession> rSess =
+                        boost::make_shared<RendezvousSymmConnSession>(connId, !!jt->second->callback);
+                    jt->second->rSess = rSess;
+                    res = rSess->start(boost::bind(&DMasterClient::onRendezvous, this, connId, _1, _2, _3, _4));*/
+                    break;
+                }
+                case RendezvousModeSymmAcc: {
+                    /*boost::shared_ptr<RendezvousSymmAccSession> rSess =
+                        boost::make_shared<RendezvousSymmAccSession>(connId, !!jt->second->callback);
+                    jt->second->rSess = rSess;
+                    res = rSess->start(boost::bind(&DMasterClient::onRendezvous, this, connId, _1, _2, _3, _4));*/
+                    break;
+                }
+                default:
+                    assert(false);
+                    break;
+                }
+
+                if (!res) {
+                    boost::shared_ptr<RendezvousSession> rSess = jt->second->rSess;
+                    RegisterConnectionCallback cb = jt->second->callback;
+                    connStates_.erase(jt);
+
+                    DTun::DProtocolMsgConnClose msg;
+
+                    msg.connId = DTun::toProtocolConnId(connId);
+                    msg.established = 0;
+
+                    sendMsg(DPROTOCOL_MSG_CONN_CLOSE, &msg, sizeof(msg));
+                    lock.unlock();
+                    rSess.reset();
+                    if (cb) {
+                        cb(DPROTOCOL_STATUS_ERR_CANCELED, boost::shared_ptr<DTun::SHandle>(), 0, 0);
+                    }
+                    return true;
+                }
+            } else {
+                break;
+            }
+        }
+
+        return false;
     }
 }

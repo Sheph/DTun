@@ -5,19 +5,20 @@
 #include "DTun/DProtocol.h"
 #include "DTun/SManager.h"
 #include "DTun/AppConfig.h"
-#include "DMasterSession.h"
 #include "ProxySession.h"
+#include "RendezvousSession.h"
 #include <boost/optional.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/weak_ptr.hpp>
 #include <set>
+#include <list>
 
 namespace DNode
 {
     class DMasterClient : boost::noncopyable
     {
     public:
-        typedef boost::function<void (int, DTun::UInt32, DTun::UInt16)> RegisterConnectionCallback;
+        typedef boost::function<void (int, const boost::shared_ptr<DTun::SHandle>, DTun::UInt32, DTun::UInt16)> RegisterConnectionCallback;
 
         DMasterClient(DTun::SManager& remoteMgr, DTun::SManager& localMgr,
             const boost::shared_ptr<DTun::AppConfig>& appConfig);
@@ -25,21 +26,32 @@ namespace DNode
 
         bool start();
 
-        void changeNumOutConnections(int diff);
-
-        // 's' will be closed even in case of failure!
-        DTun::UInt32 registerConnection(SYSSOCKET s,
-            DTun::UInt32 remoteIp,
+        DTun::ConnId registerConnection(DTun::UInt32 remoteIp,
             DTun::UInt16 remotePort,
             const RegisterConnectionCallback& callback);
 
-        void cancelConnection(DTun::UInt32 connId);
+        void closeConnection(const DTun::ConnId& connId);
 
         void dump();
 
         bool getDstNodeId(DTun::UInt32 remoteIp, DTun::UInt32& dstNodeId) const;
 
     private:
+        enum RendezvousMode
+        {
+            RendezvousModeUnknown = 0,
+            RendezvousModeFast,
+            RendezvousModeSymmConn,
+            RendezvousModeSymmAcc
+        };
+
+        enum ConnStatus
+        {
+            ConnStatusNone = 0,
+            ConnStatusPending,
+            ConnStatusEstablished
+        };
+
         struct RouteEntry
         {
             RouteEntry()
@@ -51,49 +63,47 @@ namespace DNode
             boost::optional<DTun::UInt32> nodeId;
         };
 
-        struct ConnMasterSession
+        struct ConnState : boost::noncopyable
         {
-            boost::shared_ptr<DMasterSession> sess;
+            ConnState()
+            : remoteIp(0)
+            , remotePort(0)
+            , mode(RendezvousModeUnknown)
+            , status(ConnStatusNone)
+            , triedFastOnly(false) {}
+
+            DTun::ConnId connId;
+            DTun::UInt32 remoteIp;
+            DTun::UInt16 remotePort;
             RegisterConnectionCallback callback;
-        };
-
-        struct SysSocketHolder : boost::noncopyable
-        {
-            SysSocketHolder();
-            explicit SysSocketHolder(SYSSOCKET sock);
-            ~SysSocketHolder();
-
-            SYSSOCKET sock;
+            RendezvousMode mode;
+            ConnStatus status;
+            bool triedFastOnly;
+            boost::shared_ptr<RendezvousSession> rSess;
+            boost::shared_ptr<DTun::SHandle> boundHandle;
+            boost::shared_ptr<ProxySession> proxySession;
         };
 
         typedef std::vector<RouteEntry> Routes;
-        typedef std::map<DTun::UInt32, ConnMasterSession> ConnMasterSessionMap;
-        typedef std::map<boost::shared_ptr<DMasterSession>, boost::shared_ptr<SysSocketHolder> > AccMasterSessions;
-        typedef std::set<boost::shared_ptr<ProxySession> > ProxySessions;
+        typedef std::map<DTun::ConnId, boost::shared_ptr<ConnState> > ConnStateMap;
+        typedef std::list<DTun::ConnId> ConnIdList;
 
         void onProbeConnect(int err);
         void onProbeSend(int err);
         void onProbeRecv(int err, int numBytes);
         void onConnect(int err);
-        void onSend(int err);
+        void onHelloSend(int err);
+        void onSend(int err, const boost::shared_ptr<std::vector<char> >& sndBuff);
         void onRecvHeader(int err, int numBytes);
         void onRecvMsgConn(int err, int numBytes);
-        void onRecvMsgConnOK(int err, int numBytes);
-        void onRecvMsgConnErr(int err, int numBytes);
-        void onRegisterConnection(int err, DTun::UInt32 connId);
-        void onAcceptConnection(int err, const boost::weak_ptr<DMasterSession>& sess,
-            DTun::UInt32 localIp,
-            DTun::UInt16 localPort,
-            DTun::UInt32 remoteIp,
-            DTun::UInt16 remotePort);
-        void onProxyDone(const boost::weak_ptr<ProxySession>& sess);
+        void onRecvMsgConnStatus(int err, int numBytes);
+        void onRecvMsgOther(int err, int numBytes, DTun::UInt8 msgId);
+        void onProxyDone(const DTun::ConnId& connId);
+        void onRendezvous(const DTun::ConnId& connId, int err, SYSSOCKET s, DTun::UInt32 remoteIp, DTun::UInt16 remotePort);
 
-        void startAccMasterSession(DTun::UInt32 srcNodeId,
-            DTun::UInt32 srcConnId,
-            DTun::UInt32 localIp,
-            DTun::UInt16 localPort,
-            DTun::UInt32 remoteIp,
-            DTun::UInt16 remotePort);
+        void sendMsg(DTun::UInt8 msgCode, const void* msg, int msgSize);
+
+        bool processRendezvous(boost::mutex::scoped_lock& lock);
 
         DTun::SManager& remoteMgr_;
         DTun::SManager& localMgr_;
@@ -108,12 +118,10 @@ namespace DNode
         bool closing_;
         DTun::UInt32 probedIp_;
         DTun::UInt16 probedPort_;
-        DTun::UInt32 nextConnId_;
-        int numOutConnections_;
+        DTun::UInt32 nextConnIdx_;
         std::vector<char> buff_;
-        ConnMasterSessionMap connMasterSessions_;
-        AccMasterSessions accMasterSessions_;
-        ProxySessions proxySessions_;
+        ConnIdList rendezvousConnIds_;
+        ConnStateMap connStates_;
         boost::shared_ptr<DTun::SConnection> conn_;
         boost::shared_ptr<DTun::SConnector> connector_;
     };

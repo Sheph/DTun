@@ -19,16 +19,10 @@ namespace DNode
         ~DMasterSession();
 
         // 's' will be closed even in case of failure!
-        bool startConnector(SYSSOCKET s, DTun::UInt32 srcNodeId,
-            DTun::UInt32 dstNodeId,
-            DTun::UInt32 connId,
-            DTun::UInt32 remoteIp,
-            DTun::UInt16 remotePort,
+        bool startFast(SYSSOCKET s, DTun::UInt32 nodeId, const DTun::ConnId& connId,
             const Callback& callback);
         // 's' will be closed even in case of failure!
-        bool startAcceptor(SYSSOCKET s, DTun::UInt32 srcNodeId,
-            DTun::UInt32 dstNodeId,
-            DTun::UInt32 connId,
+        bool startSymm(SYSSOCKET s, DTun::UInt32 nodeId, const DTun::ConnId& connId,
             const Callback& callback);
 
         inline const boost::shared_ptr<DTun::SConnection>& conn() const { return conn_; }
