@@ -517,7 +517,7 @@ namespace DNode
         memcpy(&msg, &buff_[0], numBytes);
 
         LOG4CPLUS_TRACE(logger(), "Proxy request: connId = " << DTun::fromProtocolConnId(msg.connId) << ", remote_addr = " << DTun::ipPortToString(msg.ip, msg.port)
-            << ", mode = " << msg.mode);
+            << ", mode = " << (int)msg.mode);
 
         boost::shared_ptr<ConnState> connState =
             boost::make_shared<ConnState>();
@@ -654,7 +654,7 @@ namespace DNode
 
     void DMasterClient::onRecvMsgOther(int err, int numBytes, DTun::UInt8 msgId)
     {
-        LOG4CPLUS_TRACE(logger(), "DMasterClient::onRecvMsgOther(" << err << ", " << numBytes << ", " << msgId << ")");
+        LOG4CPLUS_TRACE(logger(), "DMasterClient::onRecvMsgOther(" << err << ", " << numBytes << ", " << (int)msgId << ")");
 
         boost::mutex::scoped_lock lock(m_);
 
@@ -754,9 +754,9 @@ namespace DNode
                 err = DPROTOCOL_STATUS_ERR_UNKNOWN;
                 if (s != SYS_INVALID_SOCKET) {
                     DTun::closeSysSocketChecked(s);
-                    s = SYS_INVALID_SOCKET;
                 }
             }
+            s = SYS_INVALID_SOCKET;
         }
 
         if (err) {

@@ -75,6 +75,7 @@ namespace DMaster
         mgr_.reactor().run();
         acceptor_.reset();
         sessions_.clear();
+        conns_.clear();
     }
 
     void Server::stop()
@@ -143,7 +144,32 @@ namespace DMaster
 
     void Server::onSessionMessage(const boost::weak_ptr<Session>& sess, DTun::UInt8 msgCode, const void* msg)
     {
+        boost::shared_ptr<Session> sess_shared = sess.lock();
+        if (!sess_shared) {
+            return;
+        }
 
+        switch (msgCode) {
+        case DPROTOCOL_MSG_CONN_CREATE: {
+            const DTun::DProtocolMsgConnCreate* msgConnCreate = (const DTun::DProtocolMsgConnCreate*)msg;
+            onSessionConnCreate(sess_shared, DTun::fromProtocolConnId(msgConnCreate->connId), msgConnCreate->dstNodeId,
+                msgConnCreate->remoteIp, msgConnCreate->remotePort, msgConnCreate->fastOnly);
+            break;
+        }
+        case DPROTOCOL_MSG_CONN_CLOSE: {
+            const DTun::DProtocolMsgConnClose* msgConnClose = (const DTun::DProtocolMsgConnClose*)msg;
+            onSessionConnClose(sess_shared, DTun::fromProtocolConnId(msgConnClose->connId), msgConnClose->established);
+            break;
+        }
+        case DPROTOCOL_MSG_SYMM_NEXT: {
+            const DTun::DProtocolMsgSymmNext* msgSymmNext = (const DTun::DProtocolMsgSymmNext*)msg;
+            onSessionSymmNext(sess_shared, DTun::fromProtocolConnId(msgSymmNext->connId));
+            break;
+        }
+        default:
+            assert(false);
+            break;
+        }
     }
 
     void Server::onSessionError(const boost::weak_ptr<Session>& sess, int errCode)

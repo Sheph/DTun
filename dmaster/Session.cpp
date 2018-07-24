@@ -262,7 +262,7 @@ namespace DMaster
 
     void Session::onRecvMsgOther(int err, int numBytes, DTun::UInt8 msgCode)
     {
-        LOG4CPLUS_TRACE(logger(), "Session::onRecvMsgOther(" << err << ", " << numBytes << ", " << msgCode << ")");
+        LOG4CPLUS_TRACE(logger(), "Session::onRecvMsgOther(" << err << ", " << numBytes << ", " << (int)msgCode << ")");
 
         if (err) {
             if (errorCallback_) {

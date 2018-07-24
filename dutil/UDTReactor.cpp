@@ -185,10 +185,10 @@ namespace DTun
 
             for (std::set<UDTSOCKET>::const_iterator it = readfds.begin(); it != readfds.end(); ++it) {
                 if (*it == signalRdSock_) {
-                    LOG4CPLUS_TRACE(logger(), "epoll rd: signal");
+                    //LOG4CPLUS_TRACE(logger(), "epoll rd: signal");
                     signalRd();
                 } else {
-                    LOG4CPLUS_TRACE(logger(), "epoll rd: " << *it);
+                    //LOG4CPLUS_TRACE(logger(), "epoll rd: " << *it);
                     PollHandlerMap::iterator psIt = pollHandlers_.find(*it);
                     if ((psIt != pollHandlers_.end()) && ((psIt->second.pollEvents & UDT_EPOLL_IN) != 0)) {
                         boost::mutex::scoped_lock lock(m_);
@@ -205,7 +205,7 @@ namespace DTun
                 }
             }
             for (std::set<UDTSOCKET>::const_iterator it = writefds.begin(); it != writefds.end(); ++it) {
-                LOG4CPLUS_TRACE(logger(), "epoll wr: " << *it);
+                //LOG4CPLUS_TRACE(logger(), "epoll wr: " << *it);
                 PollHandlerMap::iterator psIt = pollHandlers_.find(*it);
                 if ((psIt != pollHandlers_.end()) && ((psIt->second.pollEvents & UDT_EPOLL_OUT) != 0)) {
                     boost::mutex::scoped_lock lock(m_);
@@ -259,7 +259,7 @@ namespace DTun
 
             processUpdates();
 
-            LOG4CPLUS_TRACE(logger(), "epoll run done");
+            //LOG4CPLUS_TRACE(logger(), "epoll run done");
         }
 
         processUpdates();

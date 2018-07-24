@@ -143,10 +143,10 @@ namespace DTun
                 SYSSOCKET fd = ev[i].data.fd;
                 if ((ev[i].events & (EPOLLIN | EPOLLERR)) != 0) {
                     if (fd == signalRdSock_) {
-                        LOG4CPLUS_TRACE(logger(), "epoll rd: signal");
+                        //LOG4CPLUS_TRACE(logger(), "epoll rd: signal");
                         signalRd();
                     } else {
-                        LOG4CPLUS_TRACE(logger(), "epoll rd: " << fd);
+                        //LOG4CPLUS_TRACE(logger(), "epoll rd: " << fd);
                         PollHandlerMap::iterator psIt = pollHandlers_.find(fd);
                         if ((psIt != pollHandlers_.end()) && ((psIt->second.pollEvents & EPOLLIN) != 0)) {
                             boost::mutex::scoped_lock lock(m_);
@@ -163,7 +163,7 @@ namespace DTun
                     }
                 }
                 if ((ev[i].events & (EPOLLOUT | EPOLLERR)) != 0) {
-                    LOG4CPLUS_TRACE(logger(), "epoll wr: " << fd);
+                    //LOG4CPLUS_TRACE(logger(), "epoll wr: " << fd);
                     PollHandlerMap::iterator psIt = pollHandlers_.find(fd);
                     if ((psIt != pollHandlers_.end()) && ((psIt->second.pollEvents & EPOLLOUT) != 0)) {
                         boost::mutex::scoped_lock lock(m_);
@@ -184,7 +184,7 @@ namespace DTun
 
             processUpdates();
 
-            LOG4CPLUS_TRACE(logger(), "epoll run done");
+            //LOG4CPLUS_TRACE(logger(), "epoll run done");
         }
 
         processUpdates();

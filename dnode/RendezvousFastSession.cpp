@@ -70,6 +70,8 @@ namespace DNode
 
     void RendezvousFastSession::onMsg(DTun::UInt8 msgId, const void* msg)
     {
+        LOG4CPLUS_TRACE(logger(), "RendezvousFastSession::onMsg(" << (int)msgId << ")");
+
         if (msgId != DPROTOCOL_MSG_FAST) {
             return;
         }

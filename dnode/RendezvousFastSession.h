@@ -34,9 +34,9 @@ namespace DNode
         Callback callback_;
         DTun::UInt32 destIp_;
         DTun::UInt16 destPort_;
+        boost::shared_ptr<DTun::OpWatch> watch_;
         boost::shared_ptr<DMasterSession> masterSession_;
         boost::shared_ptr<DTun::SConnection> pingConn_;
-        boost::shared_ptr<DTun::OpWatch> watch_;
     };
 }
 
