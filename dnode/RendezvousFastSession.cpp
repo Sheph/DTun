@@ -182,8 +182,13 @@ namespace DNode
 
         if (!err) {
             if (numBytes != 4) {
-                LOG4CPLUS_WARN(logger(), "RendezvousFastSession::onRecvPing bad ping len: "
-                    << numBytes);
+                if ((ip != destIp_) || (port != destPort_)) {
+                    LOG4CPLUS_WARN(logger(), "RendezvousFastSession::onRecvPing bad ping len: "
+                        << numBytes);
+                } else {
+                    // we might receive SYN here from LTUDP session that's already created by the peer,
+                    // we'll reply to it later in our own LTUDP session...
+                }
                 pingConn_->readFrom(&rcvBuff_[0], &rcvBuff_[0] + rcvBuff_.size(),
                     boost::bind(&RendezvousFastSession::onRecvPing, this, _1, _2, _3, _4));
                 return;

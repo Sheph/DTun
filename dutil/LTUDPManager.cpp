@@ -290,7 +290,7 @@ namespace DTun
             uint8_t b = (*rcvBuff)[sizeof(struct ip_hdr) + 4 + 1];
             uint8_t c = (*rcvBuff)[sizeof(struct ip_hdr) + 4 + 2];
             uint8_t d = (*rcvBuff)[sizeof(struct ip_hdr) + 4 + 3];
-            if ((a == 0x11) && (b == 0x22) && (c == 0x33) && (d == 0x44)) {
+            if ((a == 0xAA) && (b == 0xBB) && (c == 0xCC) && (d == 0xDD)) {
                 LOG4CPLUS_TRACE(logger(), "LTUDPManager::onRecv support ping");
             } else {
                 LOG4CPLUS_WARN(logger(), "LTUDPManager::onRecv bad support ping: " << (int)a << "," << (int)b << "," << (int)c << "," << (int)d);
