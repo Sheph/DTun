@@ -96,7 +96,7 @@ namespace DTun
     {
         // The idea is that we check for sock_ to get freed inside UDT, once
         // underlying UDP socket is closed 'sock_' gets NONEXIST state.
-        return (UDT::getsockstate(checkReuseSock_) == NONEXIST);
+        return (sock_ == UDT::INVALID_SOCK) && (UDT::getsockstate(checkReuseSock_) == NONEXIST);
     }
 
     boost::shared_ptr<SConnector> UDTHandle::createConnector()

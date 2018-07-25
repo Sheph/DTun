@@ -818,8 +818,10 @@ namespace DNode
         memcpy(&(*sndBuff)[0], &header, sizeof(header));
         memcpy(&(*sndBuff)[0] + sizeof(header), msg, msgSize);
 
-        conn_->write(&(*sndBuff)[0], &(*sndBuff)[0] + sndBuff->size(),
-            boost::bind(&DMasterClient::onSend, this, _1, sndBuff));
+        if (conn_) {
+            conn_->write(&(*sndBuff)[0], &(*sndBuff)[0] + sndBuff->size(),
+                boost::bind(&DMasterClient::onSend, this, _1, sndBuff));
+        }
     }
 
     bool DMasterClient::processRendezvous(boost::mutex::scoped_lock& lock)

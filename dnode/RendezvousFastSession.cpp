@@ -131,7 +131,18 @@ namespace DNode
     {
         LOG4CPLUS_TRACE(logger(), "RendezvousFastSession::onHelloSend(" << err << ")");
 
+        boost::shared_ptr<DTun::SHandle> masterHandle;
+
+        if (!err) {
+            masterHandle = masterSession_->conn()->handle();
+            masterSession_->conn()->close(true);
+        }
+
         boost::mutex::scoped_lock lock(m_);
+
+        if (callback_ && !err) {
+            masterHandle_ = masterHandle;
+        }
 
         if (!callback_ || !err) {
             return;
@@ -220,7 +231,8 @@ namespace DNode
         }
 
         boost::shared_ptr<DTun::SConnection> conn = masterSession_->conn();
-        if ((destIp_ != 0) && conn && conn->handle()->canReuse()) {
+
+        if ((destIp_ != 0) && masterHandle_ && masterHandle_->canReuse()) {
             rcvBuff_.resize(4096);
             pingConn_->readFrom(&rcvBuff_[0], &rcvBuff_[0] + rcvBuff_.size(),
                 boost::bind(&RendezvousFastSession::onRecvPing, this, _1, _2, _3, _4));

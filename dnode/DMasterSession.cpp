@@ -103,8 +103,6 @@ namespace DNode
     {
         LOG4CPLUS_TRACE(logger(), "DMasterSession::onSend(" << err << ")");
 
-        conn_->close(true);
-
         callback_(err);
     }
 }
