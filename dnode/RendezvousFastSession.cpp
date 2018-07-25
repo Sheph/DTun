@@ -130,6 +130,8 @@ namespace DNode
     {
         LOG4CPLUS_TRACE(logger(), "RendezvousFastSession::onHelloSend(" << err << ")");
 
+        masterSession_.reset();
+
         boost::mutex::scoped_lock lock(m_);
 
         if (!callback_) {

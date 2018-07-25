@@ -53,8 +53,6 @@ namespace DTun
 
         int read(char* first, char* last, int& numRead);
 
-        void rendezvousPing(UInt32 destIp, UInt16 destPort);
-
     private:
         static err_t listenerAcceptFunc(void* arg, struct tcp_pcb* newpcb, err_t err);
 

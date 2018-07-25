@@ -62,7 +62,8 @@ namespace DTun
         } else {
             handle_->impl()->listen(1,
                 watch_->wrap<boost::shared_ptr<SHandle> >(boost::bind(&LTUDPConnector::onRendezvousAccept, this, _1, callback)));
-            onRendezvousTimeout(6, 3000, destIp, destPort, callback);
+            handle_->reactor().post(watch_->wrap(
+                boost::bind(&LTUDPConnector::onRendezvousTimeout, this, callback)), 18000);
         }
     }
 
@@ -89,21 +90,15 @@ namespace DTun
         callback(0);
     }
 
-    void LTUDPConnector::onRendezvousTimeout(int count, int timeoutMs, UInt32 destIp, UInt16 destPort, const ConnectCallback& callback)
+    void LTUDPConnector::onRendezvousTimeout(const ConnectCallback& callback)
     {
-        LOG4CPLUS_TRACE(logger(), "LTUDPConnector::onRendezvousTimeout(" << count << ")");
+        LOG4CPLUS_TRACE(logger(), "LTUDPConnector::onRendezvousTimeout()");
 
         if (handedOut_) {
             return;
         }
 
-        if (count == 0) {
-            handedOut_ = true;
-            callback(ERR_TIMEOUT);
-        } else {
-            handle_->impl()->rendezvousPing(destIp, destPort);
-            handle_->reactor().post(watch_->wrap(
-                boost::bind(&LTUDPConnector::onRendezvousTimeout, this, count - 1, timeoutMs, destIp, destPort, callback)), timeoutMs);
-        }
+        handedOut_ = true;
+        callback(ERR_TIMEOUT);
     }
 }
