@@ -66,8 +66,6 @@ namespace DTun
 
         static void errorFunc(void* arg, err_t err);
 
-        static void onRendezvousPingSend(int err, const boost::shared_ptr<std::vector<char> >& sndBuff);
-
         void setupPCB(struct tcp_pcb* pcb);
 
         LTUDPManager& mgr_;

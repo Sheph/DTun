@@ -436,11 +436,6 @@ namespace DTun
         }
     }
 
-    void LTUDPHandleImpl::onRendezvousPingSend(int err, const boost::shared_ptr<std::vector<char> >& sndBuff)
-    {
-        LOG4CPLUS_TRACE(logger(), "LTUDP RendezvousPingSend(" << err << ")");
-    }
-
     void LTUDPHandleImpl::setupPCB(struct tcp_pcb* pcb)
     {
         ip_set_option(pcb, SOF_REUSEADDR);

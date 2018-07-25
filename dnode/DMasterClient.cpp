@@ -566,11 +566,11 @@ namespace DNode
 
     void DMasterClient::onRecvMsgConnStatus(int err, int numBytes)
     {
-        LOG4CPLUS_TRACE(logger(), "DMasterClient::onRecvMsgConnStatus(" << err << ", " << numBytes << ")");
-
         boost::mutex::scoped_lock lock(m_);
 
         if (err) {
+            LOG4CPLUS_TRACE(logger(), "DMasterClient::onRecvMsgConnStatus(" << err << ", " << numBytes << ")");
+
             boost::shared_ptr<DTun::SConnection> tmp = conn_;
             conn_.reset();
             lock.unlock();
@@ -583,6 +583,9 @@ namespace DNode
         memcpy(&msg, &buff_[0], numBytes);
 
         DTun::ConnId connId = DTun::fromProtocolConnId(msg.connId);
+
+        LOG4CPLUS_TRACE(logger(), "DMasterClient::onRecvMsgConnStatus(connId = " << connId << ", mode = "
+            << (int)msg.mode << ", status = " << (int)msg.statusCode << ")");
 
         buff_.resize(sizeof(DTun::DProtocolHeader));
         conn_->read(&buff_[0], &buff_[0] + buff_.size(),
@@ -826,6 +829,10 @@ namespace DNode
 
     bool DMasterClient::processRendezvous(boost::mutex::scoped_lock& lock)
     {
+        if (!conn_) {
+            return false;
+        }
+
         bool running = false;
 
         for (ConnStateMap::const_iterator it = connStates_.begin(); it != connStates_.end(); ++it) {
@@ -891,17 +898,33 @@ namespace DNode
                     break;
                 }
                 case RendezvousModeSymmConn: {
-                    /*boost::shared_ptr<RendezvousSymmConnSession> rSess =
-                        boost::make_shared<RendezvousSymmConnSession>(connId, !!jt->second->callback);
+                    std::vector<boost::shared_ptr<DTun::SHandle> > keepalive;
+                    for (ConnStateMap::const_iterator it = connStates_.begin(); it != connStates_.end(); ++it) {
+                        if (it->second->boundHandle) {
+                            keepalive.push_back(it->second->boundHandle);
+                        }
+                    }
+
+                    boost::shared_ptr<RendezvousSymmConnSession> rSess =
+                        boost::make_shared<RendezvousSymmConnSession>(boost::ref(localMgr_),
+                            nodeId_, connId, conn_, keepalive);
                     jt->second->rSess = rSess;
-                    res = rSess->start(boost::bind(&DMasterClient::onRendezvous, this, connId, _1, _2, _3, _4));*/
+                    res = rSess->start(boost::bind(&DMasterClient::onRendezvous, this, connId, _1, _2, _3, _4));
                     break;
                 }
                 case RendezvousModeSymmAcc: {
-                    /*boost::shared_ptr<RendezvousSymmAccSession> rSess =
-                        boost::make_shared<RendezvousSymmAccSession>(connId, !!jt->second->callback);
+                    std::vector<boost::shared_ptr<DTun::SHandle> > keepalive;
+                    for (ConnStateMap::const_iterator it = connStates_.begin(); it != connStates_.end(); ++it) {
+                        if (it->second->boundHandle) {
+                            keepalive.push_back(it->second->boundHandle);
+                        }
+                    }
+
+                    boost::shared_ptr<RendezvousSymmAccSession> rSess =
+                        boost::make_shared<RendezvousSymmAccSession>(boost::ref(localMgr_), boost::ref(remoteMgr_),
+                            nodeId_, connId, keepalive);
                     jt->second->rSess = rSess;
-                    res = rSess->start(boost::bind(&DMasterClient::onRendezvous, this, connId, _1, _2, _3, _4));*/
+                    res = rSess->start(boost::bind(&DMasterClient::onRendezvous, this, connId, _1, _2, _3, _4));
                     break;
                 }
                 default:

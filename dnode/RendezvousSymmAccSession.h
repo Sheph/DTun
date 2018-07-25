@@ -3,17 +3,20 @@
 
 #include "RendezvousSession.h"
 #include "DMasterSession.h"
+#include "DTun/SManager.h"
 #include "DTun/OpWatch.h"
+#include <boost/thread/mutex.hpp>
 
 namespace DNode
 {
     class RendezvousSymmAccSession : public RendezvousSession
     {
     public:
-        RendezvousSymmAccSession(const DTun::ConnId& connId, bool owner);
+        RendezvousSymmAccSession(DTun::SManager& localMgr, DTun::SManager& remoteMgr,
+            DTun::UInt32 nodeId, const DTun::ConnId& connId,
+            const std::vector<boost::shared_ptr<DTun::SHandle> >& keepalive);
         ~RendezvousSymmAccSession();
 
-        //bool start(const boost::shared_ptr<DTun::SConnection>& serverConn, const std::vector<boost::shared_ptr<DTun::SHandle> >& keepalive, const Callback& callback);
         bool start(const Callback& callback);
 
         virtual void onMsg(DTun::UInt8 msgId, const void* msg);
@@ -21,18 +24,23 @@ namespace DNode
         virtual void onEstablished();
 
     private:
-        void onSymmNext();
-        void onPingSend(int err);
         void onHelloSend(int err);
-        void onSymmTimeout();
+        void onPingSend(int err, const boost::shared_ptr<std::vector<char> >& sndBuff);
+        void onRecvPing(int err, int numBytes, DTun::UInt32 ip, DTun::UInt16 port, const boost::shared_ptr<std::vector<char> >& rcvBuff);
+        void onSymmNextTimeout();
 
+        DTun::SManager& localMgr_;
+        DTun::SManager& remoteMgr_;
         bool owner_;
+        boost::mutex m_;
         int stepIdx_;
-        SYSSOCKET s_;
+        int numPingSent_;
+        int numKeepaliveSent_;
         Callback callback_;
-        boost::shared_ptr<DMasterSession> masterSession_;
-        boost::shared_ptr<DTun::SConnection> serverConn_;
         boost::shared_ptr<DTun::OpWatch> watch_;
+        std::vector<boost::shared_ptr<DTun::SHandle> > keepalive_;
+        boost::shared_ptr<DTun::SConnection> pingConn_;
+        boost::shared_ptr<DMasterSession> masterSession_;
     };
 }
 
