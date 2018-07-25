@@ -16,10 +16,10 @@ namespace DTun
         close();
     }
 
-    void LTUDPAcceptor::close()
+    void LTUDPAcceptor::close(bool immediate)
     {
         if (watch_->close()) {
-            handle_->close();
+            handle_->close(immediate);
         }
     }
 

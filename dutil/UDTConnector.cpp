@@ -72,11 +72,11 @@ namespace DTun
         return true;
     }
 
-    void UDTConnector::close()
+    void UDTConnector::close(bool immediate)
     {
         boost::shared_ptr<UDTHandle> handle = reactor().remove(this);
         if (!noCloseSock_ && handle) {
-            handle->close();
+            handle->close(immediate);
         }
     }
 

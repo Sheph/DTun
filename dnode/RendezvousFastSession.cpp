@@ -64,8 +64,15 @@ namespace DNode
         pingConn_ = handle->createConnection();
         masterSession_ =
             boost::make_shared<DMasterSession>(boost::ref(remoteMgr_), serverAddr, serverPort);
-        return masterSession_->startFast(s, nodeId(), connId(),
+        bool startRes = masterSession_->startFast(s, nodeId(), connId(),
             boost::bind(&RendezvousFastSession::onHelloSend, this, _1));
+
+        lock.unlock();
+
+        localMgr_.reactor().post(
+            watch_->wrap(boost::bind(&RendezvousFastSession::onCheckStartTimeout, this)));
+
+        return startRes;
     }
 
     void RendezvousFastSession::onMsg(DTun::UInt8 msgId, const void* msg)
@@ -94,13 +101,7 @@ namespace DNode
             SYSSOCKET s = pingConn_->handle()->duplicate();
             pingConn_->close();
             cb(0, s, destIp_, destPort_);
-            return;
         }
-
-        lock.unlock();
-
-        localMgr_.reactor().post(
-            watch_->wrap(boost::bind(&RendezvousFastSession::onPingTimeout, this)));
     }
 
     void RendezvousFastSession::onEstablished()
@@ -130,18 +131,9 @@ namespace DNode
     {
         LOG4CPLUS_TRACE(logger(), "RendezvousFastSession::onHelloSend(" << err << ")");
 
-        masterSession_.reset();
-
         boost::mutex::scoped_lock lock(m_);
 
-        if (!callback_) {
-            return;
-        }
-
-        if (!err) {
-            rcvBuff_.resize(4096);
-            pingConn_->readFrom(&rcvBuff_[0], &rcvBuff_[0] + rcvBuff_.size(),
-                boost::bind(&RendezvousFastSession::onRecvPing, this, _1, _2, _3, _4));
+        if (!callback_ || !err) {
             return;
         }
 
@@ -217,9 +209,9 @@ namespace DNode
         }
     }
 
-    void RendezvousFastSession::onPingTimeout()
+    void RendezvousFastSession::onCheckStartTimeout()
     {
-        LOG4CPLUS_TRACE(logger(), "RendezvousFastSession::onPingTimeout()");
+        LOG4CPLUS_TRACE(logger(), "RendezvousFastSession::onCheckStartTimeout(" << connId() << ")");
 
         boost::mutex::scoped_lock lock(m_);
 
@@ -227,8 +219,39 @@ namespace DNode
             return;
         }
 
+        boost::shared_ptr<DTun::SConnection> conn = masterSession_->conn();
+        if ((destIp_ != 0) && conn && conn->handle()->canReuse()) {
+            rcvBuff_.resize(4096);
+            pingConn_->readFrom(&rcvBuff_[0], &rcvBuff_[0] + rcvBuff_.size(),
+                boost::bind(&RendezvousFastSession::onRecvPing, this, _1, _2, _3, _4));
+
+            lock.unlock();
+
+            localMgr_.reactor().post(
+                watch_->wrap(boost::bind(&RendezvousFastSession::onPingTimeout, this)));
+
+            return;
+        }
+
+        lock.unlock();
+
+        localMgr_.reactor().post(
+            watch_->wrap(boost::bind(&RendezvousFastSession::onCheckStartTimeout, this)), 250);
+    }
+
+    void RendezvousFastSession::onPingTimeout()
+    {
+        boost::mutex::scoped_lock lock(m_);
+
+        if (!callback_) {
+            LOG4CPLUS_TRACE(logger(), "RendezvousFastSession::onPingTimeout(" << connId() << ")");
+            return;
+        }
+
         assert(destIp_ != 0);
         assert(destPort_ != 0);
+
+        LOG4CPLUS_TRACE(logger(), "RendezvousFastSession::onPingTimeout(" << connId() << ", " << DTun::ipPortToString(destIp_, destPort_) << ")");
 
         boost::shared_ptr<std::vector<char> > sndBuff =
             boost::make_shared<std::vector<char> >(4);

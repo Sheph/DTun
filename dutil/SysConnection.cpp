@@ -95,11 +95,11 @@ namespace DTun
         reactor().update(this);
     }
 
-    void SysConnection::close()
+    void SysConnection::close(bool immediate)
     {
         boost::shared_ptr<SysHandle> handle = reactor().remove(this);
         if (handle) {
-            handle->close();
+            handle->close(immediate);
         }
     }
 

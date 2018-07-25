@@ -11,6 +11,7 @@ namespace DTun
     UDTHandle::UDTHandle(UDTReactor& reactor, UDTSOCKET sock)
     : reactor_(reactor)
     , sock_(sock)
+    , checkReuseSock_(sock)
     {
     }
 
@@ -83,12 +84,19 @@ namespace DTun
         return SYS_INVALID_SOCKET;
     }
 
-    void UDTHandle::close()
+    void UDTHandle::close(bool immediate)
     {
         if (sock_ != UDT::INVALID_SOCK) {
             DTun::closeUDTSocketChecked(sock_);
             sock_ = UDT::INVALID_SOCK;
         }
+    }
+
+    bool UDTHandle::canReuse() const
+    {
+        // The idea is that we check for sock_ to get freed inside UDT, once
+        // underlying UDP socket is closed 'sock_' gets NONEXIST state.
+        return (UDT::getsockstate(checkReuseSock_) == NONEXIST);
     }
 
     boost::shared_ptr<SConnector> UDTHandle::createConnector()

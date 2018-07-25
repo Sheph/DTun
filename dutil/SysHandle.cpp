@@ -80,12 +80,17 @@ namespace DTun
         return dup(sock_);
     }
 
-    void SysHandle::close()
+    void SysHandle::close(bool immediate)
     {
         if (sock_ != SYS_INVALID_SOCKET) {
             DTun::closeSysSocketChecked(sock_);
             sock_ = SYS_INVALID_SOCKET;
         }
+    }
+
+    bool SysHandle::canReuse() const
+    {
+        return (sock_ == SYS_INVALID_SOCKET);
     }
 
     boost::shared_ptr<SConnector> SysHandle::createConnector()

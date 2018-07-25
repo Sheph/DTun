@@ -13,7 +13,7 @@ namespace DTun
 
         virtual boost::shared_ptr<SHandle> handle() const = 0;
 
-        virtual void close() = 0;
+        virtual void close(bool immediate = false) = 0;
     };
 }
 

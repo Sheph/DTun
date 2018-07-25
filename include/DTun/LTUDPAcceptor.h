@@ -16,7 +16,7 @@ namespace DTun
 
         virtual boost::shared_ptr<SHandle> handle() const { return handle_; }
 
-        virtual void close();
+        virtual void close(bool immediate = false);
 
         virtual bool listen(int backlog, const ListenCallback& callback);
 

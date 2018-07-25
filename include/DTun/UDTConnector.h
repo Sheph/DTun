@@ -14,7 +14,7 @@ namespace DTun
 
         virtual bool connect(const std::string& address, const std::string& port, const ConnectCallback& callback, Mode mode);
 
-        virtual void close();
+        virtual void close(bool immediate = false);
 
         virtual int getPollEvents() const;
 

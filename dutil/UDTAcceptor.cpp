@@ -31,11 +31,11 @@ namespace DTun
         return true;
     }
 
-    void UDTAcceptor::close()
+    void UDTAcceptor::close(bool immediate)
     {
         boost::shared_ptr<UDTHandle> handle = reactor().remove(this);
         if (handle) {
-            handle->close();
+            handle->close(immediate);
         }
     }
 

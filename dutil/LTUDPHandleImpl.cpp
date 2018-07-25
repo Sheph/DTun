@@ -34,7 +34,7 @@ namespace DTun
         assert(!conn_);
     }
 
-    boost::shared_ptr<SConnection> LTUDPHandleImpl::kill(bool sameThreadOnly)
+    boost::shared_ptr<SConnection> LTUDPHandleImpl::kill(bool sameThreadOnly, bool abort)
     {
         assert(!sameThreadOnly || mgr_.reactor().isSameThread());
         boost::shared_ptr<SConnection> res = conn_;
@@ -46,8 +46,13 @@ namespace DTun
                 tcp_sent(pcb_, NULL);
                 tcp_err(pcb_, NULL);
             }
-            if (tcp_close(pcb_) != ERR_OK) {
-                LOG4CPLUS_FATAL(logger(), "tcp_close failed");
+            if (abort) {
+                tcp_abort(pcb_);
+            } else {
+                if (tcp_close(pcb_) != ERR_OK) {
+                    LOG4CPLUS_FATAL(logger(), "tcp_close failed");
+                    tcp_abort(pcb_);
+                }
             }
             pcb_ = NULL;
         }
@@ -312,6 +317,24 @@ namespace DTun
         }
 
         return err;
+    }
+
+    UInt16 LTUDPHandleImpl::getTransportPort() const
+    {
+        if (!conn_) {
+            return 0;
+        }
+
+        UInt32 ip;
+        UInt16 port;
+
+        if (!conn_->handle()->getSockName(ip, port)) {
+            return 0;
+        }
+
+        assert(ip == htonl(INADDR_ANY));
+
+        return port;
     }
 
     err_t LTUDPHandleImpl::listenerAcceptFunc(void* arg, struct tcp_pcb* newpcb, err_t err)

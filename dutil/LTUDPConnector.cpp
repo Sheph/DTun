@@ -18,10 +18,10 @@ namespace DTun
         close();
     }
 
-    void LTUDPConnector::close()
+    void LTUDPConnector::close(bool immediate)
     {
         if (watch_->close() && !handedOut_) {
-            handle_->close();
+            handle_->close(immediate);
         }
     }
 

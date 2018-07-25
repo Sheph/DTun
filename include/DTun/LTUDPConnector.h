@@ -15,7 +15,7 @@ namespace DTun
 
         virtual boost::shared_ptr<SHandle> handle() const { return handle_; }
 
-        virtual void close();
+        virtual void close(bool immediate = false);
 
         virtual bool connect(const std::string& address, const std::string& port, const ConnectCallback& callback, Mode mode);
 

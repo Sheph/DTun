@@ -15,7 +15,7 @@ namespace DTun
 
         virtual bool listen(int backlog, const ListenCallback& callback);
 
-        virtual void close();
+        virtual void close(bool immediate = false);
 
         virtual int getPollEvents() const;
 

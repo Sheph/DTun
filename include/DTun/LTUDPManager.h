@@ -4,7 +4,6 @@
 #include "DTun/SManager.h"
 #include "DTun/OpWatch.h"
 #include <boost/thread/mutex.hpp>
-#include <set>
 #include <lwip/netif.h>
 
 struct tcp_pcb;
@@ -27,7 +26,7 @@ namespace DTun
 
         virtual boost::shared_ptr<SHandle> createDatagramSocket(SYSSOCKET s = SYS_INVALID_SOCKET);
 
-        void addToKill(const boost::shared_ptr<LTUDPHandleImpl>& handle);
+        void addToKill(const boost::shared_ptr<LTUDPHandleImpl>& handle, bool abort);
 
         boost::shared_ptr<SConnection> createTransportConnection(const struct sockaddr* name, int namelen);
 
@@ -37,8 +36,10 @@ namespace DTun
         boost::shared_ptr<SHandle> createStreamSocket(const boost::shared_ptr<SConnection>& conn,
             struct tcp_pcb* pcb);
 
+        bool haveTransportConnection(UInt16 port) const;
+
     private:
-        typedef std::set<boost::shared_ptr<LTUDPHandleImpl> > HandleSet;
+        typedef std::map<boost::shared_ptr<LTUDPHandleImpl>, bool> HandleMap;
         typedef std::map<UInt16, boost::weak_ptr<SConnection> > ConnectionCache;
 
         static err_t netifInitFunc(struct netif* netif);
@@ -71,11 +72,11 @@ namespace DTun
         struct netif netif_;
         std::vector<char> tmpBuff_;
 
-        boost::mutex m_;
+        mutable boost::mutex m_;
         int numAliveHandles_;
         int tcpTimerMod4_;
         ConnectionCache connCache_;
-        HandleSet toKillHandles_;
+        HandleMap toKillHandles_;
     };
 }
 

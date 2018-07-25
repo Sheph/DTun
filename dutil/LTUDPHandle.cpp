@@ -8,21 +8,28 @@
 namespace DTun
 {
     LTUDPHandle::LTUDPHandle(LTUDPManager& mgr)
-    : reactor_(mgr.reactor())
+    : mgr_(mgr)
     , impl_(boost::make_shared<LTUDPHandleImpl>(boost::ref(mgr)))
+    , transportPort_(0)
     {
     }
 
     LTUDPHandle::LTUDPHandle(LTUDPManager& mgr,
         const boost::shared_ptr<SConnection>& conn, struct tcp_pcb* pcb)
-    : reactor_(mgr.reactor())
+    : mgr_(mgr)
     , impl_(boost::make_shared<LTUDPHandleImpl>(boost::ref(mgr), conn, pcb))
+    , transportPort_(0)
     {
     }
 
     LTUDPHandle::~LTUDPHandle()
     {
         close();
+    }
+
+    SReactor& LTUDPHandle::reactor()
+    {
+        return mgr_.reactor();
     }
 
     bool LTUDPHandle::bind(SYSSOCKET s)
@@ -50,12 +57,18 @@ namespace DTun
         return impl_->duplicate();
     }
 
-    void LTUDPHandle::close()
+    void LTUDPHandle::close(bool immediate)
     {
         if (impl_) {
-            impl_->mgr().addToKill(impl_);
+            transportPort_ = impl_->getTransportPort();
+            impl_->mgr().addToKill(impl_, immediate);
             impl_.reset();
         }
+    }
+
+    bool LTUDPHandle::canReuse() const
+    {
+        return !impl_ && ((transportPort_ == 0) || !mgr_.haveTransportConnection(transportPort_));
     }
 
     boost::shared_ptr<SConnector> LTUDPHandle::createConnector()

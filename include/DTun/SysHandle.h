@@ -27,7 +27,9 @@ namespace DTun
 
         virtual SYSSOCKET duplicate();
 
-        virtual void close();
+        virtual void close(bool immediate = false);
+
+        virtual bool canReuse() const;
 
         virtual boost::shared_ptr<SConnector> createConnector();
 

@@ -20,7 +20,7 @@ namespace DTun
 
         inline const boost::shared_ptr<LTUDPHandleImpl>& impl() const { return impl_; }
 
-        inline SReactor& reactor() { return reactor_; }
+        SReactor& reactor();
 
         virtual bool bind(SYSSOCKET s);
 
@@ -32,7 +32,9 @@ namespace DTun
 
         virtual SYSSOCKET duplicate();
 
-        virtual void close();
+        virtual void close(bool immediate = false);
+
+        virtual bool canReuse() const;
 
         virtual boost::shared_ptr<SConnector> createConnector();
 
@@ -41,8 +43,9 @@ namespace DTun
         virtual boost::shared_ptr<SConnection> createConnection();
 
     private:
-        SReactor& reactor_;
+        LTUDPManager& mgr_;
         boost::shared_ptr<LTUDPHandleImpl> impl_;
+        UInt16 transportPort_;
     };
 }
 

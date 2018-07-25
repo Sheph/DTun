@@ -66,11 +66,11 @@ namespace DTun
         LOG4CPLUS_FATAL(logger(), "readFrom not supported!");
     }
 
-    void UDTConnection::close()
+    void UDTConnection::close(bool immediate)
     {
         boost::shared_ptr<UDTHandle> handle = reactor().remove(this);
         if (handle) {
-            handle->close();
+            handle->close(immediate);
         }
     }
 

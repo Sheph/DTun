@@ -22,7 +22,7 @@ namespace DTun
 
         virtual void readFrom(char* first, char* last, const ReadFromCallback& callback);
 
-        virtual void close();
+        virtual void close(bool immediate = false);
 
         virtual int getPollEvents() const;
 

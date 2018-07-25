@@ -24,6 +24,7 @@ namespace DNode
         void onHelloSend(int err);
         void onPingSend(int err, const boost::shared_ptr<std::vector<char> >& sndBuff);
         void onRecvPing(int err, int numBytes, DTun::UInt32 ip, DTun::UInt16 port);
+        void onCheckStartTimeout();
         void onPingTimeout();
 
         DTun::SManager& localMgr_;

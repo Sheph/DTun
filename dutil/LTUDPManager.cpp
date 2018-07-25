@@ -90,11 +90,11 @@ namespace DTun
         return true;
     }
 
-    void LTUDPManager::addToKill(const boost::shared_ptr<LTUDPHandleImpl>& handle)
+    void LTUDPManager::addToKill(const boost::shared_ptr<LTUDPHandleImpl>& handle, bool abort)
     {
         boost::mutex::scoped_lock lock(m_);
         --numAliveHandles_;
-        bool res = toKillHandles_.insert(handle).second;
+        bool res = toKillHandles_.insert(std::make_pair(handle, abort)).second;
         assert(res);
         if (!res) {
             LOG4CPLUS_FATAL(logger(), "double kill!");
@@ -130,6 +130,16 @@ namespace DTun
             ++numAliveHandles_;
         }
         return boost::make_shared<LTUDPHandle>(boost::ref(*this), conn, pcb);
+    }
+
+    bool LTUDPManager::haveTransportConnection(UInt16 port) const
+    {
+        boost::mutex::scoped_lock lock(m_);
+        ConnectionCache::const_iterator it = connCache_.find(port);
+        if (it == connCache_.end()) {
+            return false;
+        }
+        return !it->second.expired();
     }
 
     boost::shared_ptr<SHandle> LTUDPManager::createStreamSocket()
@@ -280,10 +290,10 @@ namespace DTun
             uint8_t b = (*rcvBuff)[sizeof(struct ip_hdr) + 4 + 1];
             uint8_t c = (*rcvBuff)[sizeof(struct ip_hdr) + 4 + 2];
             uint8_t d = (*rcvBuff)[sizeof(struct ip_hdr) + 4 + 3];
-            if ((a == 0xAA) && (b == 0xBB) && (c == 0xCC) && (d == 0xDD)) {
-                LOG4CPLUS_TRACE(logger(), "LTUDPManager::onRecv rendezvous ping");
+            if ((a == 0x11) && (b == 0x22) && (c == 0x33) && (d == 0x44)) {
+                LOG4CPLUS_TRACE(logger(), "LTUDPManager::onRecv support ping");
             } else {
-                LOG4CPLUS_WARN(logger(), "LTUDPManager::onRecv bad rendezvous ping: " << (int)a << "," << (int)b << "," << (int)c << "," << (int)d);
+                LOG4CPLUS_WARN(logger(), "LTUDPManager::onRecv bad support ping: " << (int)a << "," << (int)b << "," << (int)c << "," << (int)d);
             }
         } else {
             LOG4CPLUS_WARN(logger(), "LTUDPManager::onRecv too short " << numBytes);
@@ -328,18 +338,20 @@ namespace DTun
     {
         LOG4CPLUS_TRACE(logger(), "onKillHandles(" << sameThreadOnly << ")");
 
-        HandleSet toKillHandles;
+        HandleMap toKillHandles;
 
         {
             boost::mutex::scoped_lock lock(m_);
             toKillHandles.swap(toKillHandles_);
         }
 
-        for (HandleSet::iterator it = toKillHandles.begin(); it != toKillHandles.end(); ++it) {
-            boost::shared_ptr<SConnection> conn = (*it)->kill(sameThreadOnly);
+        for (HandleMap::iterator it = toKillHandles.begin(); it != toKillHandles.end(); ++it) {
+            boost::shared_ptr<SConnection> conn = it->first->kill(sameThreadOnly, it->second);
             if (sameThreadOnly && conn) {
+                // Unfortunately we can't use 0 timeout even with abort, transport needs to be alive for some time to send stuff,
+                // but we can at least make timeout smaller...
                 innerMgr_.reactor().post(
-                    watch_->wrap(boost::bind(&LTUDPManager::onTransportConnectionKill, this, conn)), 1000);
+                    watch_->wrap(boost::bind(&LTUDPManager::onTransportConnectionKill, this, conn)), (it->second ? 250 : 1000));
             }
         }
     }

@@ -28,7 +28,7 @@ namespace DTun
             const boost::shared_ptr<SConnection>& conn, struct tcp_pcb* pcb);
         ~LTUDPHandleImpl();
 
-        boost::shared_ptr<SConnection> kill(bool sameThreadOnly);
+        boost::shared_ptr<SConnection> kill(bool sameThreadOnly, bool abort);
 
         inline LTUDPManager& mgr() { return mgr_; }
 
@@ -52,6 +52,8 @@ namespace DTun
         int write(const char* first, const char* last, int& numWritten);
 
         int read(char* first, char* last, int& numRead);
+
+        UInt16 getTransportPort() const;
 
     private:
         static err_t listenerAcceptFunc(void* arg, struct tcp_pcb* newpcb, err_t err);

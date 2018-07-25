@@ -73,11 +73,11 @@ namespace DTun
         return true;
     }
 
-    void SysConnector::close()
+    void SysConnector::close(bool immediate)
     {
         boost::shared_ptr<SysHandle> handle = reactor().remove(this);
         if (!handedOut_ && handle) {
-            handle->close();
+            handle->close(immediate);
         }
     }
 
