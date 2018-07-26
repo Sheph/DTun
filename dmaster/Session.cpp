@@ -190,7 +190,7 @@ namespace DMaster
         type_ = TypePersistent;
         nodeId_ = msg.nodeId;
         symm_ = msg.probePort && (msg.probePort != peerPort_);
-        symm_ = (nodeId_ == 1);
+        //symm_ = (nodeId_ == 1);
 
         startRecvHeader();
 

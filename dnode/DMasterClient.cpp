@@ -189,7 +189,7 @@ namespace DNode
 
         assert(!tmp->proxySession);
 
-        if ((tmp->status == ConnStatusPending) && (tmp->mode != RendezvousModeUnknown)) {
+        if (tmp->status == ConnStatusPending) {
             DTun::DProtocolMsgConnClose msg;
 
             msg.connId = DTun::toProtocolConnId(connId);
@@ -199,6 +199,12 @@ namespace DNode
         }
 
         lock.unlock();
+
+        tmp.reset();
+
+        lock.lock();
+
+        while (processRendezvous(lock)) {}
     }
 
     void DMasterClient::dump()
@@ -703,6 +709,11 @@ namespace DNode
                     boost::bind(&DMasterClient::onRecvHeader, this, _1, _2),
                     true);
             }
+        } else {
+            buff_.resize(sizeof(DTun::DProtocolHeader));
+            conn_->read(&buff_[0], &buff_[0] + buff_.size(),
+                boost::bind(&DMasterClient::onRecvHeader, this, _1, _2),
+                true);
         }
     }
 
@@ -970,8 +981,8 @@ namespace DNode
                         cb(DPROTOCOL_STATUS_ERR_CANCELED, boost::shared_ptr<DTun::SHandle>(), 0, 0);
                     }
                     lock.lock();
-                    return true;
                 }
+                return true;
             } else {
                 break;
             }

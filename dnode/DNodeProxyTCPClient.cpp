@@ -127,6 +127,8 @@ namespace DNode
 
         inline bool isEOF() const { return eof_; }
 
+        inline DTun::ConnId getConnId() const { return connId_; }
+
     private:
         void onConnectionRegister(int err, const boost::shared_ptr<DTun::SHandle>& handle, DTun::UInt32 remoteIp, DTun::UInt16 remotePort)
         {
@@ -192,11 +194,11 @@ namespace DNode
 
             boost::mutex::scoped_lock lock(m_);
 
-            sending_ = 0;
-            bytesSent_ = numBytes;
-
             if (err) {
                 state_ = STATE_ERR;
+            } else {
+                sending_ = 0;
+                bytesSent_ = numBytes;
             }
 
             signalReactor();
@@ -206,16 +208,18 @@ namespace DNode
         {
             LOG4CPLUS_TRACE(logger(), "ProxyTCPClient::onRecv(" << err << ", " << numBytes << ")");
 
-            boost::mutex::scoped_lock lock(m_);
+            assert((numBytes != 0) ^ (err != 0));
 
-            receiving_ = 0;
-            bytesReceived_ = numBytes;
+            boost::mutex::scoped_lock lock(m_);
 
             if (err) {
                 if (err == DTUN_ERR_CONN_CLOSED) {
                     eof_ = true;
                 }
                 state_ = STATE_ERR;
+            } else {
+                receiving_ = 0;
+                bytesReceived_ = numBytes;
             }
 
             signalReactor();
@@ -320,13 +324,12 @@ extern "C" void DNodeProxyTCPClient_SignalHandler(BThreadSignal* reactor_signal)
 {
     DNodeProxyTCPClient* dtcp_client = UPPER_OBJECT(reactor_signal, DNodeProxyTCPClient, reactor_signal);
 
-    LOG4CPLUS_TRACE(DNode::logger(), "ProxyTCPClient_SignalHandler");
-
     int new_state = dtcp_client->client->getState();
 
     if (dtcp_client->state != new_state) {
         dtcp_client->state = new_state;
         if (dtcp_client->state == STATE_UP) {
+            LOG4CPLUS_TRACE(DNode::logger(), "ProxyTCPClient_SignalHandler(UP)");
             dtcp_client->was_connected = 1;
             BReactor_RemoveTimer(dtcp_client->reactor_signal.reactor, &dtcp_client->conn_timer);
             StreamPassInterface_Init(&dtcp_client->send_iface,
@@ -337,9 +340,16 @@ extern "C" void DNodeProxyTCPClient_SignalHandler(BThreadSignal* reactor_signal)
                 BReactor_PendingGroup(reactor_signal->reactor));
             dtcp_client->base.handler(dtcp_client->base.handler_data, DNODE_TCPCLIENT_EVENT_UP);
         } else if (dtcp_client->state == STATE_ERR) {
+            if (dtcp_client->client->isEOF()) {
+                LOG4CPLUS_TRACE(DNode::logger(), "ProxyTCPClient_SignalHandler(EOF)");
+            } else {
+                LOG4CPLUS_TRACE(DNode::logger(), "ProxyTCPClient_SignalHandler(ERR)");
+            }
             dtcp_client->base.handler(dtcp_client->base.handler_data,
                 dtcp_client->client->isEOF() ? DNODE_TCPCLIENT_EVENT_ERROR_CLOSED : DNODE_TCPCLIENT_EVENT_ERROR);
         }
+    } else {
+        LOG4CPLUS_TRACE(DNode::logger(), "ProxyTCPClient_SignalHandler(IO)");
     }
 
     if (new_state != STATE_UP) {
@@ -376,6 +386,8 @@ extern "C" void DNodeProxyTCPClient_Destroy(struct DNodeTCPClient* dtcp_client_)
     } else {
         BReactor_RemoveTimer(dtcp_client->reactor_signal.reactor, &dtcp_client->conn_timer);
     }
+
+    LOG4CPLUS_TRACE(DNode::logger(), "DNodeProxyTCPClient_Destroy(" << dtcp_client->client->getConnId() << ")");
 
     delete dtcp_client->client;
 
