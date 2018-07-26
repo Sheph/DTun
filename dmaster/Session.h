@@ -51,11 +51,13 @@ namespace DMaster
         void sendConnRequest(const DTun::ConnId& connId,
             DTun::UInt32 ip,
             DTun::UInt16 port,
-            DTun::UInt8 mode);
+            DTun::UInt8 mode,
+            DTun::UInt32 srcIp);
 
         void sendConnStatus(const DTun::ConnId& connId,
             DTun::UInt8 statusCode,
-            DTun::UInt8 mode = DPROTOCOL_RMODE_FAST);
+            DTun::UInt8 mode = DPROTOCOL_RMODE_FAST,
+            DTun::UInt32 dstIp = 0);
 
         void sendFast(const DTun::ConnId& connId,
             DTun::UInt32 nodeIp,

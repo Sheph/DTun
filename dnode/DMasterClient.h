@@ -68,6 +68,7 @@ namespace DNode
             ConnState()
             : remoteIp(0)
             , remotePort(0)
+            , dstNodeIp(0)
             , mode(RendezvousModeUnknown)
             , status(ConnStatusNone)
             , triedFastOnly(false) {}
@@ -75,6 +76,7 @@ namespace DNode
             DTun::ConnId connId;
             DTun::UInt32 remoteIp;
             DTun::UInt16 remotePort;
+            DTun::UInt32 dstNodeIp;
             RegisterConnectionCallback callback;
             RendezvousMode mode;
             ConnStatus status;

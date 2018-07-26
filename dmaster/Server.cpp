@@ -274,6 +274,12 @@ namespace DMaster
             return;
         }
 
+        if (sess->peerIp() == 0) {
+            LOG4CPLUS_ERROR(logger(), "no src peer address, cannot proceed with ConnCreate");
+            sess->sendConnStatus(connId, DPROTOCOL_STATUS_ERR_UNKNOWN);
+            return;
+        }
+
         if (conns_.count(connId) > 0) {
             LOG4CPLUS_ERROR(logger(), "connId " << connId << " already exists");
             sess->sendConnStatus(connId, DPROTOCOL_STATUS_ERR_UNKNOWN);
@@ -286,6 +292,12 @@ namespace DMaster
             LOG4CPLUS_ERROR(logger(), "persistent dest session not found for dstNodeId = "
                 << dstNodeId << ", addr = " << DTun::ipPortToString(remoteIp, remotePort));
             sess->sendConnStatus(connId, DPROTOCOL_STATUS_ERR_NOTFOUND);
+            return;
+        }
+
+        if (dstSess->peerIp() == 0) {
+            LOG4CPLUS_ERROR(logger(), "no dst peer address, cannot proceed with ConnCreate");
+            sess->sendConnStatus(connId, DPROTOCOL_STATUS_ERR_UNKNOWN);
             return;
         }
 
@@ -316,9 +328,9 @@ namespace DMaster
 
         conns_[connId] = Conn(sess, dstSess, srcMode, dstMode);
 
-        sess->sendConnStatus(connId, DPROTOCOL_STATUS_PENDING, srcMode);
+        sess->sendConnStatus(connId, DPROTOCOL_STATUS_PENDING, srcMode, dstSess->peerIp());
 
-        dstSess->sendConnRequest(connId, remoteIp, remotePort, dstMode);
+        dstSess->sendConnRequest(connId, remoteIp, remotePort, dstMode, sess->peerIp());
     }
 
     void Server::onSessionConnClose(const boost::shared_ptr<Session>& sess, const DTun::ConnId& connId, bool established)

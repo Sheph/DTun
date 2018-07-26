@@ -15,7 +15,8 @@ namespace DNode
 
         RendezvousSession(DTun::UInt32 nodeId, const DTun::ConnId& connId)
         : nodeId_(nodeId)
-        , connId_(connId) {}
+        , connId_(connId)
+        , started_(false) {}
         virtual ~RendezvousSession() {}
 
         virtual void onMsg(DTun::UInt8 msgId, const void* msg) = 0;
@@ -26,9 +27,13 @@ namespace DNode
 
         inline const DTun::ConnId& connId() const { return connId_; }
 
+        inline bool started() const { return started_; }
+        inline void setStarted() { started_ = true; }
+
     private:
         DTun::UInt32 nodeId_;
         DTun::ConnId connId_;
+        bool started_;
     };
 }
 

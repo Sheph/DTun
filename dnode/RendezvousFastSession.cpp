@@ -23,6 +23,8 @@ namespace DNode
 
     bool RendezvousFastSession::start(const std::string& serverAddr, int serverPort, const Callback& callback)
     {
+        setStarted();
+
         boost::mutex::scoped_lock lock(m_);
 
         SYSSOCKET s = ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
@@ -87,12 +89,12 @@ namespace DNode
 
         boost::mutex::scoped_lock lock(m_);
 
-        if (!callback_ || (destIp_ != 0)) {
-            return;
-        }
-
         destIp_ = msgFast->nodeIp;
         destPort_ = msgFast->nodePort;
+
+        if (!callback_) {
+            return;
+        }
 
         if (established_) {
             Callback cb = callback_;
@@ -234,8 +236,6 @@ namespace DNode
         if (!callback_) {
             return;
         }
-
-        boost::shared_ptr<DTun::SConnection> conn = masterSession_->conn();
 
         if ((destIp_ != 0) && masterHandle_ && masterHandle_->canReuse()) {
             rcvBuff_.resize(4096);

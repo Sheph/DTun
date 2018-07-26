@@ -32,7 +32,8 @@ namespace DMaster
     void Session::sendConnRequest(const DTun::ConnId& connId,
         DTun::UInt32 ip,
         DTun::UInt16 port,
-        DTun::UInt8 mode)
+        DTun::UInt8 mode,
+        DTun::UInt32 srcIp)
     {
         DTun::DProtocolMsgConn msg;
 
@@ -40,19 +41,22 @@ namespace DMaster
         msg.ip = ip;
         msg.port = port;
         msg.mode = mode;
+        msg.srcIp = srcIp;
 
         sendMsg(DPROTOCOL_MSG_CONN, &msg, sizeof(msg));
     }
 
     void Session::sendConnStatus(const DTun::ConnId& connId,
         DTun::UInt8 statusCode,
-        DTun::UInt8 mode)
+        DTun::UInt8 mode,
+        DTun::UInt32 dstIp)
     {
         DTun::DProtocolMsgConnStatus msg;
 
         msg.connId = DTun::toProtocolConnId(connId);
         msg.mode = mode;
         msg.statusCode = statusCode;
+        msg.dstIp = dstIp;
 
         sendMsg(DPROTOCOL_MSG_CONN_STATUS, &msg, sizeof(msg));
     }

@@ -2,9 +2,9 @@
 #define _RENDEZVOUSSYMMCONNSESSION_H_
 
 #include "RendezvousSession.h"
-#include "DMasterSession.h"
 #include "DTun/SManager.h"
 #include "DTun/OpWatch.h"
+#include "DTun/DProtocol.h"
 #include <boost/thread/mutex.hpp>
 #include <vector>
 
@@ -13,13 +13,13 @@ namespace DNode
     class RendezvousSymmConnSession : public RendezvousSession
     {
     public:
-        RendezvousSymmConnSession(DTun::SManager& mgr,
-            DTun::UInt32 nodeId, const DTun::ConnId& connId,
-            const boost::shared_ptr<DTun::SConnection>& serverConn,
-            const std::vector<boost::shared_ptr<DTun::SHandle> >& keepalive);
+        RendezvousSymmConnSession(DTun::SManager& localMgr, DTun::SManager& remoteMgr,
+            DTun::UInt32 nodeId, const DTun::ConnId& connId);
         ~RendezvousSymmConnSession();
 
-        bool start(const Callback& callback);
+        bool start(const boost::shared_ptr<DTun::SConnection>& serverConn,
+            const std::vector<boost::shared_ptr<DTun::SHandle> >& keepalive,
+            const Callback& callback);
 
         virtual void onMsg(DTun::UInt8 msgId, const void* msg);
 
@@ -34,12 +34,12 @@ namespace DNode
 
         void sendSymmNext();
 
-        DTun::SManager& mgr_;
+        DTun::SManager& localMgr_;
+        DTun::SManager& remoteMgr_;
         bool owner_;
         boost::mutex m_;
         int numPingSent_;
         int numKeepaliveSent_;
-        bool established_;
         Callback callback_;
         DTun::UInt32 destIp_;
         DTun::UInt16 destPort_;

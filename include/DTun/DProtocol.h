@@ -98,6 +98,7 @@ namespace DTun
         UInt32 ip;
         UInt16 port;
         UInt8 mode;
+        UInt32 srcIp;
     };
 
     struct DProtocolMsgConnStatus
@@ -105,6 +106,7 @@ namespace DTun
         DProtocolConnId connId;
         UInt8 mode;
         UInt8 statusCode;
+        UInt32 dstIp;
     };
 
     struct DProtocolMsgFast
