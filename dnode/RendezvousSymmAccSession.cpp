@@ -13,7 +13,7 @@ namespace DNode
     , remoteMgr_(remoteMgr)
     , serverAddr_(serverAddr)
     , serverPort_(serverPort)
-    , windowSize_(100)
+    , windowSize_(300)
     , owner_(connId.nodeId == nodeId)
     , stepIdx_(0)
     , numPingSent_(0)
@@ -186,6 +186,16 @@ namespace DNode
 
     void RendezvousSymmAccSession::onRecvPing(int err, int numBytes, DTun::UInt32 ip, DTun::UInt16 port, const boost::shared_ptr<std::vector<char> >& rcvBuff)
     {
+        LOG4CPLUS_INFO(logger(), "RendezvousSymmAccSession::onRecvPing(" << err << ", " << numBytes << ", src=" << DTun::ipPortToString(ip, port) << ")");
+
+        boost::mutex::scoped_lock lock(m_);
+
+        if (!callback_) {
+            return;
+        }
+
+        pingConn_->readFrom(&(*rcvBuff)[0], &(*rcvBuff)[0] + rcvBuff->size(),
+            boost::bind(&RendezvousSymmAccSession::onRecvPing, this, _1, _2, _3, _4, rcvBuff));
     }
 
     void RendezvousSymmAccSession::onSymmNextTimeout()

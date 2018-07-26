@@ -29,13 +29,14 @@ namespace DNode
         static void onServerSend(int err, const boost::shared_ptr<std::vector<char> >& sndBuff);
 
         void onPingSend(int err, const boost::shared_ptr<std::vector<char> >& sndBuff);
-        void onRecvPing(int err, int numBytes, DTun::UInt32 ip, DTun::UInt16 port, const boost::shared_ptr<std::vector<char> >& rcvBuff);
+        void onRecvPing(int err, int numBytes, DTun::UInt32 ip, DTun::UInt16 port, int connIdx, const boost::shared_ptr<std::vector<char> >& rcvBuff);
         void onEstablishedTimeout();
 
         void sendSymmNext();
 
         DTun::SManager& localMgr_;
         DTun::SManager& remoteMgr_;
+        int windowSize_;
         bool owner_;
         boost::mutex m_;
         int numPingSent_;

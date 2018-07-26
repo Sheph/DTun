@@ -10,6 +10,7 @@ namespace DNode
     : RendezvousSession(nodeId, connId)
     , localMgr_(localMgr)
     , remoteMgr_(remoteMgr)
+    , windowSize_(300)
     , owner_(connId.nodeId == nodeId)
     , numPingSent_(0)
     , numKeepaliveSent_(0)
@@ -39,7 +40,7 @@ namespace DNode
         addr.sin_family = AF_INET;
         addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
-        for (int i = 0; i < 100; ++i) {
+        for (int i = 0; i < windowSize_; ++i) {
             boost::shared_ptr<DTun::SHandle> handle = localMgr_.createDatagramSocket();
             if (!handle) {
                 return false;
@@ -61,7 +62,7 @@ namespace DNode
             boost::shared_ptr<std::vector<char> > rcvBuff =
                 boost::make_shared<std::vector<char> >(1024);
             pingConns[i]->readFrom(&(*rcvBuff)[0], &(*rcvBuff)[0] + rcvBuff->size(),
-                boost::bind(&RendezvousSymmConnSession::onRecvPing, this, _1, _2, _3, _4, rcvBuff));
+                boost::bind(&RendezvousSymmConnSession::onRecvPing, this, _1, _2, _3, _4, i, rcvBuff));
         }
 
         if (!owner_) {
@@ -128,7 +129,7 @@ namespace DNode
         ++numPingSent_;
 
         if (numPingSent_ < (int)pingConns_.size()) {
-            pingConns_[0]->writeTo(&(*sndBuff)[0], &(*sndBuff)[0] + sndBuff->size(),
+            pingConns_[numPingSent_]->writeTo(&(*sndBuff)[0], &(*sndBuff)[0] + sndBuff->size(),
                 destIp_, destPort_,
                 boost::bind(&RendezvousSymmConnSession::onPingSend, this, _1, sndBuff));
         } else {
@@ -141,15 +142,18 @@ namespace DNode
         LOG4CPLUS_TRACE(logger(), "RendezvousSymmConnSession::onServerSend(" << err << ")");
     }
 
-    void RendezvousSymmConnSession::onRecvPing(int err, int numBytes, DTun::UInt32 ip, DTun::UInt16 port, const boost::shared_ptr<std::vector<char> >& rcvBuff)
+    void RendezvousSymmConnSession::onRecvPing(int err, int numBytes, DTun::UInt32 ip, DTun::UInt16 port, int connIdx, const boost::shared_ptr<std::vector<char> >& rcvBuff)
     {
-        LOG4CPLUS_TRACE(logger(), "RendezvousSymmConnSession::onRecvPing(" << err << ", " << numBytes << ", src=" << DTun::ipPortToString(ip, port) << ")");
+        LOG4CPLUS_INFO(logger(), "RendezvousSymmConnSession::onRecvPing(" << err << ", " << numBytes << ", i=" << connIdx << ", src=" << DTun::ipPortToString(ip, port) << ")");
 
         boost::mutex::scoped_lock lock(m_);
 
         if (!callback_) {
             return;
         }
+
+        pingConns_[connIdx]->readFrom(&(*rcvBuff)[0], &(*rcvBuff)[0] + rcvBuff->size(),
+            boost::bind(&RendezvousSymmConnSession::onRecvPing, this, _1, _2, _3, _4, connIdx, rcvBuff));
     }
 
     void RendezvousSymmConnSession::onEstablishedTimeout()
