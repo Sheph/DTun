@@ -180,7 +180,7 @@ namespace DNode
             d = (*rcvBuff)[3];
             if ((a != 0xAA) || (b != 0xBB) || (c != 0xCC) || ((d != 0xDD) && (d != 0xEE))) {
                 LOG4CPLUS_TRACE(logger(), "RendezvousSymmConnSession::onRecvPing(" << err << ", " << numBytes << ", i=" << connIdx << ", src=" << DTun::ipPortToString(ip, port) << ")");
-                LOG4CPLUS_WARN(logger(), "RendezvousSymmAccSession::onRecvPing bad ping: "
+                LOG4CPLUS_WARN(logger(), "RendezvousSymmConnSession::onRecvPing bad ping: "
                     << (int)a << "," << (int)b << "," << (int)c << "," << (int)d);
                 pingConns_[connIdx]->readFrom(&(*rcvBuff)[0], &(*rcvBuff)[0] + rcvBuff->size(),
                     boost::bind(&RendezvousSymmConnSession::onRecvPing, this, _1, _2, _3, _4, connIdx, rcvBuff));
@@ -188,7 +188,7 @@ namespace DNode
             }
             if (ip != destIp_) {
                 LOG4CPLUS_TRACE(logger(), "RendezvousSymmConnSession::onRecvPing(" << err << ", " << numBytes << ", i=" << connIdx << ", src=" << DTun::ipPortToString(ip, port) << ")");
-                LOG4CPLUS_WARN(logger(), "RendezvousSymmAccSession::onRecvPing bad source ip");
+                LOG4CPLUS_WARN(logger(), "RendezvousSymmConnSession::onRecvPing bad source ip, expected: " << DTun::ipToString(destIp_));
                 pingConns_[connIdx]->readFrom(&(*rcvBuff)[0], &(*rcvBuff)[0] + rcvBuff->size(),
                     boost::bind(&RendezvousSymmConnSession::onRecvPing, this, _1, _2, _3, _4, connIdx, rcvBuff));
                 return;

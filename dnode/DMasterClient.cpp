@@ -148,7 +148,7 @@ namespace DNode
             }
         }
 
-        if (!running && (rendezvousConnIds_.size() == 1)) {
+        if (!running && rendezvousConnIds_.empty()) {
             connState.status = ConnStatusPending;
 
             DTun::DProtocolMsgConnCreate msg;
