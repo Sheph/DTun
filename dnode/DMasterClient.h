@@ -63,7 +63,7 @@ namespace DNode
             boost::optional<DTun::UInt32> nodeId;
         };
 
-        struct ConnState : boost::noncopyable
+        struct ConnState
         {
             ConnState()
             : remoteIp(0)
@@ -87,7 +87,7 @@ namespace DNode
         };
 
         typedef std::vector<RouteEntry> Routes;
-        typedef std::map<DTun::ConnId, boost::shared_ptr<ConnState> > ConnStateMap;
+        typedef std::map<DTun::ConnId, ConnState> ConnStateMap;
         typedef std::list<DTun::ConnId> ConnIdList;
 
         void onProbeConnect(int err);
