@@ -26,13 +26,14 @@ namespace DNode
         virtual void onEstablished();
 
     private:
-        static void onServerSend(int err, const boost::shared_ptr<std::vector<char> >& sndBuff);
+        static void onSend(int err, const boost::shared_ptr<std::vector<char> >& sndBuff);
 
         void onHelloSend(int err);
         void onPingSend(int err, const boost::shared_ptr<std::vector<char> >& sndBuff);
         void onRecvPing(int err, int numBytes, DTun::UInt32 ip, DTun::UInt16 port, const boost::shared_ptr<std::vector<char> >& rcvBuff);
         void onSymmNextTimeout();
         void onCheckStartTimeout();
+        void onSendFinalTimeout(int cnt);
 
         DTun::UInt16 getCurrentPort();
 
@@ -50,6 +51,7 @@ namespace DNode
         int numKeepaliveSent_;
         Callback callback_;
         DTun::UInt32 destIp_;
+        DTun::UInt16 destDiscoveredPort_;
         boost::shared_ptr<DTun::OpWatch> watch_;
         std::vector<boost::shared_ptr<DTun::SHandle> > keepalive_;
         boost::shared_ptr<DTun::SConnection> serverConn_;
