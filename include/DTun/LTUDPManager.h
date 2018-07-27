@@ -4,6 +4,7 @@
 #include "DTun/SManager.h"
 #include "DTun/OpWatch.h"
 #include <boost/thread/mutex.hpp>
+#include <boost/bimap.hpp>
 #include <lwip/netif.h>
 
 struct tcp_pcb;
@@ -39,8 +40,29 @@ namespace DTun
         bool haveTransportConnection(UInt16 port) const;
 
     private:
+        typedef boost::bimap<UInt16, UInt16> PortMap;
+
+        struct PeerInfo
+        {
+            PeerInfo() {}
+
+            PortMap portMap; // send_from -> send_to
+        };
+
+        typedef std::map<UInt32, PeerInfo> PeerMap;
+
+        struct ConnectionInfo : boost::noncopyable
+        {
+            ConnectionInfo() {}
+            explicit ConnectionInfo(const boost::shared_ptr<SConnection>& conn)
+            : conn(conn) {}
+
+            boost::weak_ptr<SConnection> conn;
+            PeerMap peers;
+        };
+
         typedef std::map<boost::shared_ptr<LTUDPHandleImpl>, bool> HandleMap;
-        typedef std::map<UInt16, boost::weak_ptr<SConnection> > ConnectionCache;
+        typedef std::map<UInt16, boost::shared_ptr<ConnectionInfo> > ConnectionCache;
 
         static err_t netifInitFunc(struct netif* netif);
 
@@ -49,7 +71,7 @@ namespace DTun
         static err_t netifOutputFunc(struct netif* netif, struct pbuf* p, const ip4_addr_t* ipaddr);
 
         void onRecv(int err, int numBytes, UInt32 srcIp, UInt16 srcPort,
-            UInt16 dstPort, const boost::weak_ptr<SConnection>& conn,
+            UInt16 dstPort, const boost::shared_ptr<ConnectionInfo>& connInfo,
             const boost::shared_ptr<std::vector<char> >& rcvBuff);
 
         void onSend(int err, const boost::shared_ptr<std::vector<char> >& sndBuff);
@@ -62,7 +84,7 @@ namespace DTun
 
         void reapConnCache();
 
-        boost::shared_ptr<SConnection> getTransportConnection(UInt16 port);
+        boost::shared_ptr<ConnectionInfo> getConnectionInfo(UInt16 port);
 
         // 's' is consumed.
         boost::shared_ptr<SConnection> createTransportConnectionInternal(const struct sockaddr* name, int namelen, SYSSOCKET s);
