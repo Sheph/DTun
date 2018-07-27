@@ -163,7 +163,8 @@ namespace DTun
         netif->name[1] = 'u';
         netif->output = netifOutputFunc;
         netif->output_ip6 = NULL;
-        netif->mtu = 0;
+        // MTU = 1500 - tcp_hdr without first 2 fields.
+        netif->mtu = 1500 - (sizeof(struct tcp_hdr) - 4);
 
         return ERR_OK;
     }
