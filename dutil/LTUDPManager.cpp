@@ -230,8 +230,8 @@ namespace DTun
 
         PeerMap::const_iterator it = connInfo->peers.find(iphdr->dest.addr);
         if (it != connInfo->peers.end()) {
-            PortMap::left_const_iterator jt = it->second.portMap.left.find(tcphdr->dest);
-            if (jt != it->second.portMap.left.end()) {
+            PortMap::const_iterator jt = it->second.portMap.find(tcphdr->dest);
+            if (jt != it->second.portMap.end()) {
                 actualPort = jt->second;
             }
         }
@@ -304,13 +304,7 @@ namespace DTun
                     LOG4CPLUS_ERROR(logger(), "netif.input failed");
                     pbuf_free(p);
                 } else {
-                    PeerInfo& peerInfo = connInfo->peers[srcIp];
-                    PortMap::left_iterator it = peerInfo.portMap.left.find(origSrc);
-                    if (it == peerInfo.portMap.left.end()) {
-                        peerInfo.portMap.insert(PortMap::value_type(origSrc, srcPort));
-                    } else {
-                        peerInfo.portMap.left.replace_data(it, srcPort);
-                    }
+                    connInfo->peers[srcIp].portMap[origSrc] = srcPort;
                 }
             } else {
                 LOG4CPLUS_ERROR(logger(), "pbuf_alloc failed");
