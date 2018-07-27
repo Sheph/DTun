@@ -113,7 +113,7 @@ namespace DNode
 
         localMgr_.reactor().post(
             watch_->wrap(boost::bind(&RendezvousSymmAccSession::onSymmNextTimeout, this)),
-            ((stepIdx_ == 0) ? 0 : 500));
+            ((stepIdx_ == 0) ? 0 : 1000));
     }
 
     void RendezvousSymmAccSession::onEstablished()

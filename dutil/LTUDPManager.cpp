@@ -211,7 +211,9 @@ namespace DTun
 
         boost::shared_ptr<SConnection> conn = this_->getTransportConnection(tcphdr->src);
         if (!conn) {
-            LOG4CPLUS_TRACE(logger(), "No transport");
+            LOG4CPLUS_TRACE(logger(), "No transport"
+                << " from=" << DTun::ipPortToString(iphdr->src.addr, tcphdr->src)
+                << " to=" << DTun::ipPortToString(iphdr->dest.addr, tcphdr->dest));
             return ERR_OK;
         }
 
