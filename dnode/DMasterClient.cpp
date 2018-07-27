@@ -433,7 +433,7 @@ namespace DNode
             boost::shared_ptr<DTun::SConnection> tmp = conn_;
             conn_.reset();
             lock.unlock();
-            LOG4CPLUS_ERROR(logger(), "Connection to server lost");
+            LOG4CPLUS_ERROR(logger(), "DMasterClient::onHelloSend(" << err << "): Connection to server lost");
             return;
         }
 
@@ -453,7 +453,7 @@ namespace DNode
             boost::shared_ptr<DTun::SConnection> tmp = conn_;
             conn_.reset();
             lock.unlock();
-            LOG4CPLUS_ERROR(logger(), "Connection to server lost");
+            LOG4CPLUS_ERROR(logger(), "DMasterClient::onSend(" << err << "): Connection to server lost");
         }
     }
 
@@ -467,7 +467,7 @@ namespace DNode
             boost::shared_ptr<DTun::SConnection> tmp = conn_;
             conn_.reset();
             lock.unlock();
-            LOG4CPLUS_ERROR(logger(), "Connection to server lost");
+            LOG4CPLUS_ERROR(logger(), "DMasterClient::onRecvHeader(" << err << ", " << numBytes << "): Connection to server lost");
             return;
         }
 
@@ -525,7 +525,7 @@ namespace DNode
             boost::shared_ptr<DTun::SConnection> tmp = conn_;
             conn_.reset();
             lock.unlock();
-            LOG4CPLUS_ERROR(logger(), "Connection to server lost");
+            LOG4CPLUS_ERROR(logger(), "DMasterClient::onRecvMsgConn(" << err << ", " << numBytes << "): Connection to server lost");
             return;
         }
 
@@ -596,7 +596,7 @@ namespace DNode
             boost::shared_ptr<DTun::SConnection> tmp = conn_;
             conn_.reset();
             lock.unlock();
-            LOG4CPLUS_ERROR(logger(), "Connection to server lost");
+            LOG4CPLUS_ERROR(logger(), "DMasterClient::onRecvMsgConnStatus(" << err << ", " << numBytes << "): Connection to server lost");
             return;
         }
 
@@ -688,7 +688,7 @@ namespace DNode
             boost::shared_ptr<DTun::SConnection> tmp = conn_;
             conn_.reset();
             lock.unlock();
-            LOG4CPLUS_ERROR(logger(), "Connection to server lost");
+            LOG4CPLUS_ERROR(logger(), "DMasterClient::onRecvMsgOther(" << err << ", " << numBytes << ", " << (int)msgId << "): Connection to server lost");
             return;
         }
 
