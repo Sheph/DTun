@@ -35,6 +35,8 @@ namespace DTun
         inline void setWriteCallback(const WriteCallback& cb) { writeCallback_ = cb; }
         inline void setReadCallback(const ReadCallback& cb) { readCallback_ = cb; }
 
+        void ping(UInt32 ip, UInt16 port);
+
         bool bind(SYSSOCKET s);
 
         bool bind(const struct sockaddr* name, int namelen);
@@ -65,6 +67,8 @@ namespace DTun
         static err_t sentFunc(void* arg, struct tcp_pcb* pcb, u16_t len);
 
         static void errorFunc(void* arg, err_t err);
+
+        static void onPingSend(int err, const boost::shared_ptr<std::vector<char> >& sndBuff, UInt32 ip, UInt32 port);
 
         void setupPCB(struct tcp_pcb* pcb);
 

@@ -17,7 +17,6 @@ namespace DNode
     , owner_(connId.nodeId == nodeId)
     , stepIdx_(0)
     , numPingSent_(0)
-    , numKeepaliveSent_(0)
     , destIp_(destIp)
     , destDiscoveredPort_(0)
     , watch_(boost::make_shared<DTun::OpWatch>(boost::ref(localMgr.reactor())))
@@ -31,7 +30,7 @@ namespace DNode
     }
 
     bool RendezvousSymmAccSession::start(const boost::shared_ptr<DTun::SConnection>& serverConn,
-        const std::vector<boost::shared_ptr<DTun::SHandle> >& keepalive,
+        const HandleKeepaliveList& keepalive,
         const Callback& callback)
     {
         setStarted();
@@ -179,6 +178,18 @@ namespace DNode
             pingConn_->writeTo(&(*sndBuff)[0], &(*sndBuff)[0] + sndBuff->size(),
                 destIp_, port,
                 boost::bind(&RendezvousSymmAccSession::onPingSend, this, _1, sndBuff));
+            return;
+        }
+
+        lock.unlock();
+
+        for (size_t i = 0; i < keepalive_.size(); ++i) {
+            keepalive_[i].handle->ping(keepalive_[i].destIp, keepalive_[i].destPort);
+        }
+
+        lock.lock();
+
+        if (!callback_) {
             return;
         }
 
@@ -386,7 +397,6 @@ namespace DNode
             assert(port);
 
             numPingSent_= 0;
-            numKeepaliveSent_ = 0;
 
             pingConn_->writeTo(&(*sndBuff)[0], &(*sndBuff)[0] + sndBuff->size(),
                 destIp_, port,

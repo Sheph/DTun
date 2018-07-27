@@ -18,7 +18,7 @@ namespace DNode
         ~RendezvousSymmAccSession();
 
         bool start(const boost::shared_ptr<DTun::SConnection>& serverConn,
-            const std::vector<boost::shared_ptr<DTun::SHandle> >& keepalive,
+            const HandleKeepaliveList& keepalive,
             const Callback& callback);
 
         virtual void onMsg(DTun::UInt8 msgId, const void* msg);
@@ -48,12 +48,11 @@ namespace DNode
         boost::mutex m_;
         int stepIdx_;
         int numPingSent_;
-        int numKeepaliveSent_;
         Callback callback_;
         DTun::UInt32 destIp_;
         DTun::UInt16 destDiscoveredPort_;
         boost::shared_ptr<DTun::OpWatch> watch_;
-        std::vector<boost::shared_ptr<DTun::SHandle> > keepalive_;
+        HandleKeepaliveList keepalive_;
         boost::shared_ptr<DTun::SConnection> serverConn_;
         boost::shared_ptr<DTun::SConnection> pingConn_;
         boost::shared_ptr<DTun::SHandle> masterHandle_;

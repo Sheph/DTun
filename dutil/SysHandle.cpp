@@ -18,6 +18,11 @@ namespace DTun
         close();
     }
 
+    void SysHandle::ping(UInt32 ip, UInt16 port)
+    {
+        assert(false);
+    }
+
     bool SysHandle::bind(SYSSOCKET s)
     {
         assert(false);

@@ -4,6 +4,7 @@
 #include "DTun/Types.h"
 #include <boost/noncopyable.hpp>
 #include <boost/shared_ptr.hpp>
+#include <boost/function.hpp>
 
 namespace DTun
 {
@@ -16,6 +17,10 @@ namespace DTun
     public:
         SHandle() {}
         virtual ~SHandle() {}
+
+        // used to ping handle from any place, use with care
+        // it may run underlying transport connection's destructor...
+        virtual void ping(UInt32 ip, UInt16 port) = 0;
 
         // consumes 'sock'
         virtual bool bind(SYSSOCKET s) = 0;

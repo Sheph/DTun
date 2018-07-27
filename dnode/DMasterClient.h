@@ -82,7 +82,7 @@ namespace DNode
             ConnStatus status;
             bool triedFastOnly;
             boost::shared_ptr<RendezvousSession> rSess;
-            boost::shared_ptr<DTun::SHandle> boundHandle;
+            HandleKeepalive keepalive;
             boost::shared_ptr<ProxySession> proxySession;
         };
 

@@ -17,6 +17,8 @@ namespace DTun
 
         inline SYSSOCKET sock() const { return sock_; }
 
+        virtual void ping(UInt32 ip, UInt16 port);
+
         virtual bool bind(SYSSOCKET s);
 
         virtual bool bind(const struct sockaddr* name, int namelen);

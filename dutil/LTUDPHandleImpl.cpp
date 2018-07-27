@@ -59,6 +59,26 @@ namespace DTun
         return res;
     }
 
+    void LTUDPHandleImpl::ping(UInt32 ip, UInt16 port)
+    {
+        boost::shared_ptr<SConnection> conn = conn_;
+        if (!conn) {
+            return;
+        }
+
+        boost::shared_ptr<std::vector<char> > sndBuff =
+            boost::make_shared<std::vector<char> >(4);
+
+        (*sndBuff)[0] = 0xAA;
+        (*sndBuff)[1] = 0xBB;
+        (*sndBuff)[2] = 0xCC;
+        (*sndBuff)[3] = 0xDD;
+
+        conn->writeTo(&(*sndBuff)[0], &(*sndBuff)[0] + sndBuff->size(),
+            ip, port,
+            boost::bind(&LTUDPHandleImpl::onPingSend, _1, sndBuff, ip, port));
+    }
+
     bool LTUDPHandleImpl::bind(SYSSOCKET s)
     {
         assert(!conn_);
@@ -434,6 +454,11 @@ namespace DTun
                 this_->readCallback_();
             }
         }
+    }
+
+    void LTUDPHandleImpl::onPingSend(int err, const boost::shared_ptr<std::vector<char> >& sndBuff, UInt32 ip, UInt32 port)
+    {
+        LOG4CPLUS_TRACE(logger(), "LTUDP onPingSend(" << err << ", " << ipPortToString(ip, port) << ")");
     }
 
     void LTUDPHandleImpl::setupPCB(struct tcp_pcb* pcb)

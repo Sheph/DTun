@@ -32,6 +32,16 @@ namespace DTun
         return mgr_.reactor();
     }
 
+    void LTUDPHandle::ping(UInt32 ip, UInt16 port)
+    {
+        boost::shared_ptr<LTUDPHandleImpl> impl = impl_;
+        if (!impl) {
+            return;
+        }
+
+        impl->ping(ip, port);
+    }
+
     bool LTUDPHandle::bind(SYSSOCKET s)
     {
         return impl_->bind(s);

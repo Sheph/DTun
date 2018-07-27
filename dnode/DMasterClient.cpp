@@ -795,7 +795,7 @@ namespace DNode
         } else {
             sendClose = (it->second.status != ConnStatusEstablished);
             tmp.status = it->second.status = ConnStatusEstablished;
-            it->second.boundHandle = handle;
+            it->second.keepalive = HandleKeepalive(handle, ip, port);
         }
 
         if (sendClose) {
@@ -885,7 +885,7 @@ namespace DNode
             }
 
             assert(!jt->second.rSess || !jt->second.rSess->started());
-            assert(!jt->second.boundHandle);
+            assert(!jt->second.keepalive.handle);
             assert(!jt->second.proxySession);
 
             if ((jt->second.mode == RendezvousModeUnknown) && (jt->second.status == ConnStatusNone)) {
@@ -929,10 +929,17 @@ namespace DNode
                     break;
                 }
                 case RendezvousModeSymmConn: {
-                    std::vector<boost::shared_ptr<DTun::SHandle> > keepalive;
+                    HandleKeepaliveList keepalive;
+
+                    DTun::UInt32 connIp = 0;
+                    DTun::UInt16 connPort = 0;
+                    if (conn_->handle()->getPeerName(connIp, connPort)) {
+                        keepalive.push_back(HandleKeepalive(conn_->handle(), connIp, connPort));
+                    }
+
                     for (ConnStateMap::const_iterator it = connStates_.begin(); it != connStates_.end(); ++it) {
-                        if (it->second.boundHandle) {
-                            keepalive.push_back(it->second.boundHandle);
+                        if (it->second.keepalive.handle) {
+                            keepalive.push_back(it->second.keepalive);
                         }
                     }
 
@@ -949,10 +956,17 @@ namespace DNode
                     break;
                 }
                 case RendezvousModeSymmAcc: {
-                    std::vector<boost::shared_ptr<DTun::SHandle> > keepalive;
+                    HandleKeepaliveList keepalive;
+
+                    DTun::UInt32 connIp = 0;
+                    DTun::UInt16 connPort = 0;
+                    if (conn_->handle()->getPeerName(connIp, connPort)) {
+                        keepalive.push_back(HandleKeepalive(conn_->handle(), connIp, connPort));
+                    }
+
                     for (ConnStateMap::const_iterator it = connStates_.begin(); it != connStates_.end(); ++it) {
-                        if (it->second.boundHandle) {
-                            keepalive.push_back(it->second.boundHandle);
+                        if (it->second.keepalive.handle) {
+                            keepalive.push_back(it->second.keepalive);
                         }
                     }
 

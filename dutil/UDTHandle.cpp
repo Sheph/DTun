@@ -20,6 +20,11 @@ namespace DTun
         close();
     }
 
+    void UDTHandle::ping(UInt32 ip, UInt16 port)
+    {
+        assert(false);
+    }
+
     bool UDTHandle::bind(SYSSOCKET s)
     {
         bool optval = false;
