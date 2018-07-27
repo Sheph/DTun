@@ -763,7 +763,6 @@ namespace DNode
         }
 
         ConnStateMap::iterator it = connStates_.find(connId);
-        assert(it != connStates_.end());
         if (it == connStates_.end()) {
             if (s != SYS_INVALID_SOCKET) {
                 DTun::closeSysSocketChecked(s);
