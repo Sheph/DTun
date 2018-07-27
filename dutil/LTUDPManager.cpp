@@ -300,11 +300,11 @@ namespace DTun
                 tcphdr->chksum = chksum;
                 pbuf_header(p, sizeof(struct ip_hdr));
 
+                connInfo->peers[srcIp].portMap[origSrc] = srcPort;
+
                 if (netif_.input(p, &netif_) != ERR_OK) {
                     LOG4CPLUS_ERROR(logger(), "netif.input failed");
                     pbuf_free(p);
-                } else {
-                    connInfo->peers[srcIp].portMap[origSrc] = srcPort;
                 }
             } else {
                 LOG4CPLUS_ERROR(logger(), "pbuf_alloc failed");
