@@ -898,7 +898,7 @@ namespace DNode
 
                 sendMsg(DPROTOCOL_MSG_CONN_CREATE, &msg, sizeof(msg));
                 break;
-            } else if (jt->second.mode >= RendezvousModeFast) {
+            } else if ((jt->second.mode == RendezvousModeFast) || (!running && (jt->second.mode > RendezvousModeFast))) {
                 rendezvousConnIds_.erase(it++);
 
                 bool res = false;
