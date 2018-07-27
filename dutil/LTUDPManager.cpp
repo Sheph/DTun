@@ -163,8 +163,8 @@ namespace DTun
         netif->name[1] = 'u';
         netif->output = netifOutputFunc;
         netif->output_ip6 = NULL;
-        // MTU = 1500 - tcp_hdr without first 2 fields.
-        netif->mtu = 1500 - (sizeof(struct tcp_hdr) - 4);
+        // MTU = 1500 - tcp_hdr.
+        netif->mtu = 1500 - sizeof(struct tcp_hdr);
 
         return ERR_OK;
     }
@@ -219,9 +219,9 @@ namespace DTun
         }
 
         boost::shared_ptr<std::vector<char> > sndBuff =
-            boost::make_shared<std::vector<char> >(p->tot_len - iphdrLen - 4);
+            boost::make_shared<std::vector<char> >(p->tot_len - iphdrLen);
 
-        memcpy(&(*sndBuff)[0], (const char*)tcphdr + 4, sndBuff->size());
+        memcpy(&(*sndBuff)[0], (const char*)tcphdr, sndBuff->size());
 
         conn->writeTo(&(*sndBuff)[0], &(*sndBuff)[0] + sndBuff->size(),
             iphdr->dest.addr, tcphdr->dest,
@@ -246,8 +246,8 @@ namespace DTun
             return;
         }
 
-        if (numBytes >= ((int)sizeof(struct tcp_hdr) - 4)) {
-            struct pbuf* p = pbuf_alloc(PBUF_RAW, numBytes + sizeof(struct ip_hdr) + 4, PBUF_POOL);
+        if (numBytes >= (int)sizeof(struct tcp_hdr)) {
+            struct pbuf* p = pbuf_alloc(PBUF_RAW, numBytes + sizeof(struct ip_hdr), PBUF_POOL);
 
             if (p) {
                 struct ip_hdr* iphdr = (struct ip_hdr*)&(*rcvBuff)[0];
@@ -265,11 +265,10 @@ namespace DTun
                 IPH_CHKSUM_SET(iphdr, 0);
                 IPH_CHKSUM_SET(iphdr, inet_chksum(iphdr, sizeof(struct ip_hdr)));
 
-                tcphdr->src = srcPort;
                 tcphdr->dest = dstPort;
                 tcphdr->chksum = 0;
 
-                pbuf_take(p, &(*rcvBuff)[0], numBytes + sizeof(struct ip_hdr) + 4);
+                pbuf_take(p, &(*rcvBuff)[0], numBytes + sizeof(struct ip_hdr));
 
                 ip_addr_t srcAddr, dstAddr;
                 ip_addr_set_ip4_u32(&srcAddr, iphdr->src.addr);
@@ -289,10 +288,10 @@ namespace DTun
                 LOG4CPLUS_ERROR(logger(), "pbuf_alloc failed");
             }
         } else if (numBytes == 4) {
-            uint8_t a = (*rcvBuff)[sizeof(struct ip_hdr) + 4 + 0];
-            uint8_t b = (*rcvBuff)[sizeof(struct ip_hdr) + 4 + 1];
-            uint8_t c = (*rcvBuff)[sizeof(struct ip_hdr) + 4 + 2];
-            uint8_t d = (*rcvBuff)[sizeof(struct ip_hdr) + 4 + 3];
+            uint8_t a = (*rcvBuff)[sizeof(struct ip_hdr) + 0];
+            uint8_t b = (*rcvBuff)[sizeof(struct ip_hdr) + 1];
+            uint8_t c = (*rcvBuff)[sizeof(struct ip_hdr) + 2];
+            uint8_t d = (*rcvBuff)[sizeof(struct ip_hdr) + 3];
             if ((a == 0xAA) && (b == 0xBB) && (c == 0xCC) && ((d == 0xDD) || (d == 0xEE))) {
                 LOG4CPLUS_TRACE(logger(), "LTUDPManager::onRecv support ping");
             } else {
@@ -302,7 +301,7 @@ namespace DTun
             LOG4CPLUS_WARN(logger(), "LTUDPManager::onRecv too short " << numBytes);
         }
 
-        conn_shared->readFrom(&(*rcvBuff)[0] + sizeof(struct ip_hdr) + 4, &(*rcvBuff)[0] + rcvBuff->size() - (sizeof(struct ip_hdr) + 4),
+        conn_shared->readFrom(&(*rcvBuff)[0] + sizeof(struct ip_hdr), &(*rcvBuff)[0] + rcvBuff->size() - sizeof(struct ip_hdr),
             boost::bind(&LTUDPManager::onRecv, this, _1, _2, _3, _4, dstPort, conn, rcvBuff));
     }
 
@@ -444,7 +443,7 @@ namespace DTun
 
             boost::shared_ptr<std::vector<char> > rcvBuff =
                 boost::make_shared<std::vector<char> >(8192);
-            res->readFrom(&(*rcvBuff)[0] + sizeof(struct ip_hdr) + 4, &(*rcvBuff)[0] + rcvBuff->size() - (sizeof(struct ip_hdr) + 4),
+            res->readFrom(&(*rcvBuff)[0] + sizeof(struct ip_hdr), &(*rcvBuff)[0] + rcvBuff->size() - sizeof(struct ip_hdr),
                 boost::bind(&LTUDPManager::onRecv, this, _1, _2, _3, _4, port, boost::weak_ptr<SConnection>(res), rcvBuff));
         } else {
             if (s != SYS_INVALID_SOCKET) {
