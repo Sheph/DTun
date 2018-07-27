@@ -281,6 +281,7 @@ namespace DNode
         DTun::UInt16 port = getCurrentPort();
 
         if (!port) {
+            LOG4CPLUS_WARN(logger(), "RendezvousSymmAccSession::onSymmNextTimeout(" << connId() << ", no more ports to try)");
             Callback cb = callback_;
             callback_ = Callback();
             lock.unlock();

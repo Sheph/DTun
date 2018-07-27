@@ -213,13 +213,14 @@ namespace DNode
 
     void RendezvousSymmConnSession::onEstablishedTimeout()
     {
-        LOG4CPLUS_TRACE(logger(), "RendezvousSymmConnSession::onEstablishedTimeout(" << connId() << ")");
-
         boost::mutex::scoped_lock lock(m_);
 
         if (!callback_) {
+            LOG4CPLUS_TRACE(logger(), "RendezvousSymmConnSession::onEstablishedTimeout(" << connId() << ")");
             return;
         }
+
+        LOG4CPLUS_WARN(logger(), "RendezvousSymmConnSession::onEstablishedTimeout(" << connId() << ")");
 
         Callback cb = callback_;
         callback_ = Callback();

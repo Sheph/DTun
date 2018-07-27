@@ -219,16 +219,28 @@ namespace DNode
         boost::mutex::scoped_lock lock(m_);
 
         int totStates = connStates_.size();
+        int totStatesReported = 0;
         int connSess = 0;
         int accSess = 0;
+        int connSessActive = 0;
+        int accSessActive = 0;
         int prx = 0;
         int numOut = 0;
         for (ConnStateMap::const_iterator it = connStates_.begin(); it != connStates_.end(); ++it) {
+            if (it->second.mode != RendezvousModeUnknown) {
+                ++totStatesReported;
+            }
             if (it->second.rSess) {
                 if (it->second.callback) {
                     ++connSess;
+                    if (it->second.rSess->started()) {
+                        ++connSessActive;
+                    }
                 } else {
                     ++accSess;
+                    if (it->second.rSess->started()) {
+                        ++accSessActive;
+                    }
                 }
             }
             if (it->second.proxySession) {
@@ -239,8 +251,8 @@ namespace DNode
             }
         }
 
-        LOG4CPLUS_INFO(logger(), "totStates=" << totStates << ", connSess=" << connSess
-            << ", accSess=" << accSess << ", prx=" << prx << ", numOut=" << numOut
+        LOG4CPLUS_INFO(logger(), "totStates=" << totStates << "(" << totStatesReported << "), connSess=" << connSess << "(" << connSessActive
+            << "), accSess=" << accSess << "(" << accSessActive << "), prx=" << prx << ", numOut=" << numOut
             << ", " << remoteMgr_.reactor().dump()
             << ", numFds=" << numFds << ", maxFds=" << fdMax);
     }
@@ -604,7 +616,7 @@ namespace DNode
 
         ConnStateMap::iterator it = connStates_.find(connId);
         if (it == connStates_.end()) {
-            LOG4CPLUS_WARN(logger(), "Conn " << connId << " not found");
+            LOG4CPLUS_WARN(logger(), "DMasterClient::onRecvMsgConnStatus: conn " << connId << " not found");
             return;
         }
 
@@ -688,7 +700,7 @@ namespace DNode
 
         ConnStateMap::iterator it = connStates_.find(connId);
         if (it == connStates_.end()) {
-            LOG4CPLUS_WARN(logger(), "Conn " << connId << " not found");
+            LOG4CPLUS_WARN(logger(), "DMasterClient::onRecvMsgOther: conn " << connId << " not found");
             buff_.resize(sizeof(DTun::DProtocolHeader));
             conn_->read(&buff_[0], &buff_[0] + buff_.size(),
                 boost::bind(&DMasterClient::onRecvHeader, this, _1, _2),
