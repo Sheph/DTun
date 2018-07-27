@@ -113,8 +113,15 @@ namespace DTun
 
     bool LTUDPHandleImpl::getPeerName(UInt32& ip, UInt16& port) const
     {
-        if (!pcb_ || connectCallback_ || listenCallback_) {
+        if (!pcb_ || connectCallback_ || listenCallback_ || !conn_) {
             LOG4CPLUS_ERROR(logger(), "socket is not connected");
+            return false;
+        }
+
+        UInt32 myIp = 0;
+        UInt16 myPort = 0;
+
+        if (!conn_->handle()->getSockName(myIp, myPort)) {
             return false;
         }
 
@@ -128,6 +135,8 @@ namespace DTun
 
         ip = ip_addr_get_ip4_u32(&tcpAddr);
         port = lwip_htons(port);
+
+        port = mgr_.getMappedPeerPort(myPort, ip, port);
 
         return true;
     }

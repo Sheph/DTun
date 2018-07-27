@@ -142,6 +142,25 @@ namespace DTun
         return !it->second->conn.expired();
     }
 
+    UInt16 LTUDPManager::getMappedPeerPort(UInt16 port, UInt32 peerIp, UInt16 peerPort) const
+    {
+        boost::mutex::scoped_lock lock(m_);
+        ConnectionCache::const_iterator it = connCache_.find(port);
+        if (it == connCache_.end()) {
+            return peerPort;
+        }
+
+        PeerMap::const_iterator jt = it->second->peers.find(peerIp);
+        if (jt != it->second->peers.end()) {
+            PortMap::const_iterator kt = jt->second.portMap.find(peerPort);
+            if (kt != jt->second.portMap.end()) {
+                return kt->second;
+            }
+        }
+
+        return peerPort;
+    }
+
     boost::shared_ptr<SHandle> LTUDPManager::createStreamSocket()
     {
         {

@@ -38,6 +38,8 @@ namespace DTun
 
         bool haveTransportConnection(UInt16 port) const;
 
+        UInt16 getMappedPeerPort(UInt16 port, UInt32 peerIp, UInt16 peerPort) const;
+
     private:
         typedef std::map<UInt16, UInt16> PortMap;
 
