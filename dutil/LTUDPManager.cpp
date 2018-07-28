@@ -36,7 +36,7 @@ namespace DTun
 
         // close all connections, i/o will no longer take place
         for (ConnectionCache::iterator it = connCache.begin(); it != connCache.end(); ++it) {
-            boost::shared_ptr<SConnection> conn = it->second->conn.lock();
+            boost::shared_ptr<SConnection> conn = it->second.lock();
             if (conn) {
                 conn->close();
             }
@@ -139,7 +139,7 @@ namespace DTun
         if (it == connCache_.end()) {
             return false;
         }
-        return !it->second->conn.expired();
+        return !it->second.expired();
     }
 
     boost::shared_ptr<SHandle> LTUDPManager::createStreamSocket()
@@ -210,30 +210,12 @@ namespace DTun
             << ", from=" << DTun::ipPortToString(iphdr->src.addr, tcphdr->src)
             << ", to=" << DTun::ipPortToString(iphdr->dest.addr, tcphdr->dest) << ")");*/
 
-        boost::shared_ptr<ConnectionInfo> connInfo = this_->getConnectionInfo(tcphdr->src);
-        if (!connInfo) {
-            LOG4CPLUS_TRACE(logger(), "No transport"
-                << " from=" << DTun::ipPortToString(iphdr->src.addr, tcphdr->src)
-                << " to=" << DTun::ipPortToString(iphdr->dest.addr, tcphdr->dest));
-            return ERR_OK;
-        }
-
-        boost::shared_ptr<SConnection> conn = connInfo->conn.lock();
+        boost::shared_ptr<SConnection> conn = this_->getTransportConnection(tcphdr->src);
         if (!conn) {
             LOG4CPLUS_TRACE(logger(), "No transport"
                 << " from=" << DTun::ipPortToString(iphdr->src.addr, tcphdr->src)
                 << " to=" << DTun::ipPortToString(iphdr->dest.addr, tcphdr->dest));
             return ERR_OK;
-        }
-
-        UInt16 actualPort = tcphdr->dest;
-
-        PeerMap::const_iterator it = connInfo->peers.find(iphdr->dest.addr);
-        if (it != connInfo->peers.end()) {
-            PortMap::left_const_iterator jt = it->second.portMap.left.find(tcphdr->dest);
-            if (jt != it->second.portMap.left.end()) {
-                actualPort = jt->second;
-            }
         }
 
         boost::shared_ptr<std::vector<char> > sndBuff =
@@ -242,17 +224,17 @@ namespace DTun
         memcpy(&(*sndBuff)[0], (const char*)tcphdr, sndBuff->size());
 
         conn->writeTo(&(*sndBuff)[0], &(*sndBuff)[0] + sndBuff->size(),
-            iphdr->dest.addr, actualPort,
+            iphdr->dest.addr, tcphdr->dest,
             boost::bind(&LTUDPManager::onSend, this_, _1, sndBuff));
 
         return ERR_OK;
     }
 
     void LTUDPManager::onRecv(int err, int numBytes, UInt32 srcIp, UInt16 srcPort,
-        UInt16 dstPort, const boost::shared_ptr<ConnectionInfo>& connInfo,
+        UInt16 dstPort, const boost::weak_ptr<SConnection>& conn,
         const boost::shared_ptr<std::vector<char> >& rcvBuff)
     {
-        boost::shared_ptr<SConnection> conn_shared = connInfo->conn.lock();
+        boost::shared_ptr<SConnection> conn_shared = conn.lock();
         if (!conn_shared) {
             return;
         }
@@ -283,8 +265,6 @@ namespace DTun
                 IPH_CHKSUM_SET(iphdr, 0);
                 IPH_CHKSUM_SET(iphdr, inet_chksum(iphdr, sizeof(struct ip_hdr)));
 
-                UInt16 origSrc = tcphdr->src;
-
                 tcphdr->dest = dstPort;
                 tcphdr->chksum = 0;
 
@@ -303,14 +283,6 @@ namespace DTun
                 if (netif_.input(p, &netif_) != ERR_OK) {
                     LOG4CPLUS_ERROR(logger(), "netif.input failed");
                     pbuf_free(p);
-                } else {
-                    PeerInfo& peerInfo = connInfo->peers[srcIp];
-                    PortMap::left_iterator it = peerInfo.portMap.left.find(origSrc);
-                    if (it == peerInfo.portMap.left.end()) {
-                        peerInfo.portMap.insert(PortMap::value_type(origSrc, srcPort));
-                    } else {
-                        peerInfo.portMap.left.replace_data(it, srcPort);
-                    }
                 }
             } else {
                 LOG4CPLUS_ERROR(logger(), "pbuf_alloc failed");
@@ -330,7 +302,7 @@ namespace DTun
         }
 
         conn_shared->readFrom(&(*rcvBuff)[0] + sizeof(struct ip_hdr), &(*rcvBuff)[0] + rcvBuff->size() - sizeof(struct ip_hdr),
-            boost::bind(&LTUDPManager::onRecv, this, _1, _2, _3, _4, dstPort, connInfo, rcvBuff));
+            boost::bind(&LTUDPManager::onRecv, this, _1, _2, _3, _4, dstPort, conn, rcvBuff));
     }
 
     void LTUDPManager::onSend(int err, const boost::shared_ptr<std::vector<char> >& sndBuff)
@@ -395,7 +367,7 @@ namespace DTun
     {
         boost::mutex::scoped_lock lock(m_);
         for (ConnectionCache::iterator it = connCache_.begin(); it != connCache_.end();) {
-            if (it->second->conn.lock()) {
+            if (it->second.lock()) {
                 ++it;
             } else {
                 connCache_.erase(it++);
@@ -403,14 +375,14 @@ namespace DTun
         }
     }
 
-    boost::shared_ptr<LTUDPManager::ConnectionInfo> LTUDPManager::getConnectionInfo(UInt16 port)
+    boost::shared_ptr<SConnection> LTUDPManager::getTransportConnection(UInt16 port)
     {
         boost::mutex::scoped_lock lock(m_);
         ConnectionCache::const_iterator it = connCache_.find(port);
         if (it == connCache_.end()) {
-            return boost::shared_ptr<ConnectionInfo>();
+            return boost::shared_ptr<SConnection>();
         }
-        return it->second;
+        return it->second.lock();
     }
 
     boost::shared_ptr<SConnection> LTUDPManager::createTransportConnectionInternal(const struct sockaddr* name, int namelen, SYSSOCKET s)
@@ -435,7 +407,7 @@ namespace DTun
         if (!isAny) {
             ConnectionCache::iterator it = connCache_.find(name4->sin_port);
             if (it != connCache_.end()) {
-                res = it->second->conn.lock();
+                res = it->second.lock();
                 if (!res) {
                     connCache_.erase(it);
                 }
@@ -462,9 +434,7 @@ namespace DTun
             }
 
             res = handle->createConnection();
-
-            boost::shared_ptr<ConnectionInfo> connInfo = boost::make_shared<ConnectionInfo>(res);
-            bool inserted = connCache_.insert(std::make_pair(port, connInfo)).second;
+            bool inserted = connCache_.insert(std::make_pair(port, res)).second;
             assert(inserted);
             if (!inserted) {
                 LOG4CPLUS_FATAL(logger(), "double port, WTF???");
@@ -474,7 +444,7 @@ namespace DTun
             boost::shared_ptr<std::vector<char> > rcvBuff =
                 boost::make_shared<std::vector<char> >(8192);
             res->readFrom(&(*rcvBuff)[0] + sizeof(struct ip_hdr), &(*rcvBuff)[0] + rcvBuff->size() - sizeof(struct ip_hdr),
-                boost::bind(&LTUDPManager::onRecv, this, _1, _2, _3, _4, port, connInfo, rcvBuff));
+                boost::bind(&LTUDPManager::onRecv, this, _1, _2, _3, _4, port, boost::weak_ptr<SConnection>(res), rcvBuff));
         } else {
             if (s != SYS_INVALID_SOCKET) {
                 closeSysSocketChecked(s);
