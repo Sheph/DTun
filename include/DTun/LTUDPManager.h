@@ -4,6 +4,7 @@
 #include "DTun/SManager.h"
 #include "DTun/OpWatch.h"
 #include <boost/thread/mutex.hpp>
+#include <boost/bimap.hpp>
 #include <lwip/netif.h>
 
 struct tcp_pcb;
@@ -39,7 +40,7 @@ namespace DTun
         bool haveTransportConnection(UInt16 port) const;
 
     private:
-        typedef std::map<UInt16, UInt16> PortMap;
+        typedef boost::bimap<UInt16, UInt16> PortMap;
 
         struct PeerInfo
         {
