@@ -452,7 +452,7 @@ namespace DNode
     DTun::UInt16 RendezvousSymmAccSession::getCurrentPort()
     {
         int port = 1024 + (stepIdx_ * windowSize_) + numPingSent_;
-        return (port > 65535) ? 0 : port;
+        return htons((port > 65535) ? 0 : port);
     }
 
     void RendezvousSymmAccSession::sendSymmNext()
