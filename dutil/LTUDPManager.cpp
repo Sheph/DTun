@@ -314,7 +314,7 @@ namespace DTun
                         PeerInfo& peerInfo = connInfo->peers[srcIp];
                         PortMap::iterator it = peerInfo.portMap.find(tcphdr->src);
                         if (it == peerInfo.portMap.end()) {
-                            peerInfo.portMap.insert(std::make_pair(tcphdr->src, srcPort));
+                            peerInfo.portMap.insert(std::make_pair((UInt16)tcphdr->src, srcPort));
                         } else {
                             if (it->second != srcPort) {
                                 LOG4CPLUS_WARN(logger(), "Port " << ntohs(it->second) << " remapped to " << ntohs(srcPort) << " at " << ipToString(srcIp));
