@@ -4,6 +4,7 @@
 #include "DTun/SManager.h"
 #include "DTun/OpWatch.h"
 #include <boost/thread/mutex.hpp>
+#include <set>
 #include <lwip/netif.h>
 
 struct tcp_pcb;
@@ -25,6 +26,8 @@ namespace DTun
         virtual boost::shared_ptr<SHandle> createStreamSocket();
 
         virtual boost::shared_ptr<SHandle> createDatagramSocket(SYSSOCKET s = SYS_INVALID_SOCKET);
+
+        virtual void enablePortRemap(UInt16 dstPort);
 
         void addToKill(const boost::shared_ptr<LTUDPHandleImpl>& handle, bool abort);
 
@@ -98,6 +101,7 @@ namespace DTun
         mutable boost::mutex m_;
         int numAliveHandles_;
         int tcpTimerMod4_;
+        std::set<UInt16> portsToRemap_;
         ConnectionCache connCache_;
         HandleMap toKillHandles_;
     };

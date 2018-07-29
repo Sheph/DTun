@@ -176,6 +176,12 @@ namespace DTun
         return boost::shared_ptr<SHandle>();
     }
 
+    void LTUDPManager::enablePortRemap(UInt16 dstPort)
+    {
+        boost::mutex::scoped_lock lock(m_);
+        portsToRemap_.insert(dstPort);
+    }
+
     err_t LTUDPManager::netifInitFunc(struct netif* netif)
     {
         netif->name[0] = 'l';
@@ -302,7 +308,15 @@ namespace DTun
                 IPH_CHKSUM_SET(iphdr, 0);
                 IPH_CHKSUM_SET(iphdr, inet_chksum(iphdr, sizeof(struct ip_hdr)));
 
-                UInt16 origSrc = tcphdr->src;
+                {
+                    boost::mutex::scoped_lock lock(m_);
+                    if (portsToRemap_.count(dstPort) > 0) {
+                        UInt16 origSrc = tcphdr->src;
+                        connInfo->peers[srcIp].portMap[origSrc] = srcPort;
+                    } else {
+                        tcphdr->src = srcPort;
+                    }
+                }
 
                 tcphdr->dest = dstPort;
                 tcphdr->chksum = 0;
@@ -318,8 +332,6 @@ namespace DTun
                 tcphdr = (struct tcp_hdr*)p->payload;
                 tcphdr->chksum = chksum;
                 pbuf_header(p, sizeof(struct ip_hdr));
-
-                connInfo->peers[srcIp].portMap[origSrc] = srcPort;
 
                 if (netif_.input(p, &netif_) != ERR_OK) {
                     LOG4CPLUS_ERROR(logger(), "netif.input failed");

@@ -34,4 +34,8 @@ namespace DTun
         assert(false);
         return boost::shared_ptr<SHandle>();
     }
+
+    void UDTManager::enablePortRemap(UInt16 dstPort)
+    {
+    }
 }
