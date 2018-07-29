@@ -445,17 +445,22 @@ namespace DTun
 
     void LTUDPHandleImpl::errorFunc(void* arg, err_t err)
     {
-        LOG4CPLUS_TRACE(logger(), "LTUDP error(" << (int)err << ")");
-
         LTUDPHandleImpl* this_ = (LTUDPHandleImpl*)arg;
 
         this_->pcb_ = NULL;
 
         if (this_->connectCallback_) {
+            LOG4CPLUS_TRACE(logger(), "LTUDP error(" << (int)err << ")");
             SConnector::ConnectCallback cb = this_->connectCallback_;
             this_->connectCallback_ = SConnector::ConnectCallback();
             cb(err);
         } else {
+            if (err == ERR_ABRT) {
+                LOG4CPLUS_ERROR(logger(), "LTUDP error(" << (int)err << ")");
+            } else {
+                LOG4CPLUS_TRACE(logger(), "LTUDP error(" << (int)err << ")");
+            }
+
             if (this_->writeCallback_) {
                 this_->writeCallback_(err, 0);
             }
