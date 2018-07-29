@@ -311,8 +311,16 @@ namespace DTun
                 {
                     boost::mutex::scoped_lock lock(m_);
                     if (portsToRemap_.count(dstPort) > 0) {
-                        UInt16 origSrc = tcphdr->src;
-                        connInfo->peers[srcIp].portMap[origSrc] = srcPort;
+                        PeerInfo& peerInfo = connInfo->peers[srcIp];
+                        PortMap::iterator it = peerInfo.portMap.find(tcphdr->src);
+                        if (it == peerInfo.portMap.end()) {
+                            peerInfo.portMap.insert(std::make_pair(tcphdr->src, srcPort));
+                        } else {
+                            if (it->second != srcPort) {
+                                LOG4CPLUS_WARN(logger(), "Port " << ntohs(it->second) << " remapped to " << ntohs(srcPort) << " at " << ipToString(srcIp));
+                            }
+                            it->second = srcPort;
+                        }
                     } else {
                         tcphdr->src = srcPort;
                     }
