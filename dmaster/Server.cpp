@@ -95,7 +95,7 @@ namespace DMaster
 
         session->setStartPersistentCallback(boost::bind(&Server::onSessionStartPersistent, this, boost::weak_ptr<Session>(session)));
         session->setStartFastCallback(boost::bind(&Server::onSessionStartFast, this, boost::weak_ptr<Session>(session), _1));
-        session->setStartSymmCallback(boost::bind(&Server::onSessionStartSymm, this, boost::weak_ptr<Session>(session), _1));
+        session->setStartSymmCallback(boost::bind(&Server::onSessionStartSymm, this, boost::weak_ptr<Session>(session), _1, _2));
         session->setMessageCallback(boost::bind(&Server::onSessionMessage, this, boost::weak_ptr<Session>(session), _1, _2));
         session->setErrorCallback(boost::bind(&Server::onSessionError, this, boost::weak_ptr<Session>(session), _1));
 
@@ -134,14 +134,14 @@ namespace DMaster
         onSessionHelloFast(sess_shared, connId);
     }
 
-    void Server::onSessionStartSymm(const boost::weak_ptr<Session>& sess, const DTun::ConnId& connId)
+    void Server::onSessionStartSymm(const boost::weak_ptr<Session>& sess, const DTun::ConnId& connId, bool dryRun)
     {
         boost::shared_ptr<Session> sess_shared = sess.lock();
         if (!sess_shared) {
             return;
         }
 
-        onSessionHelloSymm(sess_shared, connId);
+        onSessionHelloSymm(sess_shared, connId, dryRun);
     }
 
     void Server::onSessionMessage(const boost::weak_ptr<Session>& sess, DTun::UInt8 msgCode, const void* msg)
@@ -223,7 +223,7 @@ namespace DMaster
         }
     }
 
-    void Server::onSessionHelloSymm(const boost::shared_ptr<Session>& sess, const DTun::ConnId& connId)
+    void Server::onSessionHelloSymm(const boost::shared_ptr<Session>& sess, const DTun::ConnId& connId, bool dryRun)
     {
         LOG4CPLUS_TRACE(logger(), "Server::onSessionHelloSymm(" << sess->nodeId() << ", "
             << connId << ")");
@@ -243,6 +243,10 @@ namespace DMaster
         ConnMap::iterator it = conns_.find(connId);
         if (it == conns_.end()) {
             LOG4CPLUS_TRACE(logger(), "connId = " << connId << " not found");
+            return;
+        }
+
+        if (dryRun) {
             return;
         }
 

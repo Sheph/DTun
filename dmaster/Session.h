@@ -24,7 +24,7 @@ namespace DMaster
 
         typedef boost::function<void ()> StartPersistentCallback;
         typedef boost::function<void (const DTun::ConnId&)> StartFastCallback;
-        typedef boost::function<void (const DTun::ConnId&)> StartSymmCallback;
+        typedef boost::function<void (const DTun::ConnId&, bool)> StartSymmCallback;
         typedef boost::function<void (DTun::UInt8, const void*)> MessageCallback;
         typedef boost::function<void (int)> ErrorCallback;
 

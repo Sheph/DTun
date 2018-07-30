@@ -23,7 +23,7 @@ namespace DNode
             const Callback& callback);
         // 's' will be closed even in case of failure!
         bool startSymm(SYSSOCKET s, DTun::UInt32 nodeId, const DTun::ConnId& connId,
-            const Callback& callback);
+            const Callback& callback, bool dryRun = false);
 
         inline const boost::shared_ptr<DTun::SConnection>& conn() const { return conn_; }
 

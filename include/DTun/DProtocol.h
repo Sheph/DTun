@@ -68,6 +68,7 @@ namespace DTun
     {
         UInt32 nodeId;
         DProtocolConnId connId;
+        UInt8 dryRun;
     };
 
     struct DProtocolMsgConnCreate

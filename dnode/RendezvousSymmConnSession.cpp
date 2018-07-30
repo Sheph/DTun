@@ -212,9 +212,24 @@ namespace DNode
             lock.unlock();
             SYSSOCKET s = pingConns_[connIdx]->handle()->duplicate();
             pingConns_[connIdx]->close();
+            if (port != destPort_) {
+                LOG4CPLUS_ERROR(logger(), "AAA");
+            }
             cb(0, s, destIp_, destPort_, 0);
         } else {
             LOG4CPLUS_TRACE(logger(), "RendezvousSymmConnSession::onRecvPing(" << err << ", " << numBytes << ", i=" << connIdx << ", src=" << DTun::ipPortToString(ip, port) << ")");
+
+            /*boost::shared_ptr<std::vector<char> > sndBuff =
+                boost::make_shared<std::vector<char> >(4);
+
+            (*sndBuff)[0] = 0xAA;
+            (*sndBuff)[1] = 0xBB;
+            (*sndBuff)[2] = 0xCC;
+            (*sndBuff)[3] = 0xDD;
+
+            pingConns_[connIdx]->writeTo(&(*sndBuff)[0], &(*sndBuff)[0] + sndBuff->size(),
+                destIp_, destPort_,
+                boost::bind(&RendezvousSymmConnSession::onServerSend, _1, sndBuff));*/
 
             pingConns_[connIdx]->readFrom(&(*rcvBuff)[0], &(*rcvBuff)[0] + rcvBuff->size(),
                 boost::bind(&RendezvousSymmConnSession::onRecvPing, this, _1, _2, _3, _4, connIdx, rcvBuff));

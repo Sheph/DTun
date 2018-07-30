@@ -273,7 +273,7 @@ namespace DMaster
         startRecvHeader();
 
         if (startSymmCallback_) {
-            startSymmCallback_(DTun::fromProtocolConnId(msg.connId));
+            startSymmCallback_(DTun::fromProtocolConnId(msg.connId), msg.dryRun != 0);
         }
     }
 

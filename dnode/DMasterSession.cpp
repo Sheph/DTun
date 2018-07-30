@@ -37,7 +37,7 @@ namespace DNode
     }
 
     bool DMasterSession::startSymm(SYSSOCKET s, DTun::UInt32 nodeId, const DTun::ConnId& connId,
-        const Callback& callback)
+        const Callback& callback, bool dryRun)
     {
         DTun::DProtocolHeader header;
         DTun::DProtocolMsgHelloSymm msg;
@@ -45,6 +45,7 @@ namespace DNode
         header.msgCode = DPROTOCOL_MSG_HELLO_SYMM;
         msg.nodeId = nodeId;
         msg.connId = DTun::toProtocolConnId(connId);
+        msg.dryRun = dryRun;
 
         buff_.resize(sizeof(header) + sizeof(msg));
         memcpy(&buff_[0], &header, sizeof(header));

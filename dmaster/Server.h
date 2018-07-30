@@ -53,7 +53,7 @@ namespace DMaster
 
         void onSessionStartFast(const boost::weak_ptr<Session>& sess, const DTun::ConnId& connId);
 
-        void onSessionStartSymm(const boost::weak_ptr<Session>& sess, const DTun::ConnId& connId);
+        void onSessionStartSymm(const boost::weak_ptr<Session>& sess, const DTun::ConnId& connId, bool dryRun);
 
         void onSessionMessage(const boost::weak_ptr<Session>& sess, DTun::UInt8 msgCode, const void* msg);
 
@@ -61,7 +61,7 @@ namespace DMaster
 
         void onSessionHelloFast(const boost::shared_ptr<Session>& sess, const DTun::ConnId& connId);
 
-        void onSessionHelloSymm(const boost::shared_ptr<Session>& sess, const DTun::ConnId& connId);
+        void onSessionHelloSymm(const boost::shared_ptr<Session>& sess, const DTun::ConnId& connId, bool dryRun);
 
         void onSessionConnCreate(const boost::shared_ptr<Session>& sess, const DTun::ConnId& connId,
             DTun::UInt32 dstNodeId,

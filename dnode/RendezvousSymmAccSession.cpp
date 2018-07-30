@@ -109,6 +109,28 @@ namespace DNode
             return;
         }
 
+        if (pingConn_) {
+            SYSSOCKET s = pingConn_->handle()->duplicate();
+            lock.unlock();
+            pingConn_->close();
+            lock.lock();
+            if (!callback_) {
+                DTun::closeSysSocketChecked(s);
+                return;
+            }
+            masterSession_ =
+                boost::make_shared<DMasterSession>(boost::ref(remoteMgr_), serverAddr_, serverPort_);
+            if (!masterSession_->startSymm(s, nodeId(), connId(),
+                boost::bind(&RendezvousSymmAccSession::onByeSend, this, _1, _2), true)) {
+                Callback cb = callback_;
+                callback_ = Callback();
+                lock.unlock();
+                cb(1, SYS_INVALID_SOCKET, 0, 0, 0);
+            }
+
+            return;
+        }
+
         lock.unlock();
 
         localMgr_.reactor().post(
@@ -160,6 +182,46 @@ namespace DNode
         callback_ = Callback();
         lock.unlock();
         cb(err, SYS_INVALID_SOCKET, 0, 0, 0);
+    }
+
+    void RendezvousSymmAccSession::onByeSend(int err, DTun::UInt16 srcPort)
+    {
+        LOG4CPLUS_TRACE(logger(), "RendezvousSymmAccSession::onByeSend(" << err << ", " << srcPort << ")");
+
+        boost::mutex::scoped_lock lock(m_);
+
+        if (!callback_) {
+            return;
+        }
+
+        if (err) {
+            Callback cb = callback_;
+            callback_ = Callback();
+            lock.unlock();
+            cb(err, SYS_INVALID_SOCKET, 0, 0, 0);
+            return;
+        }
+
+        if (srcPort != srcPort_) {
+            LOG4CPLUS_ERROR(logger(), "Port changed!");
+        }
+
+        srcPort_ = srcPort;
+
+        for (size_t i = 0; i < keepalive_.size(); ++i) {
+            if (keepalive_[i].srcPort == srcPort) {
+                LOG4CPLUS_ERROR(logger(), "Port stolen!");
+            }
+        }
+
+        boost::shared_ptr<DTun::SHandle> handle = localMgr_.createDatagramSocket(masterSession_->conn()->handle()->duplicate());
+        pingConn_ = handle->createConnection();
+
+        lock.unlock();
+
+        localMgr_.reactor().post(
+            watch_->wrap(boost::bind(&RendezvousSymmAccSession::onSymmNextTimeout, this)),
+            ((stepIdx_ == 0) ? 0 : 1000));
     }
 
     void RendezvousSymmAccSession::onPingSend(int err, const boost::shared_ptr<std::vector<char> >& sndBuff)
