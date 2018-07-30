@@ -233,6 +233,12 @@ namespace DMaster
         type_ = TypeFast;
         nodeId_ = msg.nodeId;
 
+        DTun::DProtocolMsgReport reportMsg;
+
+        reportMsg.srcPort = peerPort_;
+
+        sendMsg(DPROTOCOL_MSG_REPORT, &reportMsg, sizeof(reportMsg));
+
         startRecvHeader();
 
         if (startFastCallback_) {
@@ -257,6 +263,12 @@ namespace DMaster
 
         type_ = TypeSymm;
         nodeId_ = msg.nodeId;
+
+        DTun::DProtocolMsgReport reportMsg;
+
+        reportMsg.srcPort = peerPort_;
+
+        sendMsg(DPROTOCOL_MSG_REPORT, &reportMsg, sizeof(reportMsg));
 
         startRecvHeader();
 

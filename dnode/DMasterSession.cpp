@@ -90,7 +90,7 @@ namespace DNode
 
         if (err) {
             handle->close();
-            callback_(err);
+            callback_(err, 0);
         } else {
             conn_ = handle->createConnection();
 
@@ -103,6 +103,36 @@ namespace DNode
     {
         LOG4CPLUS_TRACE(logger(), "DMasterSession::onSend(" << err << ")");
 
-        callback_(err);
+        if (err) {
+            callback_(err, 0);
+            return;
+        }
+
+        buff_.resize(sizeof(DTun::DProtocolHeader) + sizeof(DTun::DProtocolMsgReport));
+        conn_->read(&buff_[0], &buff_[0] + buff_.size(),
+            boost::bind(&DMasterSession::onRecv, this, _1, _2),
+            true);
+    }
+
+    void DMasterSession::onRecv(int err, int numBytes)
+    {
+        LOG4CPLUS_TRACE(logger(), "DMasterSession::onRecv(" << err << ", " << numBytes << ")");
+
+        if (err) {
+            callback_(err, 0);
+            return;
+        }
+
+        DTun::DProtocolHeader header;
+        DTun::DProtocolMsgReport msg;
+        memcpy(&header, &buff_[0], sizeof(header));
+        memcpy(&msg, &buff_[0] + sizeof(header), sizeof(msg));
+
+        if (header.msgCode != DPROTOCOL_MSG_REPORT) {
+            callback_(1, 0);
+            return;
+        }
+
+        callback_(0, msg.srcPort);
     }
 }

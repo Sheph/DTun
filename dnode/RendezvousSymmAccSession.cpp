@@ -19,6 +19,7 @@ namespace DNode
     , numPingSent_(0)
     , destIp_(destIp)
     , destDiscoveredPort_(0)
+    , srcPort_(0)
     , watch_(boost::make_shared<DTun::OpWatch>(boost::ref(localMgr.reactor())))
     {
         assert(destIp_ != 0);
@@ -84,7 +85,7 @@ namespace DNode
         masterSession_ =
             boost::make_shared<DMasterSession>(boost::ref(remoteMgr_), serverAddr_, serverPort_);
         bool startRes = masterSession_->startSymm(s, nodeId(), connId(),
-            boost::bind(&RendezvousSymmAccSession::onHelloSend, this, _1));
+            boost::bind(&RendezvousSymmAccSession::onHelloSend, this, _1, _2));
 
         lock.unlock();
 
@@ -126,13 +127,21 @@ namespace DNode
         LOG4CPLUS_TRACE(logger(), "RendezvousSymmAccSession::onSend(" << err << ")");
     }
 
-    void RendezvousSymmAccSession::onHelloSend(int err)
+    void RendezvousSymmAccSession::onHelloSend(int err, DTun::UInt16 srcPort)
     {
-        LOG4CPLUS_TRACE(logger(), "RendezvousSymmAccSession::onHelloSend(" << err << ")");
+        LOG4CPLUS_TRACE(logger(), "RendezvousSymmAccSession::onHelloSend(" << err << ", " << srcPort << ")");
 
         boost::shared_ptr<DTun::SHandle> masterHandle;
 
         if (!err) {
+            srcPort_ = srcPort;
+
+            for (size_t i = 0; i < keepalive_.size(); ++i) {
+                if (keepalive_[i].srcPort == srcPort) {
+                    LOG4CPLUS_ERROR(logger(), "Port stolen!");
+                }
+            }
+
             masterHandle = masterSession_->conn()->handle();
             masterSession_->conn()->close(true);
         }
@@ -150,7 +159,7 @@ namespace DNode
         Callback cb = callback_;
         callback_ = Callback();
         lock.unlock();
-        cb(err, SYS_INVALID_SOCKET, 0, 0);
+        cb(err, SYS_INVALID_SOCKET, 0, 0, 0);
     }
 
     void RendezvousSymmAccSession::onPingSend(int err, const boost::shared_ptr<std::vector<char> >& sndBuff)
@@ -166,7 +175,7 @@ namespace DNode
             Callback cb = callback_;
             callback_ = Callback();
             lock.unlock();
-            cb(err, SYS_INVALID_SOCKET, 0, 0);
+            cb(err, SYS_INVALID_SOCKET, 0, 0, 0);
             return;
         }
 
@@ -212,7 +221,7 @@ namespace DNode
             Callback cb = callback_;
             callback_ = Callback();
             lock.unlock();
-            cb(err, SYS_INVALID_SOCKET, 0, 0);
+            cb(err, SYS_INVALID_SOCKET, 0, 0, 0);
             return;
         }
 
@@ -296,7 +305,7 @@ namespace DNode
             Callback cb = callback_;
             callback_ = Callback();
             lock.unlock();
-            cb(1, SYS_INVALID_SOCKET, 0, 0);
+            cb(1, SYS_INVALID_SOCKET, 0, 0, 0);
             return;
         }
 
@@ -306,7 +315,7 @@ namespace DNode
             Callback cb = callback_;
             callback_ = Callback();
             lock.unlock();
-            cb(1, SYS_INVALID_SOCKET, 0, 0);
+            cb(1, SYS_INVALID_SOCKET, 0, 0, 0);
             return;
         }
 
@@ -317,7 +326,7 @@ namespace DNode
             Callback cb = callback_;
             callback_ = Callback();
             lock.unlock();
-            cb(1, SYS_INVALID_SOCKET, 0, 0);
+            cb(1, SYS_INVALID_SOCKET, 0, 0, 0);
             return;
         }
 
@@ -336,7 +345,7 @@ namespace DNode
             Callback cb = callback_;
             callback_ = Callback();
             lock.unlock();
-            cb(1, SYS_INVALID_SOCKET, 0, 0);
+            cb(1, SYS_INVALID_SOCKET, 0, 0, 0);
             return;
         }
 
@@ -347,7 +356,7 @@ namespace DNode
             Callback cb = callback_;
             callback_ = Callback();
             lock.unlock();
-            cb(1, SYS_INVALID_SOCKET, 0, 0);
+            cb(1, SYS_INVALID_SOCKET, 0, 0, 0);
             return;
         }
 
@@ -355,11 +364,11 @@ namespace DNode
         masterSession_ =
             boost::make_shared<DMasterSession>(boost::ref(remoteMgr_), serverAddr_, serverPort_);
         if (!masterSession_->startSymm(s, nodeId(), connId(),
-            boost::bind(&RendezvousSymmAccSession::onHelloSend, this, _1))) {
+            boost::bind(&RendezvousSymmAccSession::onHelloSend, this, _1, _2))) {
             Callback cb = callback_;
             callback_ = Callback();
             lock.unlock();
-            cb(1, SYS_INVALID_SOCKET, 0, 0);
+            cb(1, SYS_INVALID_SOCKET, 0, 0, 0);
             return;
         }
 
@@ -427,7 +436,7 @@ namespace DNode
             lock.unlock();
             SYSSOCKET s = pingConn_->handle()->duplicate();
             pingConn_->close();
-            cb(0, s, destIp_, destDiscoveredPort_);
+            cb(0, s, destIp_, destDiscoveredPort_, srcPort_);
             return;
         }
 

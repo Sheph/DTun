@@ -12,6 +12,7 @@ namespace DNode
     , established_(false)
     , destIp_(0)
     , destPort_(0)
+    , srcPort_(0)
     , watch_(boost::make_shared<DTun::OpWatch>(boost::ref(localMgr.reactor())))
     {
     }
@@ -67,7 +68,7 @@ namespace DNode
         masterSession_ =
             boost::make_shared<DMasterSession>(boost::ref(remoteMgr_), serverAddr, serverPort);
         bool startRes = masterSession_->startFast(s, nodeId(), connId(),
-            boost::bind(&RendezvousFastSession::onHelloSend, this, _1));
+            boost::bind(&RendezvousFastSession::onHelloSend, this, _1, _2));
 
         lock.unlock();
 
@@ -102,7 +103,7 @@ namespace DNode
             lock.unlock();
             SYSSOCKET s = pingConn_->handle()->duplicate();
             pingConn_->close();
-            cb(0, s, destIp_, destPort_);
+            cb(0, s, destIp_, destPort_, srcPort_);
         }
     }
 
@@ -126,16 +127,17 @@ namespace DNode
         lock.unlock();
         SYSSOCKET s = pingConn_->handle()->duplicate();
         pingConn_->close();
-        cb(0, s, destIp_, destPort_);
+        cb(0, s, destIp_, destPort_, srcPort_);
     }
 
-    void RendezvousFastSession::onHelloSend(int err)
+    void RendezvousFastSession::onHelloSend(int err, DTun::UInt16 srcPort)
     {
-        LOG4CPLUS_TRACE(logger(), "RendezvousFastSession::onHelloSend(" << err << ")");
+        LOG4CPLUS_TRACE(logger(), "RendezvousFastSession::onHelloSend(" << err << ", " << srcPort << ")");
 
         boost::shared_ptr<DTun::SHandle> masterHandle;
 
         if (!err) {
+            srcPort_ = srcPort;
             masterHandle = masterSession_->conn()->handle();
             masterSession_->conn()->close(true);
         }
@@ -153,7 +155,7 @@ namespace DNode
         Callback cb = callback_;
         callback_ = Callback();
         lock.unlock();
-        cb(err, SYS_INVALID_SOCKET, 0, 0);
+        cb(err, SYS_INVALID_SOCKET, 0, 0, 0);
     }
 
     void RendezvousFastSession::onPingSend(int err, const boost::shared_ptr<std::vector<char> >& sndBuff)
@@ -169,7 +171,7 @@ namespace DNode
         Callback cb = callback_;
         callback_ = Callback();
         lock.unlock();
-        cb(err, SYS_INVALID_SOCKET, 0, 0);
+        cb(err, SYS_INVALID_SOCKET, 0, 0, 0);
     }
 
     void RendezvousFastSession::onRecvPing(int err, int numBytes, DTun::UInt32 ip, DTun::UInt16 port)
@@ -219,11 +221,11 @@ namespace DNode
         callback_ = Callback();
         lock.unlock();
         if (err) {
-            cb(err, SYS_INVALID_SOCKET, 0, 0);
+            cb(err, SYS_INVALID_SOCKET, 0, 0, 0);
         } else {
             SYSSOCKET s = pingConn_->handle()->duplicate();
             pingConn_->close();
-            cb(0, s, ip, port);
+            cb(0, s, ip, port, srcPort_);
         }
     }
 

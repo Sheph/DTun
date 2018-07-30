@@ -28,7 +28,7 @@ namespace DNode
     private:
         static void onSend(int err, const boost::shared_ptr<std::vector<char> >& sndBuff);
 
-        void onHelloSend(int err);
+        void onHelloSend(int err, DTun::UInt16 srcPort);
         void onPingSend(int err, const boost::shared_ptr<std::vector<char> >& sndBuff);
         void onRecvPing(int err, int numBytes, DTun::UInt32 ip, DTun::UInt16 port, const boost::shared_ptr<std::vector<char> >& rcvBuff);
         void onSymmNextTimeout();
@@ -51,6 +51,7 @@ namespace DNode
         Callback callback_;
         DTun::UInt32 destIp_;
         DTun::UInt16 destDiscoveredPort_;
+        DTun::UInt16 srcPort_;
         boost::shared_ptr<DTun::OpWatch> watch_;
         HandleKeepaliveList keepalive_;
         boost::shared_ptr<DTun::SConnection> serverConn_;

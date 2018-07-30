@@ -749,7 +749,7 @@ namespace DNode
         lock.unlock();
     }
 
-    void DMasterClient::onRendezvous(const DTun::ConnId& connId, int err, SYSSOCKET s, DTun::UInt32 ip, DTun::UInt16 port)
+    void DMasterClient::onRendezvous(const DTun::ConnId& connId, int err, SYSSOCKET s, DTun::UInt32 ip, DTun::UInt16 port, DTun::UInt16 srcPort)
     {
         LOG4CPLUS_TRACE(logger(), "DMasterClient::onRendezvous(" << connId << ", err=" << err << ", s=" << s << ", " << DTun::ipPortToString(ip, port) << ")");
 
@@ -794,7 +794,7 @@ namespace DNode
         } else {
             sendClose = (it->second.status != ConnStatusEstablished);
             tmp.status = it->second.status = ConnStatusEstablished;
-            it->second.keepalive = HandleKeepalive(handle, ip, port);
+            it->second.keepalive = HandleKeepalive(handle, ip, port, srcPort);
         }
 
         if (sendClose) {
@@ -924,7 +924,7 @@ namespace DNode
                         rSess = boost::make_shared<RendezvousFastSession>(boost::ref(localMgr_), boost::ref(remoteMgr_), nodeId_, connId);
                         jt->second.rSess = rSess;
                     }
-                    res = rSess->start(address_, port_, boost::bind(&DMasterClient::onRendezvous, this, connId, _1, _2, _3, _4));
+                    res = rSess->start(address_, port_, boost::bind(&DMasterClient::onRendezvous, this, connId, _1, _2, _3, _4, _5));
                     break;
                 }
                 case RendezvousModeSymmConn: {
@@ -933,7 +933,7 @@ namespace DNode
                     DTun::UInt32 connIp = 0;
                     DTun::UInt16 connPort = 0;
                     if (conn_->handle()->getPeerName(connIp, connPort)) {
-                        keepalive.push_back(HandleKeepalive(conn_->handle(), connIp, connPort));
+                        keepalive.push_back(HandleKeepalive(conn_->handle(), connIp, connPort, 0));
                     }
 
                     for (ConnStateMap::const_iterator it = connStates_.begin(); it != connStates_.end(); ++it) {
@@ -951,7 +951,7 @@ namespace DNode
                             nodeId_, connId);
                         jt->second.rSess = rSess;
                     }
-                    res = rSess->start(conn_, keepalive, boost::bind(&DMasterClient::onRendezvous, this, connId, _1, _2, _3, _4));
+                    res = rSess->start(conn_, keepalive, boost::bind(&DMasterClient::onRendezvous, this, connId, _1, _2, _3, _4, _5));
                     break;
                 }
                 case RendezvousModeSymmAcc: {
@@ -960,7 +960,7 @@ namespace DNode
                     DTun::UInt32 connIp = 0;
                     DTun::UInt16 connPort = 0;
                     if (conn_->handle()->getPeerName(connIp, connPort)) {
-                        keepalive.push_back(HandleKeepalive(conn_->handle(), connIp, connPort));
+                        keepalive.push_back(HandleKeepalive(conn_->handle(), connIp, connPort, 0));
                     }
 
                     for (ConnStateMap::const_iterator it = connStates_.begin(); it != connStates_.end(); ++it) {
@@ -978,7 +978,7 @@ namespace DNode
                             nodeId_, connId, address_, port_, jt->second.dstNodeIp);
                         jt->second.rSess = rSess;
                     }
-                    res = rSess->start(conn_, keepalive, boost::bind(&DMasterClient::onRendezvous, this, connId, _1, _2, _3, _4));
+                    res = rSess->start(conn_, keepalive, boost::bind(&DMasterClient::onRendezvous, this, connId, _1, _2, _3, _4, _5));
                     break;
                 }
                 default:

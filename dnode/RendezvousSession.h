@@ -13,18 +13,22 @@ namespace DNode
     {
         HandleKeepalive()
         : destIp(0)
-        , destPort(0) {}
+        , destPort(0)
+        , srcPort(0) {}
 
         HandleKeepalive(const boost::shared_ptr<DTun::SHandle>& handle,
             DTun::UInt32 destIp,
-            DTun::UInt32 destPort)
+            DTun::UInt16 destPort,
+            DTun::UInt16 srcPort)
         : handle(handle)
         , destIp(destIp)
-        , destPort(destPort) {}
+        , destPort(destPort)
+        , srcPort(srcPort) {}
 
         boost::shared_ptr<DTun::SHandle> handle;
         DTun::UInt32 destIp;
-        DTun::UInt32 destPort;
+        DTun::UInt16 destPort;
+        DTun::UInt16 srcPort;
     };
 
     typedef std::vector<HandleKeepalive> HandleKeepaliveList;
@@ -32,7 +36,7 @@ namespace DNode
     class RendezvousSession : boost::noncopyable
     {
     public:
-        typedef boost::function<void (int, SYSSOCKET, DTun::UInt32, DTun::UInt16)> Callback;
+        typedef boost::function<void (int, SYSSOCKET, DTun::UInt32, DTun::UInt16, DTun::UInt16)> Callback;
 
         RendezvousSession(DTun::UInt32 nodeId, const DTun::ConnId& connId)
         : nodeId_(nodeId)

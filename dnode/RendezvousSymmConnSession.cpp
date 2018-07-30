@@ -122,7 +122,7 @@ namespace DNode
             Callback cb = callback_;
             callback_ = Callback();
             lock.unlock();
-            cb(err, SYS_INVALID_SOCKET, 0, 0);
+            cb(err, SYS_INVALID_SOCKET, 0, 0, 0);
             return;
         }
 
@@ -168,7 +168,7 @@ namespace DNode
             Callback cb = callback_;
             callback_ = Callback();
             lock.unlock();
-            cb(err, SYS_INVALID_SOCKET, 0, 0);
+            cb(err, SYS_INVALID_SOCKET, 0, 0, 0);
             return;
         }
 
@@ -212,7 +212,7 @@ namespace DNode
             lock.unlock();
             SYSSOCKET s = pingConns_[connIdx]->handle()->duplicate();
             pingConns_[connIdx]->close();
-            cb(0, s, destIp_, destPort_);
+            cb(0, s, destIp_, destPort_, 0);
         } else {
             LOG4CPLUS_TRACE(logger(), "RendezvousSymmConnSession::onRecvPing(" << err << ", " << numBytes << ", i=" << connIdx << ", src=" << DTun::ipPortToString(ip, port) << ")");
 
@@ -235,7 +235,7 @@ namespace DNode
         Callback cb = callback_;
         callback_ = Callback();
         lock.unlock();
-        cb(1, SYS_INVALID_SOCKET, 0, 0);
+        cb(1, SYS_INVALID_SOCKET, 0, 0, 0);
     }
 
     void RendezvousSymmConnSession::sendSymmNext()

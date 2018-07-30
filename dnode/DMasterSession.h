@@ -13,7 +13,7 @@ namespace DNode
     class DMasterSession : boost::noncopyable
     {
     public:
-        typedef boost::function<void (int)> Callback;
+        typedef boost::function<void (int, DTun::UInt16)> Callback;
 
         DMasterSession(DTun::SManager& mgr, const std::string& address, int port);
         ~DMasterSession();
@@ -32,6 +32,7 @@ namespace DNode
 
         void onConnect(int err);
         void onSend(int err);
+        void onRecv(int err, int numBytes);
 
         DTun::SManager& mgr_;
         std::string address_;

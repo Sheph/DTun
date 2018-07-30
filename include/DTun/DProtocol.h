@@ -16,7 +16,8 @@ namespace DTun
     #define DPROTOCOL_MSG_CONN_STATUS 0x8
     #define DPROTOCOL_MSG_FAST 0x9
     #define DPROTOCOL_MSG_SYMM 0xA
-    #define DPROTOCOL_MSG_SYMM_NEXT 0xB
+    #define DPROTOCOL_MSG_REPORT 0xB
+    #define DPROTOCOL_MSG_SYMM_NEXT 0xC
 
     #define DPROTOCOL_STATUS_NONE 0x0
     #define DPROTOCOL_STATUS_PENDING 0x1
@@ -121,6 +122,11 @@ namespace DTun
         DProtocolConnId connId;
         UInt32 nodeIp;
         UInt16 nodePort;
+    };
+
+    struct DProtocolMsgReport
+    {
+        UInt16 srcPort;
     };
 
     // IN/OUT MSGS
