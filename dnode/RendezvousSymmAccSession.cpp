@@ -7,12 +7,15 @@ namespace DNode
 {
     RendezvousSymmAccSession::RendezvousSymmAccSession(DTun::SManager& localMgr, DTun::SManager& remoteMgr,
         DTun::UInt32 nodeId, const DTun::ConnId& connId, const std::string& serverAddr, int serverPort,
+        const std::string& probeAddr, int probePort,
         DTun::UInt32 destIp)
     : RendezvousSession(nodeId, connId)
     , localMgr_(localMgr)
     , remoteMgr_(remoteMgr)
     , serverAddr_(serverAddr)
     , serverPort_(serverPort)
+    , probeAddr_(probeAddr)
+    , probePort_(probePort)
     , windowSize_(601)
     , owner_(connId.nodeId == nodeId)
     , stepIdx_(0)
@@ -119,7 +122,7 @@ namespace DNode
                 return;
             }
             masterSession_ =
-                boost::make_shared<DMasterSession>(boost::ref(remoteMgr_), serverAddr_, serverPort_);
+                boost::make_shared<DMasterSession>(boost::ref(remoteMgr_), probeAddr_, probePort_);
             if (!masterSession_->startSymm(s, nodeId(), connId(),
                 boost::bind(&RendezvousSymmAccSession::onByeSend, this, _1, _2), true)) {
                 Callback cb = callback_;

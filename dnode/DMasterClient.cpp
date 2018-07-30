@@ -560,7 +560,7 @@ namespace DNode
             connState.mode = RendezvousModeSymmAcc;
             connState.rSess =
                 boost::make_shared<RendezvousSymmAccSession>(boost::ref(localMgr_), boost::ref(remoteMgr_),
-                    nodeId_, connState.connId, address_, port_, msg.srcIp);
+                    nodeId_, connState.connId, address_, port_, probeAddress_, probePort_, msg.srcIp);
             break;
         }
 
@@ -975,7 +975,7 @@ namespace DNode
                         assert(rSess);
                     } else {
                         rSess = boost::make_shared<RendezvousSymmAccSession>(boost::ref(localMgr_), boost::ref(remoteMgr_),
-                            nodeId_, connId, address_, port_, jt->second.dstNodeIp);
+                            nodeId_, connId, address_, port_, probeAddress_, probePort_, jt->second.dstNodeIp);
                         jt->second.rSess = rSess;
                     }
                     res = rSess->start(conn_, keepalive, boost::bind(&DMasterClient::onRendezvous, this, connId, _1, _2, _3, _4, _5));

@@ -14,6 +14,7 @@ namespace DNode
     public:
         RendezvousSymmAccSession(DTun::SManager& localMgr, DTun::SManager& remoteMgr,
             DTun::UInt32 nodeId, const DTun::ConnId& connId, const std::string& serverAddr, int serverPort,
+            const std::string& probeAddr, int probePort,
             DTun::UInt32 destIp);
         ~RendezvousSymmAccSession();
 
@@ -44,6 +45,8 @@ namespace DNode
         DTun::SManager& remoteMgr_;
         std::string serverAddr_;
         int serverPort_;
+        std::string probeAddr_;
+        int probePort_;
         int windowSize_;
         bool owner_;
         boost::mutex m_;
