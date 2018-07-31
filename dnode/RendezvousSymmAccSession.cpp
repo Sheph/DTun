@@ -13,7 +13,7 @@ namespace DNode
     , remoteMgr_(remoteMgr)
     , serverAddr_(serverAddr)
     , serverPort_(serverPort)
-    , windowSize_(601)
+    , windowSize_(300)
     , owner_(connId.nodeId == nodeId)
     , stepIdx_(0)
     , numPingSent_(0)

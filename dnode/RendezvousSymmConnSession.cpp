@@ -10,7 +10,7 @@ namespace DNode
     : RendezvousSession(nodeId, connId)
     , localMgr_(localMgr)
     , remoteMgr_(remoteMgr)
-    , windowSize_(307)
+    , windowSize_(300)
     , owner_(connId.nodeId == nodeId)
     , numPingSent_(0)
     , destIp_(0)
