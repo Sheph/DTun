@@ -13,6 +13,8 @@ set(SOURCES
     RendezvousFastSession.cpp
     RendezvousSymmConnSession.cpp
     RendezvousSymmAccSession.cpp
+    PortAllocator.cpp
+    PortReservation.cpp
     base/DebugObject.c
     base/BLog.c
     base/BPending.c
