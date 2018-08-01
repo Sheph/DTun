@@ -28,6 +28,7 @@ namespace DNode
 
         // For internal use.
         void useReservation(PortReservation* reservation);
+        void keepaliveReservation(PortReservation* reservation);
         void freeReservation(PortReservation* reservation);
 
     private:

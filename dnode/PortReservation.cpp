@@ -18,6 +18,11 @@ namespace DNode
         allocator_->useReservation(this);
     }
 
+    void PortReservation::keepalive()
+    {
+        allocator_->keepaliveReservation(this);
+    }
+
     void PortReservation::cancel()
     {
         allocator_->freeReservation(this);

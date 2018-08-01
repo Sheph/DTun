@@ -53,6 +53,8 @@ namespace DNode
 
         void use();
 
+        void keepalive();
+
         void cancel();
 
         // For internal use only.
