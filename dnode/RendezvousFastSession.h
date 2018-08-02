@@ -34,6 +34,7 @@ namespace DNode
         void onCheckStartTimeout();
         void onPingTimeout();
 
+        void startConn();
         void sendReady();
 
         DTun::SManager& localMgr_;
