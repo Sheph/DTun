@@ -559,7 +559,8 @@ namespace DNode
         case DPROTOCOL_RMODE_FAST:
             connState.mode = RendezvousModeFast;
             connState.rSess =
-                boost::make_shared<RendezvousFastSession>(boost::ref(localMgr_), boost::ref(remoteMgr_), nodeId_, connState.connId, portAllocator_, msg.bestEffort);
+                boost::make_shared<RendezvousFastSession>(boost::ref(localMgr_), boost::ref(remoteMgr_), nodeId_, connState.connId,
+                    address_, port_, portAllocator_, msg.bestEffort);
             break;
         case DPROTOCOL_RMODE_SYMM_CONN:
             connState.mode = RendezvousModeSymmConn;
@@ -901,10 +902,11 @@ namespace DNode
                         rSess = boost::dynamic_pointer_cast<RendezvousFastSession>(jt->second.rSess);
                         assert(rSess);
                     } else {
-                        rSess = boost::make_shared<RendezvousFastSession>(boost::ref(localMgr_), boost::ref(remoteMgr_), nodeId_, connId, portAllocator_, bestEffort_);
+                        rSess = boost::make_shared<RendezvousFastSession>(boost::ref(localMgr_), boost::ref(remoteMgr_), nodeId_, connId,
+                            address_, port_, portAllocator_, bestEffort_);
                         jt->second.rSess = rSess;
                     }
-                    res = rSess->start(address_, port_, boost::bind(&DMasterClient::onRendezvous, this, connId, _1, _2, _3, _4));
+                    res = rSess->start(conn_, boost::bind(&DMasterClient::onRendezvous, this, connId, _1, _2, _3, _4));
                     break;
                 }
                 case RendezvousModeSymmConn: {

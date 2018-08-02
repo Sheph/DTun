@@ -11,7 +11,7 @@ namespace DNode
     : RendezvousSession(nodeId, connId)
     , localMgr_(localMgr)
     , remoteMgr_(remoteMgr)
-    , windowSize_(299)
+    , windowSize_(300)
     , owner_(connId.nodeId == nodeId)
     , portAllocator_(portAllocator)
     , bestEffort_(bestEffort)
@@ -70,11 +70,11 @@ namespace DNode
         if (owner_) {
             if (bestEffort_) {
                 portReservation_ =
-                    portAllocator_->reserveSymmPortsBestEffort(windowSize_ + 1,
+                    portAllocator_->reserveSymmPortsBestEffort(windowSize_,
                         watch_->wrap(boost::bind(&RendezvousSymmConnSession::onPortReservation, this)));
                 return true;
             } else {
-                portReservation_ = portAllocator_->reserveSymmPorts(windowSize_ + 1);
+                portReservation_ = portAllocator_->reserveSymmPorts(windowSize_);
                 if (!portReservation_) {
                     return false;
                 }
@@ -91,12 +91,12 @@ namespace DNode
 
         if (bestEffort_) {
             portReservation_ =
-                portAllocator_->reserveSymmPortsBestEffort(windowSize_ + 1,
+                portAllocator_->reserveSymmPortsBestEffort(windowSize_,
                     watch_->wrap(boost::bind(&RendezvousSymmConnSession::onPortReservation, this)));
             return true;
         }
 
-        portReservation_ = portAllocator_->reserveSymmPorts(windowSize_ + 1);
+        portReservation_ = portAllocator_->reserveSymmPorts(windowSize_);
         if (!portReservation_) {
             return false;
         }
@@ -134,10 +134,10 @@ namespace DNode
 
             if (bestEffort_) {
                 portReservation_ =
-                    portAllocator_->reserveSymmPortsBestEffort(windowSize_ + 1,
+                    portAllocator_->reserveSymmPortsBestEffort(windowSize_,
                         watch_->wrap(boost::bind(&RendezvousSymmConnSession::onPortReservation, this)));
             } else {
-                portReservation_ = portAllocator_->reserveSymmPorts(windowSize_ + 1);
+                portReservation_ = portAllocator_->reserveSymmPorts(windowSize_);
                 if (!portReservation_) {
                     Callback cb = callback_;
                     callback_ = Callback();

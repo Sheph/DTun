@@ -6,13 +6,17 @@
 namespace DNode
 {
     RendezvousFastSession::RendezvousFastSession(DTun::SManager& localMgr, DTun::SManager& remoteMgr, DTun::UInt32 nodeId, const DTun::ConnId& connId,
+        const std::string& serverAddr, int serverPort,
         const boost::shared_ptr<PortAllocator>& portAllocator, bool bestEffort)
     : RendezvousSession(nodeId, connId)
     , localMgr_(localMgr)
     , remoteMgr_(remoteMgr)
+    , serverAddr_(serverAddr)
+    , serverPort_(serverPort)
     , portAllocator_(portAllocator)
     , bestEffort_(bestEffort)
-    , established_(false)
+    , owner_(connId.nodeId == nodeId)
+    , ready_(false)
     , destIp_(0)
     , destPort_(0)
     , watch_(boost::make_shared<DTun::OpWatch>(boost::ref(localMgr.reactor())))
@@ -24,11 +28,48 @@ namespace DNode
         watch_->close();
     }
 
-    bool RendezvousFastSession::start(const std::string& serverAddr, int serverPort, const Callback& callback)
+    bool RendezvousFastSession::start(const boost::shared_ptr<DTun::SConnection>& serverConn, const Callback& callback)
     {
         setStarted();
 
         boost::mutex::scoped_lock lock(m_);
+
+        callback_ = callback;
+        serverConn_ = serverConn;
+
+        if (owner_) {
+            if (bestEffort_) {
+                portReservation_ =
+                    portAllocator_->reserveSymmPortsBestEffort(2,
+                        watch_->wrap(boost::bind(&RendezvousFastSession::onPortReservation, this)));
+                return true;
+            } else {
+                portReservation_ = portAllocator_->reserveSymmPorts(2);
+                if (!portReservation_) {
+                    return false;
+                }
+
+                sendReady();
+
+                return true;
+            }
+        }
+
+        if (!ready_) {
+            return true;
+        }
+
+        if (bestEffort_) {
+            portReservation_ =
+                portAllocator_->reserveSymmPortsBestEffort(2,
+                    watch_->wrap(boost::bind(&RendezvousFastSession::onPortReservation, this)));
+            return true;
+        }
+
+        portReservation_ = portAllocator_->reserveSymmPorts(2);
+        if (!portReservation_) {
+            return false;
+        }
 
         SYSSOCKET s = ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
         if (s == SYS_INVALID_SOCKET) {
@@ -65,10 +106,11 @@ namespace DNode
             return false;
         }
 
-        callback_ = callback;
+        portReservation_->use();
+
         pingConn_ = handle->createConnection();
         masterSession_ =
-            boost::make_shared<DMasterSession>(boost::ref(remoteMgr_), serverAddr, serverPort);
+            boost::make_shared<DMasterSession>(boost::ref(remoteMgr_), serverAddr_, serverPort_);
         bool startRes = masterSession_->startFast(s, nodeId(), connId(),
             boost::bind(&RendezvousFastSession::onHelloSend, this, _1));
 
@@ -84,28 +126,48 @@ namespace DNode
     {
         LOG4CPLUS_TRACE(logger(), "RendezvousFastSession::onMsg(" << (int)msgId << ")");
 
-        if (msgId != DPROTOCOL_MSG_FAST) {
-            return;
-        }
-
-        const DTun::DProtocolMsgFast* msgFast = (const DTun::DProtocolMsgFast*)msg;
-
         boost::mutex::scoped_lock lock(m_);
 
-        destIp_ = msgFast->nodeIp;
-        destPort_ = msgFast->nodePort;
+        if (msgId == DPROTOCOL_MSG_READY) {
+            ready_ = true;
+            if (!started()) {
+                return;
+            }
 
-        if (!callback_) {
-            return;
-        }
+            if (!callback_) {
+                return;
+            }
 
-        if (established_) {
-            Callback cb = callback_;
-            callback_ = Callback();
+            if (bestEffort_) {
+                portReservation_ =
+                    portAllocator_->reserveSymmPortsBestEffort(2,
+                        watch_->wrap(boost::bind(&RendezvousFastSession::onPortReservation, this)));
+            } else {
+                portReservation_ = portAllocator_->reserveSymmPorts(2);
+                if (!portReservation_) {
+                    Callback cb = callback_;
+                    callback_ = Callback();
+                    lock.unlock();
+                    cb(1, SYS_INVALID_SOCKET, 0, 0);
+                    return;
+                }
+                lock.unlock();
+                onPortReservation();
+            }
+        } else if (msgId == DPROTOCOL_MSG_FAST) {
+            if (!callback_) {
+                return;
+            }
+
+            const DTun::DProtocolMsgFast* msgFast = (const DTun::DProtocolMsgFast*)msg;
+
+            destIp_ = msgFast->nodeIp;
+            destPort_ = msgFast->nodePort;
+
+            assert(portReservation_);
+
             lock.unlock();
-            SYSSOCKET s = pingConn_->handle()->duplicate();
-            pingConn_->close();
-            cb(0, s, destIp_, destPort_);
+            onPortReservation();
         }
     }
 
@@ -119,10 +181,7 @@ namespace DNode
             return;
         }
 
-        if (destIp_ == 0) {
-            established_ = true;
-            return;
-        }
+        assert(destIp_ != 0);
 
         Callback cb = callback_;
         callback_ = Callback();
@@ -130,6 +189,101 @@ namespace DNode
         SYSSOCKET s = pingConn_->handle()->duplicate();
         pingConn_->close();
         cb(0, s, destIp_, destPort_);
+    }
+
+    void RendezvousFastSession::onSend(int err, const boost::shared_ptr<std::vector<char> >& sndBuff)
+    {
+        LOG4CPLUS_TRACE(logger(), "RendezvousFastSession::onSend(" << err << ")");
+    }
+
+    void RendezvousFastSession::onPortReservation()
+    {
+        LOG4CPLUS_TRACE(logger(), "RendezvousFastSession::onPortReservation()");
+
+        boost::mutex::scoped_lock lock(m_);
+
+        if (!callback_) {
+            return;
+        }
+
+        if (!ready_) {
+            assert(owner_);
+            if (owner_) {
+                ready_ = true;
+                sendReady();
+            }
+            return;
+        }
+
+        SYSSOCKET s = ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+        if (s == SYS_INVALID_SOCKET) {
+            LOG4CPLUS_ERROR(logger(), "Cannot create UDP socket");
+            Callback cb = callback_;
+            callback_ = Callback();
+            lock.unlock();
+            cb(1, SYS_INVALID_SOCKET, 0, 0);
+            return;
+        }
+
+        SYSSOCKET boundSock = ::dup(s);
+        if (boundSock == -1) {
+            LOG4CPLUS_ERROR(logger(), "Cannot dup UDP socket");
+            DTun::closeSysSocketChecked(s);
+            Callback cb = callback_;
+            callback_ = Callback();
+            lock.unlock();
+            cb(1, SYS_INVALID_SOCKET, 0, 0);
+            return;
+        }
+
+        struct sockaddr_in addr;
+
+        memset(&addr, 0, sizeof(addr));
+        addr.sin_family = AF_INET;
+        addr.sin_addr.s_addr = htonl(INADDR_ANY);
+
+        int res = ::bind(s, (const struct sockaddr*)&addr, sizeof(addr));
+
+        if (res == SYS_SOCKET_ERROR) {
+            LOG4CPLUS_ERROR(logger(), "Cannot bind UDP socket");
+            DTun::closeSysSocketChecked(s);
+            DTun::closeSysSocketChecked(boundSock);
+            Callback cb = callback_;
+            callback_ = Callback();
+            lock.unlock();
+            cb(1, SYS_INVALID_SOCKET, 0, 0);
+            return;
+        }
+
+        boost::shared_ptr<DTun::SHandle> handle = localMgr_.createDatagramSocket(boundSock);
+        if (!handle) {
+            DTun::closeSysSocketChecked(s);
+            DTun::closeSysSocketChecked(boundSock);
+            Callback cb = callback_;
+            callback_ = Callback();
+            lock.unlock();
+            cb(1, SYS_INVALID_SOCKET, 0, 0);
+            return;
+        }
+
+        portReservation_->use();
+
+        pingConn_ = handle->createConnection();
+        masterSession_ =
+            boost::make_shared<DMasterSession>(boost::ref(remoteMgr_), serverAddr_, serverPort_);
+        if (!masterSession_->startSymm(s, nodeId(), connId(),
+            boost::bind(&RendezvousFastSession::onHelloSend, this, _1))) {
+            Callback cb = callback_;
+            callback_ = Callback();
+            lock.unlock();
+            cb(1, SYS_INVALID_SOCKET, 0, 0);
+            return;
+        }
+
+        lock.unlock();
+
+        localMgr_.reactor().post(
+            watch_->wrap(boost::bind(&RendezvousFastSession::onCheckStartTimeout, this)));
     }
 
     void RendezvousFastSession::onHelloSend(int err)
@@ -220,6 +374,9 @@ namespace DNode
 
         Callback cb = callback_;
         callback_ = Callback();
+        if (!err) {
+            portReservation_->keepalive();
+        }
         lock.unlock();
         if (err) {
             cb(err, SYS_INVALID_SOCKET, 0, 0);
@@ -284,10 +441,29 @@ namespace DNode
         pingConn_->writeTo(&(*sndBuff)[0], &(*sndBuff)[0] + sndBuff->size(),
             destIp_, destPort_,
             boost::bind(&RendezvousFastSession::onPingSend, this, _1, sndBuff));
+        portReservation_->use();
 
         lock.unlock();
 
         localMgr_.reactor().post(
             watch_->wrap(boost::bind(&RendezvousFastSession::onPingTimeout, this)), 1000);
+    }
+
+    void RendezvousFastSession::sendReady()
+    {
+        DTun::DProtocolHeader header;
+        DTun::DProtocolMsgReady msg;
+
+        header.msgCode = DPROTOCOL_MSG_READY;
+        msg.connId = DTun::toProtocolConnId(connId());
+
+        boost::shared_ptr<std::vector<char> > sndBuff =
+            boost::make_shared<std::vector<char> >(sizeof(header) + sizeof(msg));
+
+        memcpy(&(*sndBuff)[0], &header, sizeof(header));
+        memcpy(&(*sndBuff)[0] + sizeof(header), &msg, sizeof(msg));
+
+        serverConn_->write(&(*sndBuff)[0], &(*sndBuff)[0] + sndBuff->size(),
+            boost::bind(&RendezvousFastSession::onSend, _1, sndBuff));
     }
 }
