@@ -866,6 +866,17 @@ namespace DNode
             return false;
         }
 
+        bool symmConnRunning = false;
+
+        for (ConnStateMap::const_iterator it = connStates_.begin(); it != connStates_.end(); ++it) {
+            if (it->second.rSess && it->second.rSess->started()) {
+                if (it->second.mode == RendezvousModeSymmConn) {
+                    symmConnRunning = true;
+                    break;
+                }
+            }
+        }
+
         for (ConnIdList::iterator it = rendezvousConnIds_.begin(); it != rendezvousConnIds_.end();) {
             DTun::ConnId connId = *it;
             ConnStateMap::iterator jt = connStates_.find(connId);
@@ -893,7 +904,9 @@ namespace DNode
 
                 sendMsg(DPROTOCOL_MSG_CONN_CREATE, &msg, sizeof(msg));
                 break;
-            } else if (jt->second.mode >= RendezvousModeFast) {
+            } else if ((jt->second.mode == RendezvousModeFast) ||
+                (jt->second.mode == RendezvousModeSymmAcc) ||
+                (!symmConnRunning && (jt->second.mode == RendezvousModeSymmConn))) {
                 rendezvousConnIds_.erase(it++);
 
                 bool res = false;
