@@ -754,7 +754,8 @@ namespace DNode
         lock.unlock();
     }
 
-    void DMasterClient::onRendezvous(const DTun::ConnId& connId, int err, SYSSOCKET s, DTun::UInt32 ip, DTun::UInt16 port)
+    void DMasterClient::onRendezvous(const DTun::ConnId& connId, int err, SYSSOCKET s, DTun::UInt32 ip, DTun::UInt16 port,
+        const boost::shared_ptr<PortReservation>& portReservation)
     {
         LOG4CPLUS_TRACE(logger(), "DMasterClient::onRendezvous(" << connId << ", err=" << err << ", s=" << s << ", " << DTun::ipPortToString(ip, port) << ")");
 
@@ -799,6 +800,7 @@ namespace DNode
         } else {
             sendClose = (it->second.status != ConnStatusEstablished);
             tmp.status = it->second.status = ConnStatusEstablished;
+            tmp.keepalive = portReservation;
         }
 
         if (sendClose) {
@@ -906,7 +908,7 @@ namespace DNode
                             address_, port_, portAllocator_, bestEffort_);
                         jt->second.rSess = rSess;
                     }
-                    res = rSess->start(conn_, boost::bind(&DMasterClient::onRendezvous, this, connId, _1, _2, _3, _4));
+                    res = rSess->start(conn_, boost::bind(&DMasterClient::onRendezvous, this, connId, _1, _2, _3, _4, _5));
                     break;
                 }
                 case RendezvousModeSymmConn: {
@@ -919,7 +921,7 @@ namespace DNode
                             nodeId_, connId, portAllocator_, bestEffort_);
                         jt->second.rSess = rSess;
                     }
-                    res = rSess->start(conn_, boost::bind(&DMasterClient::onRendezvous, this, connId, _1, _2, _3, _4));
+                    res = rSess->start(conn_, boost::bind(&DMasterClient::onRendezvous, this, connId, _1, _2, _3, _4, _5));
                     break;
                 }
                 case RendezvousModeSymmAcc: {
@@ -932,7 +934,7 @@ namespace DNode
                             nodeId_, connId, address_, port_, jt->second.dstNodeIp, portAllocator_, bestEffort_);
                         jt->second.rSess = rSess;
                     }
-                    res = rSess->start(conn_, boost::bind(&DMasterClient::onRendezvous, this, connId, _1, _2, _3, _4));
+                    res = rSess->start(conn_, boost::bind(&DMasterClient::onRendezvous, this, connId, _1, _2, _3, _4, _5));
                     break;
                 }
                 default:

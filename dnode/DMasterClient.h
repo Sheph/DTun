@@ -100,7 +100,8 @@ namespace DNode
         void onRecvMsgConnStatus(int err, int numBytes);
         void onRecvMsgOther(int err, int numBytes, DTun::UInt8 msgId);
         void onProxyDone(const DTun::ConnId& connId);
-        void onRendezvous(const DTun::ConnId& connId, int err, SYSSOCKET s, DTun::UInt32 remoteIp, DTun::UInt16 remotePort);
+        void onRendezvous(const DTun::ConnId& connId, int err, SYSSOCKET s, DTun::UInt32 remoteIp, DTun::UInt16 remotePort,
+            const boost::shared_ptr<PortReservation>& portReservation);
 
         void sendMsg(DTun::UInt8 msgCode, const void* msg, int msgSize);
 

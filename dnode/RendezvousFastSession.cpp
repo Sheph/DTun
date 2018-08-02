@@ -148,7 +148,7 @@ namespace DNode
                     Callback cb = callback_;
                     callback_ = Callback();
                     lock.unlock();
-                    cb(1, SYS_INVALID_SOCKET, 0, 0);
+                    cb(1, SYS_INVALID_SOCKET, 0, 0, boost::shared_ptr<PortReservation>());
                     return;
                 }
                 lock.unlock();
@@ -185,10 +185,11 @@ namespace DNode
 
         Callback cb = callback_;
         callback_ = Callback();
+        portReservation_->keepalive();
         lock.unlock();
         SYSSOCKET s = pingConn_->handle()->duplicate();
         pingConn_->close();
-        cb(0, s, destIp_, destPort_);
+        cb(0, s, destIp_, destPort_, portReservation_);
     }
 
     void RendezvousFastSession::onSend(int err, const boost::shared_ptr<std::vector<char> >& sndBuff)
@@ -221,7 +222,7 @@ namespace DNode
             Callback cb = callback_;
             callback_ = Callback();
             lock.unlock();
-            cb(1, SYS_INVALID_SOCKET, 0, 0);
+            cb(1, SYS_INVALID_SOCKET, 0, 0, boost::shared_ptr<PortReservation>());
             return;
         }
 
@@ -232,7 +233,7 @@ namespace DNode
             Callback cb = callback_;
             callback_ = Callback();
             lock.unlock();
-            cb(1, SYS_INVALID_SOCKET, 0, 0);
+            cb(1, SYS_INVALID_SOCKET, 0, 0, boost::shared_ptr<PortReservation>());
             return;
         }
 
@@ -251,7 +252,7 @@ namespace DNode
             Callback cb = callback_;
             callback_ = Callback();
             lock.unlock();
-            cb(1, SYS_INVALID_SOCKET, 0, 0);
+            cb(1, SYS_INVALID_SOCKET, 0, 0, boost::shared_ptr<PortReservation>());
             return;
         }
 
@@ -262,7 +263,7 @@ namespace DNode
             Callback cb = callback_;
             callback_ = Callback();
             lock.unlock();
-            cb(1, SYS_INVALID_SOCKET, 0, 0);
+            cb(1, SYS_INVALID_SOCKET, 0, 0, boost::shared_ptr<PortReservation>());
             return;
         }
 
@@ -276,7 +277,7 @@ namespace DNode
             Callback cb = callback_;
             callback_ = Callback();
             lock.unlock();
-            cb(1, SYS_INVALID_SOCKET, 0, 0);
+            cb(1, SYS_INVALID_SOCKET, 0, 0, boost::shared_ptr<PortReservation>());
             return;
         }
 
@@ -310,7 +311,7 @@ namespace DNode
         Callback cb = callback_;
         callback_ = Callback();
         lock.unlock();
-        cb(err, SYS_INVALID_SOCKET, 0, 0);
+        cb(err, SYS_INVALID_SOCKET, 0, 0, boost::shared_ptr<PortReservation>());
     }
 
     void RendezvousFastSession::onPingSend(int err, const boost::shared_ptr<std::vector<char> >& sndBuff)
@@ -326,7 +327,7 @@ namespace DNode
         Callback cb = callback_;
         callback_ = Callback();
         lock.unlock();
-        cb(err, SYS_INVALID_SOCKET, 0, 0);
+        cb(err, SYS_INVALID_SOCKET, 0, 0, boost::shared_ptr<PortReservation>());
     }
 
     void RendezvousFastSession::onRecvPing(int err, int numBytes, DTun::UInt32 ip, DTun::UInt16 port)
@@ -379,11 +380,11 @@ namespace DNode
         }
         lock.unlock();
         if (err) {
-            cb(err, SYS_INVALID_SOCKET, 0, 0);
+            cb(err, SYS_INVALID_SOCKET, 0, 0, boost::shared_ptr<PortReservation>());
         } else {
             SYSSOCKET s = pingConn_->handle()->duplicate();
             pingConn_->close();
-            cb(0, s, ip, port);
+            cb(0, s, ip, port, portReservation_);
         }
     }
 

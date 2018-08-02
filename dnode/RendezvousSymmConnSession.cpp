@@ -142,7 +142,7 @@ namespace DNode
                     Callback cb = callback_;
                     callback_ = Callback();
                     lock.unlock();
-                    cb(1, SYS_INVALID_SOCKET, 0, 0);
+                    cb(1, SYS_INVALID_SOCKET, 0, 0, boost::shared_ptr<PortReservation>());
                     return;
                 }
                 lock.unlock();
@@ -216,7 +216,7 @@ namespace DNode
             Callback cb = callback_;
             callback_ = Callback();
             lock.unlock();
-            cb(err, SYS_INVALID_SOCKET, 0, 0);
+            cb(err, SYS_INVALID_SOCKET, 0, 0, boost::shared_ptr<PortReservation>());
             return;
         }
 
@@ -251,7 +251,7 @@ namespace DNode
             Callback cb = callback_;
             callback_ = Callback();
             lock.unlock();
-            cb(err, SYS_INVALID_SOCKET, 0, 0);
+            cb(err, SYS_INVALID_SOCKET, 0, 0, boost::shared_ptr<PortReservation>());
             return;
         }
 
@@ -298,7 +298,7 @@ namespace DNode
                 lock.unlock();
                 SYSSOCKET s = pingConns_[connIdx]->handle()->duplicate();
                 pingConns_[connIdx]->close();
-                cb(0, s, destIp_, destPort_);
+                cb(0, s, destIp_, destPort_, portReservation);
             } else {
                 LOG4CPLUS_TRACE(logger(), "RendezvousSymmConnSession::onRecvPing(FINAL other, " << err << ", " << numBytes << ", i=" << connIdx << ", src=" << DTun::ipPortToString(ip, port) << ")");
 
@@ -327,7 +327,7 @@ namespace DNode
         Callback cb = callback_;
         callback_ = Callback();
         lock.unlock();
-        cb(1, SYS_INVALID_SOCKET, 0, 0);
+        cb(1, SYS_INVALID_SOCKET, 0, 0, boost::shared_ptr<PortReservation>());
     }
 
     void RendezvousSymmConnSession::sendReady()

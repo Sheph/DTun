@@ -1,6 +1,7 @@
 #ifndef _RENDEZVOUSSESSION_H_
 #define _RENDEZVOUSSESSION_H_
 
+#include "PortReservation.h"
 #include "DTun/Types.h"
 #include "DTun/SConnection.h"
 #include <boost/noncopyable.hpp>
@@ -12,7 +13,7 @@ namespace DNode
     class RendezvousSession : boost::noncopyable
     {
     public:
-        typedef boost::function<void (int, SYSSOCKET, DTun::UInt32, DTun::UInt16)> Callback;
+        typedef boost::function<void (int, SYSSOCKET, DTun::UInt32, DTun::UInt16, const boost::shared_ptr<PortReservation>&)> Callback;
 
         RendezvousSession(DTun::UInt32 nodeId, const DTun::ConnId& connId)
         : nodeId_(nodeId)
