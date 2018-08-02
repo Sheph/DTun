@@ -26,6 +26,8 @@ namespace DNode
         boost::shared_ptr<PortReservation> reserveFastPorts(int numPorts);
         boost::shared_ptr<PortReservation> reserveFastPortsBestEffort(int numPorts, const ReserveCallback& callback);
 
+        std::string dump();
+
         // For internal use.
         void useReservation(PortReservation* reservation);
         void keepaliveReservation(PortReservation* reservation);

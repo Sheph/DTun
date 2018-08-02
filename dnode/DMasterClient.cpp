@@ -259,6 +259,7 @@ namespace DNode
         LOG4CPLUS_INFO(logger(), "totStates=" << totStates << "(" << totStatesReported << "), connSess=" << connSess << "(" << connSessActive
             << "), accSess=" << accSess << "(" << accSessActive << "), prx=" << prx << ", numOut=" << numOut
             << ", " << remoteMgr_.reactor().dump()
+            << ", " << portAllocator_->dump()
             << ", numFds=" << numFds << ", maxFds=" << fdMax);
     }
 
@@ -800,7 +801,7 @@ namespace DNode
         } else {
             sendClose = (it->second.status != ConnStatusEstablished);
             tmp.status = it->second.status = ConnStatusEstablished;
-            tmp.keepalive = portReservation;
+            it->second.keepalive = portReservation;
         }
 
         if (sendClose) {

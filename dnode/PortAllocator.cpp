@@ -106,6 +106,42 @@ namespace DNode
         return res;
     }
 
+    std::string PortAllocator::dump()
+    {
+        boost::chrono::steady_clock::time_point now =
+            boost::chrono::steady_clock::now();
+
+        boost::mutex::scoped_lock lock(m_);
+
+        int portsRsvdSymm = 0;
+        int portsRsvdFast = 0;
+        int portsFree = 0;
+        int portsKeepalive = 0;
+        int portsUsable = 0;
+
+        for (PortStateSet::iterator it = ports_.begin(); it != ports_.end(); ++it) {
+            boost::shared_ptr<PortState> port = *it;
+            if (port->status == PortStatusReservedSymm) {
+                ++portsRsvdSymm;
+            } else if (port->status == PortStatusReservedFast) {
+                ++portsRsvdFast;
+            } else {
+                ++portsFree;
+            }
+
+            if ((*it)->decayTime == (boost::chrono::steady_clock::time_point::max)()) {
+                ++portsKeepalive;
+            } else if ((*it)->decayTime <= now) {
+                ++portsUsable;
+            }
+        }
+
+        std::ostringstream os;
+        os << "rsSymm=" << portsRsvdSymm << ", rsFast=" << portsRsvdFast << ", freePrts=" << portsFree << ", kpalive=" << portsKeepalive
+           << ", usable=" << portsUsable;
+        return os.str();
+    }
+
     void PortAllocator::useReservation(PortReservation* reservation)
     {
         boost::mutex::scoped_lock lock(m_);
