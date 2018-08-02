@@ -33,7 +33,8 @@ namespace DMaster
         DTun::UInt32 ip,
         DTun::UInt16 port,
         DTun::UInt8 mode,
-        DTun::UInt32 srcIp)
+        DTun::UInt32 srcIp,
+        bool bestEffort)
     {
         DTun::DProtocolMsgConn msg;
 
@@ -42,6 +43,7 @@ namespace DMaster
         msg.port = port;
         msg.mode = mode;
         msg.srcIp = srcIp;
+        msg.bestEffort = bestEffort;
 
         sendMsg(DPROTOCOL_MSG_CONN, &msg, sizeof(msg));
     }
@@ -94,6 +96,15 @@ namespace DMaster
         msg.connId = DTun::toProtocolConnId(connId);
 
         sendMsg(DPROTOCOL_MSG_SYMM_NEXT, &msg, sizeof(msg));
+    }
+
+    void Session::sendReady(const DTun::ConnId& connId)
+    {
+        DTun::DProtocolMsgReady msg;
+
+        msg.connId = DTun::toProtocolConnId(connId);
+
+        sendMsg(DPROTOCOL_MSG_READY, &msg, sizeof(msg));
     }
 
     void Session::onSend(int err, const boost::shared_ptr<std::vector<char> >& sndBuff)
@@ -153,6 +164,12 @@ namespace DMaster
             break;
         case DPROTOCOL_MSG_CONN_CLOSE:
             buff_.resize(sizeof(DTun::DProtocolMsgConnClose));
+            conn_->read(&buff_[0], &buff_[0] + buff_.size(),
+                boost::bind(&Session::onRecvMsgOther, this, _1, _2, header.msgCode),
+                true);
+            break;
+        case DPROTOCOL_MSG_READY:
+            buff_.resize(sizeof(DTun::DProtocolMsgReady));
             conn_->read(&buff_[0], &buff_[0] + buff_.size(),
                 boost::bind(&Session::onRecvMsgOther, this, _1, _2, header.msgCode),
                 true);

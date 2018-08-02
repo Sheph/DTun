@@ -16,11 +16,11 @@ namespace DTun
     #define DPROTOCOL_MSG_CONN_STATUS 0x8
     #define DPROTOCOL_MSG_FAST 0x9
     #define DPROTOCOL_MSG_SYMM 0xA
-    #define DPROTOCOL_MSG_SYMM_NEXT 0xB
+    #define DPROTOCOL_MSG_READY 0xB
+    #define DPROTOCOL_MSG_SYMM_NEXT 0xC
 
-    #define DPROTOCOL_STATUS_NONE 0x0
-    #define DPROTOCOL_STATUS_PENDING 0x1
-    #define DPROTOCOL_STATUS_ESTABLISHED 0x2
+    #define DPROTOCOL_STATUS_PENDING 0x0
+    #define DPROTOCOL_STATUS_ESTABLISHED 0x1
     #define DPROTOCOL_STATUS_ERR_CANCELED 0x10
     #define DPROTOCOL_STATUS_ERR_UNKNOWN 0x11
     #define DPROTOCOL_STATUS_ERR_NOTFOUND 0x12
@@ -75,7 +75,7 @@ namespace DTun
         UInt32 dstNodeId;
         UInt32 remoteIp;
         UInt16 remotePort;
-        UInt8 fastOnly;
+        UInt8 bestEffort;
     };
 
     struct DProtocolMsgConnClose
@@ -99,6 +99,7 @@ namespace DTun
         UInt16 port;
         UInt8 mode;
         UInt32 srcIp;
+        UInt8 bestEffort;
     };
 
     struct DProtocolMsgConnStatus
@@ -124,6 +125,11 @@ namespace DTun
     };
 
     // IN/OUT MSGS
+
+    struct DProtocolMsgReady
+    {
+        DProtocolConnId connId;
+    };
 
     struct DProtocolMsgSymmNext
     {

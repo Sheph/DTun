@@ -6,12 +6,16 @@
 namespace DNode
 {
     RendezvousSymmConnSession::RendezvousSymmConnSession(DTun::SManager& localMgr, DTun::SManager& remoteMgr,
-        DTun::UInt32 nodeId, const DTun::ConnId& connId)
+        DTun::UInt32 nodeId, const DTun::ConnId& connId,
+        const boost::shared_ptr<PortAllocator>& portAllocator, bool bestEffort)
     : RendezvousSession(nodeId, connId)
     , localMgr_(localMgr)
     , remoteMgr_(remoteMgr)
-    , windowSize_(300)
+    , windowSize_(299)
     , owner_(connId.nodeId == nodeId)
+    , portAllocator_(portAllocator)
+    , bestEffort_(bestEffort)
+    , ready_(false)
     , numPingSent_(0)
     , destIp_(0)
     , destPort_(0)
@@ -25,7 +29,7 @@ namespace DNode
     }
 
     bool RendezvousSymmConnSession::start(const boost::shared_ptr<DTun::SConnection>& serverConn,
-        const HandleKeepaliveList& keepalive, const Callback& callback)
+        const Callback& callback)
     {
         setStarted();
 
@@ -53,7 +57,6 @@ namespace DNode
         }
 
         pingConns_ = pingConns;
-        keepalive_ = keepalive;
         serverConn_ = serverConn;
         callback_ = callback;
 
@@ -64,9 +67,41 @@ namespace DNode
                 boost::bind(&RendezvousSymmConnSession::onRecvPing, this, _1, _2, _3, _4, i, rcvBuff));
         }
 
-        if (!owner_) {
-            sendSymmNext();
+        if (owner_) {
+            if (bestEffort_) {
+                portReservation_ =
+                    portAllocator_->reserveSymmPortsBestEffort(windowSize_ + 1,
+                        watch_->wrap(boost::bind(&RendezvousSymmConnSession::onPortReservation, this)));
+                return true;
+            } else {
+                portReservation_ = portAllocator_->reserveSymmPorts(windowSize_ + 1);
+                if (!portReservation_) {
+                    return false;
+                }
+
+                sendReady();
+
+                return true;
+            }
         }
+
+        if (!ready_) {
+            return true;
+        }
+
+        if (bestEffort_) {
+            portReservation_ =
+                portAllocator_->reserveSymmPortsBestEffort(windowSize_ + 1,
+                    watch_->wrap(boost::bind(&RendezvousSymmConnSession::onPortReservation, this)));
+            return true;
+        }
+
+        portReservation_ = portAllocator_->reserveSymmPorts(windowSize_ + 1);
+        if (!portReservation_) {
+            return false;
+        }
+
+        sendReady();
 
         return true;
     }
@@ -77,7 +112,43 @@ namespace DNode
 
         boost::mutex::scoped_lock lock(m_);
 
-        if (msgId == DPROTOCOL_MSG_SYMM) {
+        if (msgId == DPROTOCOL_MSG_READY) {
+            ready_ = true;
+            if (!started()) {
+                return;
+            }
+
+            if (!callback_) {
+                return;
+            }
+
+            lock.unlock();
+
+            portReservation_.reset();
+
+            lock.lock();
+
+            if (!callback_) {
+                return;
+            }
+
+            if (bestEffort_) {
+                portReservation_ =
+                    portAllocator_->reserveSymmPortsBestEffort(windowSize_ + 1,
+                        watch_->wrap(boost::bind(&RendezvousSymmConnSession::onPortReservation, this)));
+            } else {
+                portReservation_ = portAllocator_->reserveSymmPorts(windowSize_ + 1);
+                if (!portReservation_) {
+                    Callback cb = callback_;
+                    callback_ = Callback();
+                    lock.unlock();
+                    cb(1, SYS_INVALID_SOCKET, 0, 0);
+                    return;
+                }
+                lock.unlock();
+                onPortReservation();
+            }
+        } else if (msgId == DPROTOCOL_MSG_SYMM) {
             const DTun::DProtocolMsgSymm* msgSymm = (const DTun::DProtocolMsgSymm*)msg;
 
             destIp_ = msgSymm->nodeIp;
@@ -100,6 +171,7 @@ namespace DNode
             pingConns_[0]->writeTo(&(*sndBuff)[0], &(*sndBuff)[0] + sndBuff->size(),
                 destIp_, destPort_,
                 boost::bind(&RendezvousSymmConnSession::onPingSend, this, _1, sndBuff));
+            portReservation_->use();
         }
     }
 
@@ -107,6 +179,28 @@ namespace DNode
     {
         localMgr_.reactor().post(
             watch_->wrap(boost::bind(&RendezvousSymmConnSession::onEstablishedTimeout, this)), 1500);
+    }
+
+    void RendezvousSymmConnSession::onPortReservation()
+    {
+        LOG4CPLUS_TRACE(logger(), "RendezvousSymmConnSession::onPortReservation()");
+
+        boost::mutex::scoped_lock lock(m_);
+
+        if (!callback_) {
+            return;
+        }
+
+        if (!ready_) {
+            assert(owner_);
+            if (owner_) {
+                ready_ = true;
+                sendReady();
+            }
+            return;
+        }
+
+        sendReady();
     }
 
     void RendezvousSymmConnSession::onPingSend(int err, const boost::shared_ptr<std::vector<char> >& sndBuff)
@@ -132,19 +226,8 @@ namespace DNode
             pingConns_[numPingSent_]->writeTo(&(*sndBuff)[0], &(*sndBuff)[0] + sndBuff->size(),
                 destIp_, destPort_,
                 boost::bind(&RendezvousSymmConnSession::onPingSend, this, _1, sndBuff));
+            portReservation_->use();
         } else {
-            lock.unlock();
-
-            for (size_t i = 0; i < keepalive_.size(); ++i) {
-                keepalive_[i].handle->ping(keepalive_[i].destIp, keepalive_[i].destPort);
-            }
-
-            lock.lock();
-
-            if (!callback_) {
-                return;
-            }
-
             sendSymmNext();
         }
     }
@@ -206,13 +289,22 @@ namespace DNode
         }
 
         if (d == 0xEE) {
-            LOG4CPLUS_TRACE(logger(), "RendezvousSymmConnSession::onRecvPing(FINAL, " << err << ", " << numBytes << ", i=" << connIdx << ", src=" << DTun::ipPortToString(ip, port) << ")");
-            Callback cb = callback_;
-            callback_ = Callback();
-            lock.unlock();
-            SYSSOCKET s = pingConns_[connIdx]->handle()->duplicate();
-            pingConns_[connIdx]->close();
-            cb(0, s, destIp_, destPort_);
+            boost::shared_ptr<PortReservation> portReservation = portReservation_;
+            if (portReservation) {
+                LOG4CPLUS_TRACE(logger(), "RendezvousSymmConnSession::onRecvPing(FINAL, " << err << ", " << numBytes << ", i=" << connIdx << ", src=" << DTun::ipPortToString(ip, port) << ")");
+                portReservation->keepalive();
+                Callback cb = callback_;
+                callback_ = Callback();
+                lock.unlock();
+                SYSSOCKET s = pingConns_[connIdx]->handle()->duplicate();
+                pingConns_[connIdx]->close();
+                cb(0, s, destIp_, destPort_);
+            } else {
+                LOG4CPLUS_TRACE(logger(), "RendezvousSymmConnSession::onRecvPing(FINAL other, " << err << ", " << numBytes << ", i=" << connIdx << ", src=" << DTun::ipPortToString(ip, port) << ")");
+
+                pingConns_[connIdx]->readFrom(&(*rcvBuff)[0], &(*rcvBuff)[0] + rcvBuff->size(),
+                    boost::bind(&RendezvousSymmConnSession::onRecvPing, this, _1, _2, _3, _4, connIdx, rcvBuff));
+            }
         } else {
             LOG4CPLUS_TRACE(logger(), "RendezvousSymmConnSession::onRecvPing(" << err << ", " << numBytes << ", i=" << connIdx << ", src=" << DTun::ipPortToString(ip, port) << ")");
 
@@ -236,6 +328,24 @@ namespace DNode
         callback_ = Callback();
         lock.unlock();
         cb(1, SYS_INVALID_SOCKET, 0, 0);
+    }
+
+    void RendezvousSymmConnSession::sendReady()
+    {
+        DTun::DProtocolHeader header;
+        DTun::DProtocolMsgReady msg;
+
+        header.msgCode = DPROTOCOL_MSG_READY;
+        msg.connId = DTun::toProtocolConnId(connId());
+
+        boost::shared_ptr<std::vector<char> > sndBuff =
+            boost::make_shared<std::vector<char> >(sizeof(header) + sizeof(msg));
+
+        memcpy(&(*sndBuff)[0], &header, sizeof(header));
+        memcpy(&(*sndBuff)[0] + sizeof(header), &msg, sizeof(msg));
+
+        serverConn_->write(&(*sndBuff)[0], &(*sndBuff)[0] + sndBuff->size(),
+            boost::bind(&RendezvousSymmConnSession::onServerSend, _1, sndBuff));
     }
 
     void RendezvousSymmConnSession::sendSymmNext()

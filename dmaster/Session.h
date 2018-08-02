@@ -52,7 +52,8 @@ namespace DMaster
             DTun::UInt32 ip,
             DTun::UInt16 port,
             DTun::UInt8 mode,
-            DTun::UInt32 srcIp);
+            DTun::UInt32 srcIp,
+            bool bestEffort);
 
         void sendConnStatus(const DTun::ConnId& connId,
             DTun::UInt8 statusCode,
@@ -66,6 +67,8 @@ namespace DMaster
         void sendSymm(const DTun::ConnId& connId,
             DTun::UInt32 nodeIp,
             DTun::UInt16 nodePort);
+
+        void sendReady(const DTun::ConnId& connId);
 
         void sendSymmNext(const DTun::ConnId& connId);
 

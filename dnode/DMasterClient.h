@@ -7,6 +7,7 @@
 #include "DTun/AppConfig.h"
 #include "ProxySession.h"
 #include "RendezvousSession.h"
+#include "PortAllocator.h"
 #include <boost/optional.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/weak_ptr.hpp>
@@ -70,8 +71,7 @@ namespace DNode
             , remotePort(0)
             , dstNodeIp(0)
             , mode(RendezvousModeUnknown)
-            , status(ConnStatusNone)
-            , triedFastOnly(false) {}
+            , status(ConnStatusNone) {}
 
             DTun::ConnId connId;
             DTun::UInt32 remoteIp;
@@ -80,9 +80,8 @@ namespace DNode
             RegisterConnectionCallback callback;
             RendezvousMode mode;
             ConnStatus status;
-            bool triedFastOnly;
             boost::shared_ptr<RendezvousSession> rSess;
-            HandleKeepalive keepalive;
+            boost::shared_ptr<PortReservation> keepalive;
             boost::shared_ptr<ProxySession> proxySession;
         };
 
@@ -114,6 +113,8 @@ namespace DNode
         std::string probeAddress_;
         int probePort_;
         DTun::UInt32 nodeId_;
+        bool bestEffort_;
+        boost::shared_ptr<PortAllocator> portAllocator_;
         Routes routes_;
 
         boost::mutex m_;

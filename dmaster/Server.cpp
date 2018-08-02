@@ -155,12 +155,17 @@ namespace DMaster
         case DPROTOCOL_MSG_CONN_CREATE: {
             const DTun::DProtocolMsgConnCreate* msgConnCreate = (const DTun::DProtocolMsgConnCreate*)msg;
             onSessionConnCreate(sess_shared, DTun::fromProtocolConnId(msgConnCreate->connId), msgConnCreate->dstNodeId,
-                msgConnCreate->remoteIp, msgConnCreate->remotePort, msgConnCreate->fastOnly);
+                msgConnCreate->remoteIp, msgConnCreate->remotePort, msgConnCreate->bestEffort);
             break;
         }
         case DPROTOCOL_MSG_CONN_CLOSE: {
             const DTun::DProtocolMsgConnClose* msgConnClose = (const DTun::DProtocolMsgConnClose*)msg;
             onSessionConnClose(sess_shared, DTun::fromProtocolConnId(msgConnClose->connId), msgConnClose->established);
+            break;
+        }
+        case DPROTOCOL_MSG_READY: {
+            const DTun::DProtocolMsgReady* msgReady = (const DTun::DProtocolMsgReady*)msg;
+            onSessionReady(sess_shared, DTun::fromProtocolConnId(msgReady->connId));
             break;
         }
         case DPROTOCOL_MSG_SYMM_NEXT: {
@@ -259,7 +264,7 @@ namespace DMaster
         DTun::UInt32 dstNodeId,
         DTun::UInt32 remoteIp,
         DTun::UInt16 remotePort,
-        bool fastOnly)
+        bool bestEffort)
     {
         LOG4CPLUS_TRACE(logger(), "Server::onSessionConnCreate(" << sess->nodeId() << ", "
             << connId << ", " << dstNodeId << ", " << DTun::ipPortToString(remoteIp, remotePort) << ")");
@@ -313,12 +318,6 @@ namespace DMaster
         DTun::UInt8 dstMode = DPROTOCOL_RMODE_FAST;
 
         if (sess->isSymm() || dstSess->isSymm()) {
-            if (fastOnly) {
-                LOG4CPLUS_TRACE(logger(), "need symm mode, but fast was requested, don't create a connection");
-                sess->sendConnStatus(connId, DPROTOCOL_STATUS_NONE);
-                return;
-            }
-
             if (sess->isSymm()) {
                 srcMode = DPROTOCOL_RMODE_SYMM_CONN;
                 dstMode = DPROTOCOL_RMODE_SYMM_ACC;
@@ -332,7 +331,7 @@ namespace DMaster
 
         sess->sendConnStatus(connId, DPROTOCOL_STATUS_PENDING, srcMode, dstSess->peerIp());
 
-        dstSess->sendConnRequest(connId, remoteIp, remotePort, dstMode, sess->peerIp());
+        dstSess->sendConnRequest(connId, remoteIp, remotePort, dstMode, sess->peerIp(), bestEffort);
     }
 
     void Server::onSessionConnClose(const boost::shared_ptr<Session>& sess, const DTun::ConnId& connId, bool established)
@@ -358,6 +357,27 @@ namespace DMaster
         }
 
         conns_.erase(it);
+    }
+
+    void Server::onSessionReady(const boost::shared_ptr<Session>& sess, const DTun::ConnId& connId)
+    {
+        LOG4CPLUS_TRACE(logger(), "Server::onSessionReady(" << sess->nodeId() << ", "
+            << connId << ")");
+
+        ConnMap::iterator it = conns_.find(connId);
+        if (it == conns_.end()) {
+            LOG4CPLUS_TRACE(logger(), "connId = " << connId << " not found");
+            return;
+        }
+
+        if (sess == it->second.srcSess) {
+            it->second.dstSess->sendReady(connId);
+        } else if (sess == it->second.dstSess) {
+            it->second.srcSess->sendReady(connId);
+        } else {
+            LOG4CPLUS_ERROR(logger(), "cannot Ready connId = " << connId << ", not allowed");
+            return;
+        }
     }
 
     void Server::onSessionSymmNext(const boost::shared_ptr<Session>& sess, const DTun::ConnId& connId)

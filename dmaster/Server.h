@@ -67,9 +67,11 @@ namespace DMaster
             DTun::UInt32 dstNodeId,
             DTun::UInt32 remoteIp,
             DTun::UInt16 remotePort,
-            bool fastOnly);
+            bool bestEffort);
 
         void onSessionConnClose(const boost::shared_ptr<Session>& sess, const DTun::ConnId& connId, bool established);
+
+        void onSessionReady(const boost::shared_ptr<Session>& sess, const DTun::ConnId& connId);
 
         void onSessionSymmNext(const boost::shared_ptr<Session>& sess, const DTun::ConnId& connId);
 

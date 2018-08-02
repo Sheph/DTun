@@ -3,6 +3,7 @@
 
 #include "RendezvousSession.h"
 #include "DMasterSession.h"
+#include "PortAllocator.h"
 #include "DTun/OpWatch.h"
 #include "DTun/SManager.h"
 
@@ -11,7 +12,8 @@ namespace DNode
     class RendezvousFastSession : public RendezvousSession
     {
     public:
-        RendezvousFastSession(DTun::SManager& localMgr, DTun::SManager& remoteMgr, DTun::UInt32 nodeId, const DTun::ConnId& connId);
+        RendezvousFastSession(DTun::SManager& localMgr, DTun::SManager& remoteMgr, DTun::UInt32 nodeId, const DTun::ConnId& connId,
+            const boost::shared_ptr<PortAllocator>& portAllocator, bool bestEffort);
         ~RendezvousFastSession();
 
         bool start(const std::string& serverAddr, int serverPort, const Callback& callback);
@@ -29,6 +31,9 @@ namespace DNode
 
         DTun::SManager& localMgr_;
         DTun::SManager& remoteMgr_;
+        boost::shared_ptr<PortAllocator> portAllocator_;
+        bool bestEffort_;
+
         boost::mutex m_;
         bool established_;
         std::vector<char> rcvBuff_;

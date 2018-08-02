@@ -41,6 +41,11 @@ namespace DNode
             }
         }
         nodeId_ = appConfig->getUInt32("node.id");
+        bestEffort_ = appConfig->getBool("node.bestEffort");
+        portAllocator_ = boost::make_shared<PortAllocator>(boost::ref(localMgr_.reactor()),
+            appConfig->getSInt32("node.numSymmPorts"),
+            appConfig->getSInt32("node.numFastPorts"),
+            appConfig->getSInt32("node.decayTimeoutMs"));
 
         LOG4CPLUS_INFO(logger(), "Server used: " << address_ << ":" << port_ << ", this nodeId: " << nodeId_);
 
@@ -157,7 +162,7 @@ namespace DNode
             msg.dstNodeId = dstNodeId;
             msg.remoteIp = remoteIp;
             msg.remotePort = remotePort;
-            msg.fastOnly = 0;
+            msg.bestEffort = bestEffort_;
 
             sendMsg(DPROTOCOL_MSG_CONN_CREATE, &msg, sizeof(msg));
         }
@@ -500,6 +505,12 @@ namespace DNode
                 boost::bind(&DMasterClient::onRecvMsgOther, this, _1, _2, header.msgCode),
                 true);
             break;
+        case DPROTOCOL_MSG_READY:
+            buff_.resize(sizeof(DTun::DProtocolMsgReady));
+            conn_->read(&buff_[0], &buff_[0] + buff_.size(),
+                boost::bind(&DMasterClient::onRecvMsgOther, this, _1, _2, header.msgCode),
+                true);
+            break;
         case DPROTOCOL_MSG_SYMM_NEXT:
             buff_.resize(sizeof(DTun::DProtocolMsgSymmNext));
             conn_->read(&buff_[0], &buff_[0] + buff_.size(),
@@ -548,19 +559,19 @@ namespace DNode
         case DPROTOCOL_RMODE_FAST:
             connState.mode = RendezvousModeFast;
             connState.rSess =
-                boost::make_shared<RendezvousFastSession>(boost::ref(localMgr_), boost::ref(remoteMgr_), nodeId_, connState.connId);
+                boost::make_shared<RendezvousFastSession>(boost::ref(localMgr_), boost::ref(remoteMgr_), nodeId_, connState.connId, portAllocator_, msg.bestEffort);
             break;
         case DPROTOCOL_RMODE_SYMM_CONN:
             connState.mode = RendezvousModeSymmConn;
             connState.rSess =
                 boost::make_shared<RendezvousSymmConnSession>(boost::ref(localMgr_), boost::ref(remoteMgr_),
-                    nodeId_, connState.connId);
+                    nodeId_, connState.connId, portAllocator_, msg.bestEffort);
             break;
         case DPROTOCOL_RMODE_SYMM_ACC:
             connState.mode = RendezvousModeSymmAcc;
             connState.rSess =
                 boost::make_shared<RendezvousSymmAccSession>(boost::ref(localMgr_), boost::ref(remoteMgr_),
-                    nodeId_, connState.connId, address_, port_, msg.srcIp);
+                    nodeId_, connState.connId, address_, port_, msg.srcIp, portAllocator_, msg.bestEffort);
             break;
         }
 
@@ -621,13 +632,6 @@ namespace DNode
         }
 
         switch (msg.statusCode) {
-        case DPROTOCOL_STATUS_NONE:
-            // fastOnly response in case of symm rmode, no connection created.
-            assert(it->second.mode == RendezvousModeUnknown);
-            assert(it->second.status == ConnStatusPending);
-            assert(it->second.triedFastOnly);
-            it->second.status = ConnStatusNone;
-            break;
         case DPROTOCOL_STATUS_PENDING:
             // connection created, set mode.
             assert(it->second.mode == RendezvousModeUnknown);
@@ -794,7 +798,6 @@ namespace DNode
         } else {
             sendClose = (it->second.status != ConnStatusEstablished);
             tmp.status = it->second.status = ConnStatusEstablished;
-            it->second.keepalive = HandleKeepalive(handle, ip, port);
         }
 
         if (sendClose) {
@@ -859,21 +862,6 @@ namespace DNode
             return false;
         }
 
-        bool running = false;
-
-        for (ConnStateMap::const_iterator it = connStates_.begin(); it != connStates_.end(); ++it) {
-            if (it->second.rSess && it->second.rSess->started()) {
-                if (it->second.mode > RendezvousModeFast) {
-                    // Symm rendezvous session is in progress, don't do anything until its done.
-                    return false;
-                } else {
-                    assert(it->second.mode == RendezvousModeFast);
-                    running = true;
-                    break;
-                }
-            }
-        }
-
         for (ConnIdList::iterator it = rendezvousConnIds_.begin(); it != rendezvousConnIds_.end();) {
             DTun::ConnId connId = *it;
             ConnStateMap::iterator jt = connStates_.find(connId);
@@ -884,18 +872,10 @@ namespace DNode
             }
 
             assert(!jt->second.rSess || !jt->second.rSess->started());
-            assert(!jt->second.keepalive.handle);
+            assert(!jt->second.keepalive);
             assert(!jt->second.proxySession);
 
             if ((jt->second.mode == RendezvousModeUnknown) && (jt->second.status == ConnStatusNone)) {
-                if (running) {
-                    if (jt->second.triedFastOnly) {
-                        break;
-                    } else {
-                        jt->second.triedFastOnly = true;
-                    }
-                }
-
                 jt->second.status = ConnStatusPending;
 
                 DTun::DProtocolMsgConnCreate msg;
@@ -905,11 +885,11 @@ namespace DNode
                 assert(res);
                 msg.remoteIp = jt->second.remoteIp;
                 msg.remotePort = jt->second.remotePort;
-                msg.fastOnly = running ? 1 : 0;
+                msg.bestEffort = bestEffort_;
 
                 sendMsg(DPROTOCOL_MSG_CONN_CREATE, &msg, sizeof(msg));
                 break;
-            } else if ((jt->second.mode == RendezvousModeFast) || (!running && (jt->second.mode > RendezvousModeFast))) {
+            } else if (jt->second.mode >= RendezvousModeFast) {
                 rendezvousConnIds_.erase(it++);
 
                 bool res = false;
@@ -921,64 +901,36 @@ namespace DNode
                         rSess = boost::dynamic_pointer_cast<RendezvousFastSession>(jt->second.rSess);
                         assert(rSess);
                     } else {
-                        rSess = boost::make_shared<RendezvousFastSession>(boost::ref(localMgr_), boost::ref(remoteMgr_), nodeId_, connId);
+                        rSess = boost::make_shared<RendezvousFastSession>(boost::ref(localMgr_), boost::ref(remoteMgr_), nodeId_, connId, portAllocator_, bestEffort_);
                         jt->second.rSess = rSess;
                     }
                     res = rSess->start(address_, port_, boost::bind(&DMasterClient::onRendezvous, this, connId, _1, _2, _3, _4));
                     break;
                 }
                 case RendezvousModeSymmConn: {
-                    HandleKeepaliveList keepalive;
-
-                    DTun::UInt32 connIp = 0;
-                    DTun::UInt16 connPort = 0;
-                    if (conn_->handle()->getPeerName(connIp, connPort)) {
-                        keepalive.push_back(HandleKeepalive(conn_->handle(), connIp, connPort));
-                    }
-
-                    for (ConnStateMap::const_iterator it = connStates_.begin(); it != connStates_.end(); ++it) {
-                        if (it->second.keepalive.handle) {
-                            keepalive.push_back(it->second.keepalive);
-                        }
-                    }
-
                     boost::shared_ptr<RendezvousSymmConnSession> rSess;
                     if (jt->second.rSess) {
                         rSess = boost::dynamic_pointer_cast<RendezvousSymmConnSession>(jt->second.rSess);
                         assert(rSess);
                     } else {
                         rSess = boost::make_shared<RendezvousSymmConnSession>(boost::ref(localMgr_), boost::ref(remoteMgr_),
-                            nodeId_, connId);
+                            nodeId_, connId, portAllocator_, bestEffort_);
                         jt->second.rSess = rSess;
                     }
-                    res = rSess->start(conn_, keepalive, boost::bind(&DMasterClient::onRendezvous, this, connId, _1, _2, _3, _4));
+                    res = rSess->start(conn_, boost::bind(&DMasterClient::onRendezvous, this, connId, _1, _2, _3, _4));
                     break;
                 }
                 case RendezvousModeSymmAcc: {
-                    HandleKeepaliveList keepalive;
-
-                    DTun::UInt32 connIp = 0;
-                    DTun::UInt16 connPort = 0;
-                    if (conn_->handle()->getPeerName(connIp, connPort)) {
-                        keepalive.push_back(HandleKeepalive(conn_->handle(), connIp, connPort));
-                    }
-
-                    for (ConnStateMap::const_iterator it = connStates_.begin(); it != connStates_.end(); ++it) {
-                        if (it->second.keepalive.handle) {
-                            keepalive.push_back(it->second.keepalive);
-                        }
-                    }
-
                     boost::shared_ptr<RendezvousSymmAccSession> rSess;
                     if (jt->second.rSess) {
                         rSess = boost::dynamic_pointer_cast<RendezvousSymmAccSession>(jt->second.rSess);
                         assert(rSess);
                     } else {
                         rSess = boost::make_shared<RendezvousSymmAccSession>(boost::ref(localMgr_), boost::ref(remoteMgr_),
-                            nodeId_, connId, address_, port_, jt->second.dstNodeIp);
+                            nodeId_, connId, address_, port_, jt->second.dstNodeIp, portAllocator_, bestEffort_);
                         jt->second.rSess = rSess;
                     }
-                    res = rSess->start(conn_, keepalive, boost::bind(&DMasterClient::onRendezvous, this, connId, _1, _2, _3, _4));
+                    res = rSess->start(conn_, boost::bind(&DMasterClient::onRendezvous, this, connId, _1, _2, _3, _4));
                     break;
                 }
                 default:

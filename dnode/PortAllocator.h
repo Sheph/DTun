@@ -21,10 +21,10 @@ namespace DNode
         ~PortAllocator();
 
         boost::shared_ptr<PortReservation> reserveSymmPorts(int numPorts);
-        boost::shared_ptr<PortReservation> reserveSymmPortsDelayed(int numPorts, const ReserveCallback& callback);
+        boost::shared_ptr<PortReservation> reserveSymmPortsBestEffort(int numPorts, const ReserveCallback& callback);
 
         boost::shared_ptr<PortReservation> reserveFastPorts(int numPorts);
-        boost::shared_ptr<PortReservation> reserveFastPortsDelayed(int numPorts, const ReserveCallback& callback);
+        boost::shared_ptr<PortReservation> reserveFastPortsBestEffort(int numPorts, const ReserveCallback& callback);
 
         // For internal use.
         void useReservation(PortReservation* reservation);

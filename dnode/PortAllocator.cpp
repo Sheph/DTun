@@ -50,7 +50,7 @@ namespace DNode
         return res;
     }
 
-    boost::shared_ptr<PortReservation> PortAllocator::reserveSymmPortsDelayed(int numPorts, const ReserveCallback& callback)
+    boost::shared_ptr<PortReservation> PortAllocator::reserveSymmPortsBestEffort(int numPorts, const ReserveCallback& callback)
     {
         boost::shared_ptr<PortReservation> res =
             boost::make_shared<PortReservation>(this);
@@ -89,7 +89,7 @@ namespace DNode
         return res;
     }
 
-    boost::shared_ptr<PortReservation> PortAllocator::reserveFastPortsDelayed(int numPorts, const ReserveCallback& callback)
+    boost::shared_ptr<PortReservation> PortAllocator::reserveFastPortsBestEffort(int numPorts, const ReserveCallback& callback)
     {
         boost::shared_ptr<PortReservation> res =
             boost::make_shared<PortReservation>(this);

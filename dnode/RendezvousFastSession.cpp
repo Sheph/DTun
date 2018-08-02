@@ -5,10 +5,13 @@
 
 namespace DNode
 {
-    RendezvousFastSession::RendezvousFastSession(DTun::SManager& localMgr, DTun::SManager& remoteMgr, DTun::UInt32 nodeId, const DTun::ConnId& connId)
+    RendezvousFastSession::RendezvousFastSession(DTun::SManager& localMgr, DTun::SManager& remoteMgr, DTun::UInt32 nodeId, const DTun::ConnId& connId,
+        const boost::shared_ptr<PortAllocator>& portAllocator, bool bestEffort)
     : RendezvousSession(nodeId, connId)
     , localMgr_(localMgr)
     , remoteMgr_(remoteMgr)
+    , portAllocator_(portAllocator)
+    , bestEffort_(bestEffort)
     , established_(false)
     , destIp_(0)
     , destPort_(0)
