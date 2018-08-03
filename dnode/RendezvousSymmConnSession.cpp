@@ -29,6 +29,7 @@ namespace DNode
     }
 
     bool RendezvousSymmConnSession::start(const boost::shared_ptr<DTun::SConnection>& serverConn,
+        const HandleKeepaliveList& keepalive,
         const Callback& callback)
     {
         setStarted();
@@ -59,6 +60,7 @@ namespace DNode
         pingConns_ = pingConns;
         serverConn_ = serverConn;
         callback_ = callback;
+        keepalive_ = keepalive;
 
         for (size_t i = 0; i < pingConns.size(); ++i) {
             boost::shared_ptr<std::vector<char> > rcvBuff =
@@ -228,6 +230,18 @@ namespace DNode
                 boost::bind(&RendezvousSymmConnSession::onPingSend, this, _1, sndBuff));
             portReservation_->use();
         } else {
+            lock.unlock();
+
+            for (size_t i = 0; i < keepalive_.size(); ++i) {
+                keepalive_[i].handle->ping(keepalive_[i].destIp, keepalive_[i].destPort);
+            }
+
+            lock.lock();
+
+            if (!callback_) {
+                return;
+            }
+
             sendSymmNext();
         }
     }

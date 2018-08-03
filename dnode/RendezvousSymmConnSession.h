@@ -20,6 +20,7 @@ namespace DNode
         ~RendezvousSymmConnSession();
 
         bool start(const boost::shared_ptr<DTun::SConnection>& serverConn,
+            const HandleKeepaliveList& keepalive,
             const Callback& callback);
 
         virtual void onMsg(DTun::UInt8 msgId, const void* msg);
@@ -52,6 +53,7 @@ namespace DNode
         DTun::UInt32 destIp_;
         DTun::UInt16 destPort_;
         boost::shared_ptr<DTun::OpWatch> watch_;
+        HandleKeepaliveList keepalive_;
         boost::shared_ptr<PortReservation> portReservation_;
         boost::shared_ptr<DTun::SConnection> serverConn_;
         std::vector<boost::shared_ptr<DTun::SConnection> > pingConns_;

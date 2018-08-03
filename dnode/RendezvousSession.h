@@ -10,6 +10,26 @@
 
 namespace DNode
 {
+    struct HandleKeepalive
+    {
+        HandleKeepalive()
+        : destIp(0)
+        , destPort(0) {}
+
+        HandleKeepalive(const boost::shared_ptr<DTun::SHandle>& handle,
+            DTun::UInt32 destIp,
+            DTun::UInt32 destPort)
+        : handle(handle)
+        , destIp(destIp)
+        , destPort(destPort) {}
+
+        boost::shared_ptr<DTun::SHandle> handle;
+        DTun::UInt32 destIp;
+        DTun::UInt32 destPort;
+    };
+
+    typedef std::vector<HandleKeepalive> HandleKeepaliveList;
+
     class RendezvousSession : boost::noncopyable
     {
     public:
