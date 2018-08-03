@@ -77,7 +77,7 @@ int main(int argc, char* argv[])
     props.setProperty("log4cplus.rootLogger", logLevel + ", console");
     props.setProperty("log4cplus.appender.console", "log4cplus::ConsoleAppender");
     props.setProperty("log4cplus.appender.console.layout", "log4cplus::PatternLayout");
-    props.setProperty("log4cplus.appender.console.layout.ConversionPattern", "%-5p %c [%x] - %m%n");
+    props.setProperty("log4cplus.appender.console.layout.ConversionPattern", "%D{%m/%d/%y %H:%M:%S.%q} %-5p %c [%x] - %m%n");
 
     log4cplus::PropertyConfigurator propConf(props);
     propConf.configure();
