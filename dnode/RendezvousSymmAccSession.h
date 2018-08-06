@@ -50,6 +50,7 @@ namespace DNode
         bool owner_;
         boost::shared_ptr<PortAllocator> portAllocator_;
         bool bestEffort_;
+        std::vector<DTun::UInt16> ports_;
 
         boost::mutex m_;
         bool ready_;

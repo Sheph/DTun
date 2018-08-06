@@ -25,6 +25,21 @@ namespace DNode
     , watch_(boost::make_shared<DTun::OpWatch>(boost::ref(localMgr.reactor())))
     {
         assert(destIp_ != 0);
+
+        std::vector<int> seg;
+        seg.push_back(0);
+        seg.push_back(1);
+        seg.push_back(2);
+        std::random_shuffle(seg.begin(), seg.end());
+
+        for (int i = 0; i < (int)seg.size(); ++i) {
+            float r = static_cast<float>(rand() % RAND_MAX) / static_cast<float>(RAND_MAX);
+            int pos = (21503 * seg[i]) + (21503 - windowSize_ + 1) * r;
+            for (int j = pos; j < pos + windowSize_; ++j) {
+                assert(1024 + j <= 65535);
+                ports_.push_back(1024 + j);
+            }
+        }
     }
 
     RendezvousSymmAccSession::~RendezvousSymmAccSession()
@@ -324,9 +339,9 @@ namespace DNode
 
         ++numPingSent_;
 
-        DTun::UInt16 port = getCurrentPort();
+        if (numPingSent_ < windowSize_) {
+            DTun::UInt16 port = getCurrentPort();
 
-        if (port && (numPingSent_ < windowSize_)) {
             pingConn_->writeTo(&(*sndBuff)[0], &(*sndBuff)[0] + sndBuff->size(),
                 destIp_, port,
                 boost::bind(&RendezvousSymmAccSession::onPingSend, this, _1, sndBuff));
@@ -335,6 +350,7 @@ namespace DNode
         }
 
         ++stepIdx_;
+        numPingSent_= 0;
 
         sendSymmNext();
     }
@@ -433,7 +449,7 @@ namespace DNode
 
         DTun::UInt16 port = getCurrentPort();
 
-        if (!port || (stepIdx_ >= 3)) {
+        if (!port) {
             LOG4CPLUS_WARN(logger(), "RendezvousSymmAccSession::onSymmNextTimeout(" << connId() << ", no more ports to try)");
             Callback cb = callback_;
             callback_ = Callback();
@@ -471,8 +487,6 @@ namespace DNode
 
             DTun::UInt16 port = getCurrentPort();
             assert(port);
-
-            numPingSent_= 0;
 
             pingConn_->writeTo(&(*sndBuff)[0], &(*sndBuff)[0] + sndBuff->size(),
                 destIp_, port,
@@ -530,8 +544,11 @@ namespace DNode
 
     DTun::UInt16 RendezvousSymmAccSession::getCurrentPort()
     {
-        int port = 1024 + (stepIdx_ * windowSize_) + numPingSent_;
-        return htons((port > 65535) ? 0 : port);
+        int pos = (stepIdx_ * windowSize_) + numPingSent_;
+        if (pos >= (int)ports_.size()) {
+            return 0;
+        }
+        return htons(ports_[pos]);
     }
 
     void RendezvousSymmAccSession::sendReady()
