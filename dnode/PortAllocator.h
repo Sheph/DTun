@@ -37,8 +37,7 @@ namespace DNode
         struct Request
         {
             Request()
-            : numPorts(0)
-            , reservation(NULL) {}
+            : numPorts(0) {}
 
             Request(int numPorts,
                 PortReservation* reservation,

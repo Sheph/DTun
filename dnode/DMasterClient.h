@@ -81,8 +81,7 @@ namespace DNode
             RendezvousMode mode;
             ConnStatus status;
             boost::shared_ptr<RendezvousSession> rSess;
-            boost::shared_ptr<PortReservation> reservation;
-            HandleKeepalive keepalive;
+            boost::shared_ptr<PortReservation> keepalive;
             boost::shared_ptr<ProxySession> proxySession;
         };
 

@@ -33,7 +33,6 @@ namespace DNode
     }
 
     bool RendezvousSymmAccSession::start(const boost::shared_ptr<DTun::SConnection>& serverConn,
-        const HandleKeepaliveList& keepalive,
         const Callback& callback)
     {
         setStarted();
@@ -42,7 +41,6 @@ namespace DNode
 
         callback_ = callback;
         serverConn_ = serverConn;
-        keepalive_ = keepalive;
 
         if (owner_) {
             if (bestEffort_) {
@@ -333,18 +331,6 @@ namespace DNode
                 destIp_, port,
                 boost::bind(&RendezvousSymmAccSession::onPingSend, this, _1, sndBuff));
             portReservation_->use();
-            return;
-        }
-
-        lock.unlock();
-
-        for (size_t i = 0; i < keepalive_.size(); ++i) {
-            keepalive_[i].handle->ping(keepalive_[i].destIp, keepalive_[i].destPort);
-        }
-
-        lock.lock();
-
-        if (!callback_) {
             return;
         }
 
