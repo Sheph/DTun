@@ -142,7 +142,7 @@ namespace DNode
         return os.str();
     }
 
-    void PortAllocator::useReservation(PortReservation* reservation, const boost::shared_ptr<DTun::SHandle>& handle)
+    void PortAllocator::useReservation(PortReservation* reservation, const boost::shared_ptr<DTun::SHandle>& handle, int idx)
     {
         boost::mutex::scoped_lock lock(m_);
 
@@ -151,18 +151,27 @@ namespace DNode
 
         assert(!reservation->ports().empty());
 
-        if (handle && !reservation->ports()[0]->binding) {
-            boost::shared_ptr<PortSocketBinding> binding = boost::make_shared<PortSocketBinding>(handle);
-            for (size_t i = 0; i < reservation->ports().size(); ++i) {
-                boost::shared_ptr<PortState> port = reservation->ports()[i];
-                assert(!port->binding);
-                port->binding = binding;
+        if (idx == -1) {
+            if (!reservation->ports()[0]->binding) {
+                boost::shared_ptr<PortSocketBinding> binding = boost::make_shared<PortSocketBinding>(handle);
+                for (size_t i = 0; i < reservation->ports().size(); ++i) {
+                    boost::shared_ptr<PortState> port = reservation->ports()[i];
+                    assert(!port->binding);
+                    port->binding = binding;
+                }
+            }
+        } else {
+            assert(idx < (int)reservation->ports().size());
+            if (!reservation->ports()[idx]->binding) {
+                reservation->ports()[idx]->binding = boost::make_shared<PortSocketBinding>(handle);
             }
         }
 
         for (size_t i = 0; i < reservation->ports().size(); ++i) {
             boost::shared_ptr<PortState> port = reservation->ports()[i];
-            if (handle) {
+            if (idx == -1) {
+                assert(port->binding->handle.lock() == handle);
+            } else if (idx == (int)i) {
                 assert(port->binding->handle.lock() == handle);
             }
             int cnt = ports_.erase(port);
