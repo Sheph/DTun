@@ -72,7 +72,7 @@ namespace DNode
         explicit PortReservation(PortAllocator* allocator);
         ~PortReservation();
 
-        void use(const boost::shared_ptr<DTun::SHandle>& handle, int i = -1);
+        void use(const boost::shared_ptr<DTun::SHandle>& handle = boost::shared_ptr<DTun::SHandle>());
 
         void keepalive();
 

@@ -29,7 +29,7 @@ namespace DNode
         std::string dump();
 
         // For internal use.
-        void useReservation(PortReservation* reservation, const boost::shared_ptr<DTun::SHandle>& handle, int idx);
+        void useReservation(PortReservation* reservation, const boost::shared_ptr<DTun::SHandle>& handle);
         void keepaliveReservation(PortReservation* reservation);
         void freeReservation(PortReservation* reservation);
 

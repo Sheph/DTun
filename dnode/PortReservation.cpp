@@ -13,9 +13,9 @@ namespace DNode
         cancel();
     }
 
-    void PortReservation::use(const boost::shared_ptr<DTun::SHandle>& handle, int i)
+    void PortReservation::use(const boost::shared_ptr<DTun::SHandle>& handle)
     {
-        allocator_->useReservation(this, handle, i);
+        allocator_->useReservation(this, handle);
     }
 
     void PortReservation::keepalive()
