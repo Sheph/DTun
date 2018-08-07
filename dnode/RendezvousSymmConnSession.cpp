@@ -171,7 +171,7 @@ namespace DNode
             pingConns_[0]->writeTo(&(*sndBuff)[0], &(*sndBuff)[0] + sndBuff->size(),
                 destIp_, destPort_,
                 boost::bind(&RendezvousSymmConnSession::onPingSend, this, _1, sndBuff));
-            portReservation_->use();
+            portReservation_->use(pingConns_[0]->handle(), 0);
         }
     }
 
@@ -226,7 +226,7 @@ namespace DNode
             pingConns_[numPingSent_]->writeTo(&(*sndBuff)[0], &(*sndBuff)[0] + sndBuff->size(),
                 destIp_, destPort_,
                 boost::bind(&RendezvousSymmConnSession::onPingSend, this, _1, sndBuff));
-            portReservation_->use();
+            portReservation_->use(pingConns_[numPingSent_]->handle(), numPingSent_);
         } else {
             sendSymmNext();
         }

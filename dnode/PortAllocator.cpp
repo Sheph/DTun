@@ -142,7 +142,7 @@ namespace DNode
         return os.str();
     }
 
-    void PortAllocator::useReservation(PortReservation* reservation)
+    void PortAllocator::useReservation(PortReservation* reservation, const boost::shared_ptr<DTun::SHandle>& handle, int idx)
     {
         boost::mutex::scoped_lock lock(m_);
 
@@ -151,8 +151,29 @@ namespace DNode
 
         assert(!reservation->ports().empty());
 
+        if (idx == -1) {
+            if (!reservation->ports()[0]->binding) {
+                boost::shared_ptr<PortSocketBinding> binding = boost::make_shared<PortSocketBinding>(handle);
+                for (size_t i = 0; i < reservation->ports().size(); ++i) {
+                    boost::shared_ptr<PortState> port = reservation->ports()[i];
+                    assert(!port->binding);
+                    port->binding = binding;
+                }
+            }
+        } else {
+            assert(idx < (int)reservation->ports().size());
+            if (!reservation->ports()[idx]->binding) {
+                reservation->ports()[idx]->binding = boost::make_shared<PortSocketBinding>(handle);
+            }
+        }
+
         for (size_t i = 0; i < reservation->ports().size(); ++i) {
             boost::shared_ptr<PortState> port = reservation->ports()[i];
+            if (idx == -1) {
+                assert(port->binding->handle.lock() == handle);
+            } else if (idx == (int)i) {
+                assert(port->binding->handle.lock() == handle);
+            }
             int cnt = ports_.erase(port);
             assert(cnt == 1);
             port->decayTime = now + boost::chrono::milliseconds(decayTimeoutMs_);
@@ -297,12 +318,16 @@ namespace DNode
         int timeoutMs = 0;
 
         for (PortStateSet::iterator it = ports_.begin(); it != ports_.end(); ++it) {
-            if (((*it)->decayTime != (boost::chrono::steady_clock::time_point::max)()) &&
-                ((*it)->decayTime > now)) {
+            if ((*it)->decayTime == (boost::chrono::steady_clock::time_point::max)()) {
+                break;
+            }
+            if ((*it)->decayTime > now) {
                 decayRunning_ = true;
                 timeoutMs = boost::chrono::duration_cast<boost::chrono::milliseconds>(
                     (*it)->decayTime - now).count() + 1;
                 break;
+            } else {
+                (*it)->binding.reset();
             }
         }
 
@@ -334,6 +359,7 @@ namespace DNode
             }
             if ((*it)->status == PortStatusFree) {
                 (*it)->status = isSymm ? PortStatusReservedSymm : PortStatusReservedFast;
+                (*it)->binding.reset();
                 states.push_back(*it);
             }
         }
