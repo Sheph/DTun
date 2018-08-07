@@ -147,7 +147,7 @@ namespace DNode
         bool running = false;
 
         for (ConnStateMap::const_iterator it = connStates_.begin(); it != connStates_.end(); ++it) {
-            if (it->second.rSess && it->second.rSess->started()) {
+            if (it->second.rSess && it->second.rSess->started() && (it->second.mode == RendezvousModeSymmConn)) {
                 running = true;
                 break;
             }

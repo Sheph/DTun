@@ -3,15 +3,15 @@ sudo killall dnsmasq
 sudo ip netns add dnode1
 sudo ip tuntap add dev tun1 mode tun user stas
 sudo ip link set tun1 netns dnode1
-sudo ip netns exec dnode1 ifconfig tun1 10.0.0.1 netmask 255.255.255.0
-sudo ip netns exec dnode1 route add default gw 10.0.0.2
+sudo ip netns exec dnode1 ifconfig tun1 20.0.0.1 netmask 255.255.255.0
+sudo ip netns exec dnode1 route add default gw 20.0.0.2
 sudo ip netns exec dnode1 ip link set dev lo up
 
 sudo ip link add veth1a type veth peer name veth1b
 sudo ip link set veth1a netns dnode1
 sudo ip netns exec dnode1 ifconfig veth1a 13.0.0.1 netmask 255.255.255.0
 sudo ifconfig veth1b 13.0.0.2 netmask 255.255.255.0
-sudo route add 10.0.0.1 dev veth1b
+sudo route add 20.0.0.1 dev veth1b
 sudo route del -net 13.0.0.0 netmask 255.255.255.0
 
 sudo ip netns add dnode2

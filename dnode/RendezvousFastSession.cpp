@@ -367,7 +367,8 @@ namespace DNode
                     return;
                 }
                 if ((ip != destIp_) || (port != destPort_)) {
-                    LOG4CPLUS_WARN(logger(), "RendezvousFastSession::onRecvPing bad source ip/port");
+                    LOG4CPLUS_WARN(logger(), "RendezvousFastSession::onRecvPing bad source ip/port " << DTun::ipPortToString(ip, port)
+                        << ", need " << DTun::ipPortToString(destIp_, destPort_));
                     pingConn_->readFrom(&rcvBuff_[0], &rcvBuff_[0] + rcvBuff_.size(),
                         boost::bind(&RendezvousFastSession::onRecvPing, this, _1, _2, _3, _4));
                     return;
