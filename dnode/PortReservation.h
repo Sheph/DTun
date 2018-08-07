@@ -2,11 +2,8 @@
 #define _PORTRESERVATION_H_
 
 #include "DTun/Types.h"
-#include "DTun/SHandle.h"
-#include "DTun/Utils.h"
 #include <boost/noncopyable.hpp>
 #include <boost/shared_ptr.hpp>
-#include <boost/weak_ptr.hpp>
 #include <boost/chrono.hpp>
 #include <vector>
 
@@ -21,23 +18,6 @@ namespace DNode
         PortStatusReservedFast,
     };
 
-    struct PortSocketBinding : boost::noncopyable
-    {
-        explicit PortSocketBinding(const boost::shared_ptr<DTun::SHandle>& handle_)
-        : handle(handle_)
-        , boundSock(handle_->duplicate()) {}
-
-        ~PortSocketBinding()
-        {
-            if (boundSock != SYS_INVALID_SOCKET) {
-                DTun::closeSysSocketChecked(boundSock);
-            }
-        }
-
-        boost::weak_ptr<DTun::SHandle> handle;
-        SYSSOCKET boundSock;
-    };
-
     struct PortState : boost::noncopyable
     {
         explicit PortState(int id)
@@ -47,7 +27,6 @@ namespace DNode
         int id;
         PortStatus status;
         boost::chrono::steady_clock::time_point decayTime;
-        boost::shared_ptr<PortSocketBinding> binding;
     };
 
     class PortStateComparer: public std::binary_function<boost::shared_ptr<PortState>, boost::shared_ptr<PortState>, bool>
@@ -72,7 +51,7 @@ namespace DNode
         explicit PortReservation(PortAllocator* allocator);
         ~PortReservation();
 
-        void use(const boost::shared_ptr<DTun::SHandle>& handle, int i = -1);
+        void use();
 
         void keepalive();
 

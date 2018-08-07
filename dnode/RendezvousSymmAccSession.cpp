@@ -126,7 +126,7 @@ namespace DNode
             return false;
         }
 
-        portReservation_->use(handle);
+        portReservation_->use();
 
         pingConn_ = handle->createConnection();
         masterSession_ =
@@ -273,7 +273,7 @@ namespace DNode
             return;
         }
 
-        portReservation_->use(handle);
+        portReservation_->use();
 
         pingConn_ = handle->createConnection();
         masterSession_ =
@@ -345,7 +345,7 @@ namespace DNode
             pingConn_->writeTo(&(*sndBuff)[0], &(*sndBuff)[0] + sndBuff->size(),
                 destIp_, port,
                 boost::bind(&RendezvousSymmAccSession::onPingSend, this, _1, sndBuff));
-            portReservation_->use(pingConn_->handle());
+            portReservation_->use();
             return;
         }
 
@@ -491,7 +491,7 @@ namespace DNode
             pingConn_->writeTo(&(*sndBuff)[0], &(*sndBuff)[0] + sndBuff->size(),
                 destIp_, port,
                 boost::bind(&RendezvousSymmAccSession::onPingSend, this, _1, sndBuff));
-            portReservation_->use(pingConn_->handle());
+            portReservation_->use();
 
             return;
         }
@@ -534,7 +534,7 @@ namespace DNode
         pingConn_->writeTo(&(*sndBuff)[0], &(*sndBuff)[0] + sndBuff->size(),
             destIp_, destDiscoveredPort_,
             boost::bind(&RendezvousSymmAccSession::onSend, _1, sndBuff));
-        portReservation_->use(pingConn_->handle());
+        portReservation_->use();
 
         lock.unlock();
 
