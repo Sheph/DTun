@@ -1088,6 +1088,7 @@ err_t netif_init_func (struct netif *netif)
     netif->name[1] = 'o';
     netif->output = netif_output_func;
     netif->output_ip6 = netif_output_ip6_func;
+    netif->mtu = 1500 - sizeof(struct tcp_hdr);
 
     return ERR_OK;
 }
