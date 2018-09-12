@@ -497,6 +497,13 @@ namespace DTun
             res = handle->createConnection();
 
             boost::shared_ptr<ConnectionInfo> connInfo = boost::make_shared<ConnectionInfo>(res);
+            if (isAny) {
+                ConnectionCache::iterator it = connCache_.find(port);
+                if (it != connCache_.end()) {
+                    assert(!it->second->conn.lock());
+                    connCache_.erase(it);
+                }
+            }
             bool inserted = connCache_.insert(std::make_pair(port, connInfo)).second;
             assert(inserted);
             if (!inserted) {
