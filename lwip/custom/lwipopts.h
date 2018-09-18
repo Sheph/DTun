@@ -66,8 +66,6 @@
 #define TCP_MSS 1440
 #define TCP_SND_BUF 16384
 #define TCP_SND_QUEUELEN (4 * (TCP_SND_BUF)/(TCP_MSS))
-// TODO: Make proper fix, I don't understand WHY it works, but it works.
-#define TCP_WND_UPDATE_THRESHOLD 0
 
 #define MEM_LIBC_MALLOC 1
 #define MEMP_MEM_MALLOC 1

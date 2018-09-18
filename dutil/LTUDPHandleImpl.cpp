@@ -3,6 +3,7 @@
 #include "DTun/Utils.h"
 #include "Logger.h"
 #include <boost/make_shared.hpp>
+#include <lwip/priv/tcp_priv.h>
 
 namespace DTun
 {
@@ -427,6 +428,7 @@ namespace DTun
             this_->readCallback_();
         }
 
+        tcp_ack_now(pcb);
         return ERR_OK;
     }
 
