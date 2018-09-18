@@ -17,6 +17,8 @@ namespace DNode
     , bestEffort_(bestEffort)
     , owner_(connId.nodeId == nodeId)
     , ready_(false)
+    , stepIdx_(0)
+    , numPingSent_(0)
     , destIp_(0)
     , destPort_(0)
     , watch_(boost::make_shared<DTun::OpWatch>(boost::ref(localMgr.reactor())))
@@ -138,6 +140,32 @@ namespace DNode
                 return;
             }
 
+            if (!owner_ && portReservation_) {
+                ++stepIdx_;
+
+                LOG4CPLUS_WARN(logger(), "RendezvousFastSession::onMsg(NEXT " << stepIdx_ << ", " << connId() << ")");
+
+                lock.unlock();
+
+                watch_->close();
+                watch_ = boost::make_shared<DTun::OpWatch>(boost::ref(localMgr_.reactor()));
+
+                masterSession_.reset();
+                masterHandle_.reset();
+
+                portReservation_.reset();
+                pingConn_.reset();
+
+                lock.lock();
+
+                if (!callback_) {
+                    return;
+                }
+
+                destIp_ = 0;
+                destPort_ = 0;
+            }
+
             if (bestEffort_) {
                 portReservation_ =
                     portAllocator_->reserveFastPortsBestEffort(2,
@@ -215,6 +243,30 @@ namespace DNode
                 ready_ = true;
                 sendReady();
             }
+            return;
+        }
+
+        if (owner_ && portReservationNext_) {
+            ++stepIdx_;
+            numPingSent_ = 0;
+
+            lock.unlock();
+
+            masterSession_.reset();
+            masterHandle_.reset();
+
+            portReservation_ = portReservationNext_;
+            portReservationNext_.reset();
+            pingConn_.reset();
+
+            lock.lock();
+
+            if (!callback_) {
+                return;
+            }
+
+            portReservation_->use();
+            sendReady();
             return;
         }
 
@@ -447,10 +499,51 @@ namespace DNode
             boost::bind(&RendezvousFastSession::onPingSend, this, _1, sndBuff));
         portReservation_->use();
 
+        ++numPingSent_;
+
+        bool callPortRsvd = false;
+        bool keepPosting = true;
+
+        if (owner_ && (numPingSent_ == 4)) {
+            keepPosting = false;
+            if (stepIdx_ == 2) {
+                LOG4CPLUS_WARN(logger(), "RendezvousFastSession::onPingTimeout(FAILED, " << connId() << ")");
+                Callback cb = callback_;
+                callback_ = Callback();
+                lock.unlock();
+                cb(1, SYS_INVALID_SOCKET, 0, 0, boost::shared_ptr<PortReservation>());
+                return;
+            } else {
+                LOG4CPLUS_WARN(logger(), "RendezvousFastSession::onPingTimeout(NEXT " << stepIdx_ + 1 << ", " << connId() << ")");
+            }
+            if (bestEffort_) {
+                portReservationNext_ =
+                    portAllocator_->reserveFastPortsBestEffort(2,
+                        watch_->wrap(boost::bind(&RendezvousFastSession::onPortReservation, this)));
+            } else {
+                portReservationNext_ = portAllocator_->reserveFastPorts(2);
+                if (portReservationNext_) {
+                    callPortRsvd = true;
+                } else {
+                    Callback cb = callback_;
+                    callback_ = Callback();
+                    lock.unlock();
+                    cb(1, SYS_INVALID_SOCKET, 0, 0, boost::shared_ptr<PortReservation>());
+                    return;
+                }
+            }
+        }
+
         lock.unlock();
 
-        localMgr_.reactor().post(
-            watch_->wrap(boost::bind(&RendezvousFastSession::onPingTimeout, this)), 1000);
+        if (callPortRsvd) {
+            onPortReservation();
+        }
+
+        if (keepPosting) {
+            localMgr_.reactor().post(
+                watch_->wrap(boost::bind(&RendezvousFastSession::onPingTimeout, this)), 500);
+        }
     }
 
     void RendezvousFastSession::sendReady()

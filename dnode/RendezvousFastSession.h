@@ -46,12 +46,15 @@ namespace DNode
 
         boost::mutex m_;
         bool ready_;
+        int stepIdx_;
+        int numPingSent_;
         std::vector<char> rcvBuff_;
         Callback callback_;
         DTun::UInt32 destIp_;
         DTun::UInt16 destPort_;
         boost::shared_ptr<DTun::OpWatch> watch_;
         boost::shared_ptr<PortReservation> portReservation_;
+        boost::shared_ptr<PortReservation> portReservationNext_;
         boost::shared_ptr<DTun::SConnection> serverConn_;
         boost::shared_ptr<DTun::SHandle> masterHandle_;
         boost::shared_ptr<DMasterSession> masterSession_;
