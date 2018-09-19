@@ -27,8 +27,6 @@ namespace DTun
 
         virtual boost::shared_ptr<SHandle> createDatagramSocket(SYSSOCKET s = SYS_INVALID_SOCKET);
 
-        virtual void enablePortRemap(UInt16 dstPort);
-
         void addToKill(const boost::shared_ptr<LTUDPHandleImpl>& handle, bool abort);
 
         boost::shared_ptr<SConnection> createTransportConnection(const struct sockaddr* name, int namelen);
@@ -42,6 +40,12 @@ namespace DTun
         bool haveTransportConnection(UInt16 port) const;
 
         UInt16 getMappedPeerPort(UInt16 port, UInt32 peerIp, UInt16 peerPort) const;
+
+        uint16_t pcbBindAcceptor(struct tcp_pcb* pcb, uint16_t port);
+
+        uint16_t pcbBindConnector(struct tcp_pcb* pcb, uint16_t port);
+
+        void pcbUnbind(uint16_t pcbPort);
 
     private:
         typedef std::map<UInt16, UInt16> PortMap;
@@ -59,10 +63,16 @@ namespace DTun
         {
             ConnectionInfo() {}
             explicit ConnectionInfo(const boost::shared_ptr<SConnection>& conn)
-            : conn(conn) {}
+            : conn(conn)
+            , isAcceptor(false)
+            , numHandles(0)
+            , acceptorLocalPort(0) {}
 
             boost::weak_ptr<SConnection> conn;
-            PeerMap peers;
+            bool isAcceptor;
+            int numHandles;
+            PeerMap acceptorPeers;
+            uint16_t acceptorLocalPort;
         };
 
         typedef std::map<boost::shared_ptr<LTUDPHandleImpl>, bool> HandleMap;
@@ -101,8 +111,8 @@ namespace DTun
         mutable boost::mutex m_;
         int numAliveHandles_;
         int tcpTimerMod4_;
-        std::set<UInt16> portsToRemap_;
         ConnectionCache connCache_;
+        PortMap localPortMap_;
         HandleMap toKillHandles_;
     };
 }

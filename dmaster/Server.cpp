@@ -65,8 +65,6 @@ namespace DMaster
            return false;
         }
 
-        mgr_.enablePortRemap(htons(port_));
-
         LOG4CPLUS_INFO(logger(), "Server is ready at port " << port_);
 
         return true;

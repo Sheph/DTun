@@ -31,7 +31,7 @@ namespace DTun
 
         {
             boost::mutex::scoped_lock lock(m_);
-            connCache.swap(connCache_);
+            connCache = connCache_;
         }
 
         // close all connections, i/o will no longer take place
@@ -42,11 +42,10 @@ namespace DTun
             }
         }
 
-        connCache.clear();
-
         // no i/o, no timers, it's safe to kill handles even from another thread
         onKillHandles(false);
-        assert(connCache_.empty());
+        connCache.clear();
+        connCache_.clear();
         assert(toKillHandles_.empty());
         assert(numAliveHandles_ == 0);
 
@@ -128,7 +127,24 @@ namespace DTun
         {
             boost::mutex::scoped_lock lock(m_);
             ++numAliveHandles_;
+
+            ip_addr_t tcp_addr;
+            uint16_t tcp_port = 0;
+            err_t err = tcp_tcp_get_tcp_addrinfo(pcb, 1, &tcp_addr, &tcp_port);
+            assert(err == ERR_OK);
+            tcp_port = lwip_htons(tcp_port);
+
+            PortMap::const_iterator pmIt = localPortMap_.find(tcp_port);
+            assert(pmIt != localPortMap_.end());
+
+            ConnectionCache::iterator cIt = connCache_.find(pmIt->second);
+            assert(cIt != connCache_.end());
+
+            assert(cIt->second->isAcceptor);
+            assert(cIt->second->numHandles > 0);
+            ++cIt->second->numHandles;
         }
+
         return boost::make_shared<LTUDPHandle>(boost::ref(*this), conn, pcb);
     }
 
@@ -150,8 +166,8 @@ namespace DTun
             return peerPort;
         }
 
-        PeerMap::const_iterator jt = it->second->peers.find(peerIp);
-        if (jt != it->second->peers.end()) {
+        PeerMap::const_iterator jt = it->second->acceptorPeers.find(peerIp);
+        if (jt != it->second->acceptorPeers.end()) {
             PortMap::const_iterator kt = jt->second.portMap.find(peerPort);
             if (kt != jt->second.portMap.end()) {
                 return kt->second;
@@ -159,6 +175,85 @@ namespace DTun
         }
 
         return peerPort;
+    }
+
+    uint16_t LTUDPManager::pcbBindAcceptor(struct tcp_pcb* pcb, uint16_t port)
+    {
+        boost::mutex::scoped_lock lock(m_);
+        ConnectionCache::iterator cIt = connCache_.find(port);
+        assert(cIt != connCache_.end());
+        assert(cIt->second->isAcceptor || (cIt->second->numHandles == 0));
+
+        uint16_t tcpPort = 0;
+
+        if (cIt->second->numHandles > 0) {
+            assert(cIt->second->acceptorLocalPort);
+            tcpPort = lwip_ntohs(cIt->second->acceptorLocalPort);
+        }
+
+        if (tcp_bind(pcb, IP_ANY_TYPE, tcpPort) != ERR_OK) {
+            LOG4CPLUS_ERROR(logger(), "tcp_bind failed");
+            return 0;
+        }
+
+        ip_addr_t tcpAddr;
+        err_t err = tcp_tcp_get_tcp_addrinfo(pcb, 1, &tcpAddr, &tcpPort);
+        assert(err == ERR_OK);
+        tcpPort = lwip_htons(tcpPort);
+        assert(tcpPort != 0);
+
+        localPortMap_[tcpPort] = port;
+
+        cIt->second->acceptorLocalPort = tcpPort;
+        cIt->second->isAcceptor = true;
+        ++cIt->second->numHandles;
+
+        return tcpPort;
+    }
+
+    uint16_t LTUDPManager::pcbBindConnector(struct tcp_pcb* pcb, uint16_t port)
+    {
+        boost::mutex::scoped_lock lock(m_);
+        ConnectionCache::iterator cIt = connCache_.find(port);
+        assert(cIt != connCache_.end());
+        assert(!cIt->second->isAcceptor || (cIt->second->numHandles == 0));
+
+        if (tcp_bind(pcb, IP_ANY_TYPE, 0) != ERR_OK) {
+            LOG4CPLUS_ERROR(logger(), "tcp_bind failed");
+            return 0;
+        }
+
+        ip_addr_t tcpAddr;
+        uint16_t tcpPort = 0;
+        err_t err = tcp_tcp_get_tcp_addrinfo(pcb, 1, &tcpAddr, &tcpPort);
+        assert(err == ERR_OK);
+        tcpPort = lwip_htons(tcpPort);
+        assert(tcpPort != 0);
+
+        localPortMap_[tcpPort] = port;
+
+        cIt->second->acceptorLocalPort = 0;
+        cIt->second->isAcceptor = false;
+        ++cIt->second->numHandles;
+
+        cIt->second->acceptorPeers.clear();
+
+        return tcpPort;
+    }
+
+    void LTUDPManager::pcbUnbind(uint16_t pcbPort)
+    {
+        boost::mutex::scoped_lock lock(m_);
+        assert(pcbPort != 0);
+
+        PortMap::const_iterator pIt = localPortMap_.find(pcbPort);
+        assert(pIt != localPortMap_.end());
+
+        ConnectionCache::iterator cIt = connCache_.find(pIt->second);
+        assert(cIt != connCache_.end());
+
+        --cIt->second->numHandles;
+        assert(cIt->second->numHandles >= 0);
     }
 
     boost::shared_ptr<SHandle> LTUDPManager::createStreamSocket()
@@ -174,12 +269,6 @@ namespace DTun
     {
         assert(false);
         return boost::shared_ptr<SHandle>();
-    }
-
-    void LTUDPManager::enablePortRemap(UInt16 dstPort)
-    {
-        boost::mutex::scoped_lock lock(m_);
-        portsToRemap_.insert(dstPort);
     }
 
     err_t LTUDPManager::netifInitFunc(struct netif* netif)
@@ -235,7 +324,15 @@ namespace DTun
             << ", from=" << DTun::ipPortToString(iphdr->src.addr, tcphdr->src)
             << ", to=" << DTun::ipPortToString(iphdr->dest.addr, tcphdr->dest) << ")");*/
 
-        boost::shared_ptr<ConnectionInfo> connInfo = this_->getConnectionInfo(tcphdr->src);
+        PortMap::const_iterator pmIt = this_->localPortMap_.find(tcphdr->src);
+        if (pmIt == this_->localPortMap_.end()) {
+            LOG4CPLUS_TRACE(logger(), "No transport"
+                << " from=" << DTun::ipPortToString(iphdr->src.addr, tcphdr->src)
+                << " to=" << DTun::ipPortToString(iphdr->dest.addr, tcphdr->dest));
+            return ERR_OK;
+        }
+
+        boost::shared_ptr<ConnectionInfo> connInfo = this_->getConnectionInfo(pmIt->second);
         if (!connInfo) {
             LOG4CPLUS_TRACE(logger(), "No transport"
                 << " from=" << DTun::ipPortToString(iphdr->src.addr, tcphdr->src)
@@ -253,8 +350,8 @@ namespace DTun
 
         UInt16 actualPort = tcphdr->dest;
 
-        PeerMap::const_iterator it = connInfo->peers.find(iphdr->dest.addr);
-        if (it != connInfo->peers.end()) {
+        PeerMap::const_iterator it = connInfo->acceptorPeers.find(iphdr->dest.addr);
+        if (it != connInfo->acceptorPeers.end()) {
             PortMap::const_iterator jt = it->second.portMap.find(tcphdr->dest);
             if (jt != it->second.portMap.end()) {
                 actualPort = jt->second;
@@ -308,25 +405,23 @@ namespace DTun
                 IPH_CHKSUM_SET(iphdr, 0);
                 IPH_CHKSUM_SET(iphdr, inet_chksum(iphdr, sizeof(struct ip_hdr)));
 
-                {
+                if (connInfo->isAcceptor) {
                     boost::mutex::scoped_lock lock(m_);
-                    if (portsToRemap_.count(dstPort) > 0) {
-                        PeerInfo& peerInfo = connInfo->peers[srcIp];
-                        PortMap::iterator it = peerInfo.portMap.find(tcphdr->src);
-                        if (it == peerInfo.portMap.end()) {
-                            peerInfo.portMap.insert(std::make_pair((UInt16)tcphdr->src, srcPort));
-                        } else {
-                            if (it->second != srcPort) {
-                                LOG4CPLUS_WARN(logger(), "Port " << ntohs(it->second) << " remapped to " << ntohs(srcPort) << " at " << ipToString(srcIp));
-                            }
-                            it->second = srcPort;
-                        }
+                    PeerInfo& peerInfo = connInfo->acceptorPeers[srcIp];
+                    PortMap::iterator it = peerInfo.portMap.find(tcphdr->src);
+                    if (it == peerInfo.portMap.end()) {
+                        peerInfo.portMap.insert(std::make_pair((UInt16)tcphdr->src, srcPort));
                     } else {
-                        tcphdr->src = srcPort;
+                        if (it->second != srcPort) {
+                            LOG4CPLUS_WARN(logger(), "Port " << ntohs(it->second) << " remapped to " << ntohs(srcPort) << " at " << ipToString(srcIp));
+                        }
+                        it->second = srcPort;
                     }
+                    tcphdr->dest = connInfo->acceptorLocalPort;
+                } else {
+                    tcphdr->src = srcPort;
                 }
 
-                tcphdr->dest = dstPort;
                 tcphdr->chksum = 0;
 
                 pbuf_take(p, &(*rcvBuff)[0], numBytes + sizeof(struct ip_hdr));

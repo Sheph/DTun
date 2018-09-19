@@ -49,8 +49,4 @@ namespace DTun
 
         return boost::make_shared<SysHandle>(boost::ref(reactor_), sock);
     }
-
-    void SysManager::enablePortRemap(UInt16 dstPort)
-    {
-    }
 }

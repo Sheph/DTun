@@ -74,6 +74,7 @@ namespace DTun
 
         LTUDPManager& mgr_;
         struct tcp_pcb* pcb_;
+        uint16_t pcbPort_;
         bool eof_;
         boost::circular_buffer<char> rcvBuff_;
         SAcceptor::ListenCallback listenCallback_;

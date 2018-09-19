@@ -17,8 +17,6 @@ namespace DTun
         virtual boost::shared_ptr<SHandle> createStreamSocket() = 0;
 
         virtual boost::shared_ptr<SHandle> createDatagramSocket(SYSSOCKET s = SYS_INVALID_SOCKET) = 0;
-
-        virtual void enablePortRemap(UInt16 dstPort) = 0;
     };
 }
 

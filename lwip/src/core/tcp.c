@@ -67,9 +67,7 @@
 #endif
 
 #ifndef TCP_LOCAL_PORT_RANGE_START
-/* From http://www.iana.org/assignments/port-numbers:
-   "The Dynamic and/or Private Ports are those from 49152 through 65535" */
-#define TCP_LOCAL_PORT_RANGE_START        0xc000
+#define TCP_LOCAL_PORT_RANGE_START        0x0400
 #define TCP_LOCAL_PORT_RANGE_END          0xffff
 #define TCP_ENSURE_LOCAL_PORT_RANGE(port) ((u16_t)(((port) & (u16_t)~TCP_LOCAL_PORT_RANGE_START) + TCP_LOCAL_PORT_RANGE_START))
 #endif

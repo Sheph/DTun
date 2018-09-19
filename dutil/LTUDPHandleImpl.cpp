@@ -9,6 +9,7 @@ namespace DTun
     LTUDPHandleImpl::LTUDPHandleImpl(LTUDPManager& mgr)
     : mgr_(mgr)
     , pcb_(NULL)
+    , pcbPort_(0)
     , eof_(false)
     , rcvBuff_(TCP_WND)
     {
@@ -18,10 +19,18 @@ namespace DTun
         const boost::shared_ptr<SConnection>& conn, struct tcp_pcb* pcb)
     : mgr_(mgr)
     , pcb_(pcb)
+    , pcbPort_(0)
     , eof_(false)
     , rcvBuff_(TCP_WND)
     , conn_(conn)
     {
+        ip_addr_t tcpAddr;
+        uint16_t tcpPort;
+        err_t err = tcp_tcp_get_tcp_addrinfo(pcb, 1, &tcpAddr, &tcpPort);
+        assert(err == ERR_OK);
+        pcbPort_ = lwip_htons(tcpPort);
+        assert(pcbPort_ != 0);
+
         tcp_arg(pcb_, this);
         tcp_recv(pcb_, &LTUDPHandleImpl::recvFunc);
         tcp_sent(pcb_, &LTUDPHandleImpl::sentFunc);
@@ -31,6 +40,7 @@ namespace DTun
     LTUDPHandleImpl::~LTUDPHandleImpl()
     {
         assert(!pcb_);
+        assert(pcbPort_ == 0);
         assert(!conn_);
     }
 
@@ -40,6 +50,7 @@ namespace DTun
         boost::shared_ptr<SConnection> res = conn_;
         conn_.reset();
         if (pcb_) {
+            mgr_.pcbUnbind(pcbPort_);
             tcp_arg(pcb_, NULL);
             if (!listenCallback_) {
                 tcp_recv(pcb_, NULL);
@@ -55,6 +66,7 @@ namespace DTun
                 }
             }
             pcb_ = NULL;
+            pcbPort_ = 0;
         }
         return res;
     }
@@ -163,8 +175,6 @@ namespace DTun
             return;
         }
 
-        port = lwip_ntohs(port);
-
         struct tcp_pcb* l = tcp_new_ip_type(IPADDR_TYPE_V4);
         if (!l) {
             LOG4CPLUS_ERROR(logger(), "tcp_new_ip_type failed");
@@ -173,14 +183,15 @@ namespace DTun
 
         setupPCB(l);
 
-        if (tcp_bind(l, IP_ANY_TYPE, port) != ERR_OK) {
-            LOG4CPLUS_ERROR(logger(), "tcp_bind failed");
+        uint16_t pcbPort = mgr_.pcbBindAcceptor(l, port);
+        if (!pcbPort) {
             tcp_close(l);
             return;
         }
 
         if (!(pcb_ = tcp_listen_with_backlog(l, backlog))) {
             LOG4CPLUS_ERROR(logger(), "tcp_listen failed");
+            mgr_.pcbUnbind(pcbPort);
             tcp_close(l);
             return;
         }
@@ -188,6 +199,7 @@ namespace DTun
         tcp_arg(pcb_, this);
         tcp_accept(pcb_, &LTUDPHandleImpl::listenerAcceptFunc);
 
+        pcbPort_ = pcbPort;
         listenCallback_ = callback;
     }
 
@@ -218,8 +230,6 @@ namespace DTun
             return;
         }
 
-        localPort = lwip_ntohs(localPort);
-
         struct tcp_pcb* pcb = tcp_new_ip_type(IPADDR_TYPE_V4);
         if (!pcb) {
             LOG4CPLUS_ERROR(logger(), "tcp_new_ip_type failed");
@@ -229,11 +239,10 @@ namespace DTun
 
         setupPCB(pcb);
 
-        err_t err = tcp_bind(pcb, IP_ANY_TYPE, localPort);
-        if (err != ERR_OK) {
-            LOG4CPLUS_ERROR(logger(), "tcp_bind failed");
+        uint16_t pcbPort = mgr_.pcbBindConnector(pcb, localPort);
+        if (!pcbPort) {
             tcp_close(pcb);
-            callback(err);
+            callback(ERR_IF);
             return;
         }
 
@@ -259,18 +268,20 @@ namespace DTun
 
         tcp_arg(pcb, this);
         tcp_err(pcb, &LTUDPHandleImpl::errorFunc);
-        err = tcp_connect(pcb, &addr, lwip_ntohs(((const struct sockaddr_in*)res->ai_addr)->sin_port), &LTUDPHandleImpl::connectFunc);
+        err_t err = tcp_connect(pcb, &addr, lwip_ntohs(((const struct sockaddr_in*)res->ai_addr)->sin_port), &LTUDPHandleImpl::connectFunc);
 
         freeaddrinfo(res);
 
         if (err != ERR_OK) {
             LOG4CPLUS_ERROR(logger(), "tcp_connect failed: " << (int)err);
+            mgr_.pcbUnbind(pcbPort);
             tcp_close(pcb);
             callback(err);
             return;
         }
 
         pcb_ = pcb;
+        pcbPort_ = pcbPort;
         connectCallback_ = callback;
     }
 
@@ -447,7 +458,9 @@ namespace DTun
     {
         LTUDPHandleImpl* this_ = (LTUDPHandleImpl*)arg;
 
+        this_->mgr_.pcbUnbind(this_->pcbPort_);
         this_->pcb_ = NULL;
+        this_->pcbPort_ = 0;
 
         if (this_->connectCallback_) {
             LOG4CPLUS_TRACE(logger(), "LTUDP error(" << (int)err << ")");
