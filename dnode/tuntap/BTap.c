@@ -336,6 +336,7 @@ fail0:
 
         case BTAP_INIT_STRING: {
             char devname_real[IFNAMSIZ];
+            char thisns[256];
             char nsname_full[256];
 
             #ifdef BADVPN_LINUX
@@ -344,7 +345,8 @@ fail0:
 
             // open device
 
-            cur_ns_fd = old_ns_fd = open("/proc/1/ns/net", O_RDONLY);
+            snprintf(thisns, sizeof(thisns), "/proc/%d/ns/net", (int)getpid());
+            cur_ns_fd = old_ns_fd = open(thisns, O_RDONLY);
             if (old_ns_fd <= 0) {
                 BLog(BLOG_ERROR, "error opening cur ns");
                 goto fail0;
@@ -356,7 +358,7 @@ fail0:
             }
 
             if (setns(ns_fd, CLONE_NEWNET) < 0) {
-                BLog(BLOG_ERROR, "error setting ns");
+                BLog(BLOG_ERROR, "error setting ns: %s", strerror(errno));
                 goto fail0;
             }
 
