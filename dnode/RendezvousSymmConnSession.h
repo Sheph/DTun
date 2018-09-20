@@ -36,7 +36,7 @@ namespace DNode
 
         void sendReady();
 
-        void sendSymmNext();
+        void sendNext();
 
         DTun::SManager& localMgr_;
         DTun::SManager& remoteMgr_;

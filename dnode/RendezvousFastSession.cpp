@@ -18,7 +18,9 @@ namespace DNode
     , owner_(connId.nodeId == nodeId)
     , ready_(false)
     , stepIdx_(0)
-    , numPingSent_(0)
+    , origTTL_(255)
+    , ttl_(2)
+    , next_(true)
     , destIp_(0)
     , destPort_(0)
     , watch_(boost::make_shared<DTun::OpWatch>(boost::ref(localMgr.reactor())))
@@ -111,6 +113,9 @@ namespace DNode
         portReservation_->use();
 
         pingConn_ = handle->createConnection();
+        origTTL_ = pingConn_->handle()->getTTL();
+        if (origTTL_ == 0)
+            origTTL_ = 255;
         masterSession_ =
             boost::make_shared<DMasterSession>(boost::ref(remoteMgr_), serverAddr_, serverPort_);
         bool startRes = masterSession_->startFast(s, nodeId(), connId(),
@@ -142,6 +147,8 @@ namespace DNode
 
             if (!owner_ && portReservation_) {
                 ++stepIdx_;
+                ttl_ = 2;
+                next_ = true;
 
                 LOG4CPLUS_WARN(logger(), "RendezvousFastSession::onMsg(NEXT " << stepIdx_ << ", " << connId() << ")");
 
@@ -198,6 +205,8 @@ namespace DNode
                 lock.unlock();
                 onPortReservation();
             }
+        } else if (msgId == DPROTOCOL_MSG_NEXT) {
+            next_ = true;
         }
     }
 
@@ -217,6 +226,7 @@ namespace DNode
         callback_ = Callback();
         portReservation_->keepalive();
         lock.unlock();
+        pingConn_->handle()->setTTL(origTTL_);
         SYSSOCKET s = pingConn_->handle()->duplicate();
         pingConn_->close();
         cb(0, s, destIp_, destPort_, portReservation_);
@@ -248,7 +258,8 @@ namespace DNode
 
         if (owner_ && portReservationNext_) {
             ++stepIdx_;
-            numPingSent_ = 0;
+            ttl_ = 2;
+            next_ = true;
 
             lock.unlock();
 
@@ -324,6 +335,9 @@ namespace DNode
         portReservation_->use();
 
         pingConn_ = handle->createConnection();
+        origTTL_ = pingConn_->handle()->getTTL();
+        if (origTTL_ == 0)
+            origTTL_ = 255;
         masterSession_ =
             boost::make_shared<DMasterSession>(boost::ref(remoteMgr_), serverAddr_, serverPort_);
         if (!masterSession_->startFast(s, nodeId(), connId(),
@@ -375,6 +389,8 @@ namespace DNode
         boost::mutex::scoped_lock lock(m_);
 
         if (!callback_ || !err) {
+            if (callback_ && !err)
+                sendNext();
             return;
         }
 
@@ -437,6 +453,7 @@ namespace DNode
         if (err) {
             cb(err, SYS_INVALID_SOCKET, 0, 0, boost::shared_ptr<PortReservation>());
         } else {
+            pingConn_->handle()->setTTL(origTTL_);
             SYSSOCKET s = pingConn_->handle()->duplicate();
             pingConn_->close();
             cb(0, s, ip, port, portReservation_);
@@ -484,7 +501,13 @@ namespace DNode
         assert(destIp_ != 0);
         assert(destPort_ != 0);
 
-        LOG4CPLUS_TRACE(logger(), "RendezvousFastSession::onPingTimeout(" << connId() << ", " << DTun::ipPortToString(destIp_, destPort_) << ")");
+        if (!next_) {
+            localMgr_.reactor().post(
+                watch_->wrap(boost::bind(&RendezvousFastSession::onPingTimeout, this)), 25);
+            return;
+        }
+
+        LOG4CPLUS_TRACE(logger(), "RendezvousFastSession::onPingTimeout(" << connId() << ", " << DTun::ipPortToString(destIp_, destPort_) << ", ttl=" << ttl_ << ")");
 
         boost::shared_ptr<std::vector<char> > sndBuff =
             boost::make_shared<std::vector<char> >(4);
@@ -494,17 +517,21 @@ namespace DNode
         (*sndBuff)[2] = 0xCC;
         (*sndBuff)[3] = 0xDD;
 
+        pingConn_->handle()->setTTL(ttl_);
+
         pingConn_->writeTo(&(*sndBuff)[0], &(*sndBuff)[0] + sndBuff->size(),
             destIp_, destPort_,
             boost::bind(&RendezvousFastSession::onPingSend, this, _1, sndBuff));
         portReservation_->use();
 
-        ++numPingSent_;
+        next_ = false;
+
+        ++ttl_;
 
         bool callPortRsvd = false;
         bool keepPosting = true;
 
-        if (owner_ && (numPingSent_ == 4)) {
+        if (owner_ && (ttl_ == 65)) {
             keepPosting = false;
             if (stepIdx_ == 2) {
                 LOG4CPLUS_WARN(logger(), "RendezvousFastSession::onPingTimeout(FAILED, " << connId() << ")");
@@ -542,7 +569,7 @@ namespace DNode
 
         if (keepPosting) {
             localMgr_.reactor().post(
-                watch_->wrap(boost::bind(&RendezvousFastSession::onPingTimeout, this)), 500);
+                watch_->wrap(boost::bind(&RendezvousFastSession::onPingTimeout, this)), 25);
         }
     }
 
@@ -552,6 +579,24 @@ namespace DNode
         DTun::DProtocolMsgReady msg;
 
         header.msgCode = DPROTOCOL_MSG_READY;
+        msg.connId = DTun::toProtocolConnId(connId());
+
+        boost::shared_ptr<std::vector<char> > sndBuff =
+            boost::make_shared<std::vector<char> >(sizeof(header) + sizeof(msg));
+
+        memcpy(&(*sndBuff)[0], &header, sizeof(header));
+        memcpy(&(*sndBuff)[0] + sizeof(header), &msg, sizeof(msg));
+
+        serverConn_->write(&(*sndBuff)[0], &(*sndBuff)[0] + sndBuff->size(),
+            boost::bind(&RendezvousFastSession::onSend, _1, sndBuff));
+    }
+
+    void RendezvousFastSession::sendNext()
+    {
+        DTun::DProtocolHeader header;
+        DTun::DProtocolMsgNext msg;
+
+        header.msgCode = DPROTOCOL_MSG_NEXT;
         msg.connId = DTun::toProtocolConnId(connId());
 
         boost::shared_ptr<std::vector<char> > sndBuff =

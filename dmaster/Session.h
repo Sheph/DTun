@@ -70,7 +70,7 @@ namespace DMaster
 
         void sendReady(const DTun::ConnId& connId);
 
-        void sendSymmNext(const DTun::ConnId& connId);
+        void sendNext(const DTun::ConnId& connId);
 
     private:
         void onSend(int err, const boost::shared_ptr<std::vector<char> >& sndBuff);

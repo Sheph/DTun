@@ -17,7 +17,7 @@ namespace DTun
     #define DPROTOCOL_MSG_FAST 0x9
     #define DPROTOCOL_MSG_SYMM 0xA
     #define DPROTOCOL_MSG_READY 0xB
-    #define DPROTOCOL_MSG_SYMM_NEXT 0xC
+    #define DPROTOCOL_MSG_NEXT 0xC
 
     #define DPROTOCOL_STATUS_PENDING 0x0
     #define DPROTOCOL_STATUS_ESTABLISHED 0x1
@@ -131,7 +131,7 @@ namespace DTun
         DProtocolConnId connId;
     };
 
-    struct DProtocolMsgSymmNext
+    struct DProtocolMsgNext
     {
         DProtocolConnId connId;
     };

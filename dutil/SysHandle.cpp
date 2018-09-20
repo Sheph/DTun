@@ -85,6 +85,31 @@ namespace DTun
         return dup(sock_);
     }
 
+    int SysHandle::getTTL() const
+    {
+        int result = 0;
+        socklen_t resultLen = sizeof(result);
+        if (::getsockopt(sock_, IPPROTO_IP, IP_TTL, &result, &resultLen) < 0) {
+            result = errno;
+            LOG4CPLUS_ERROR(logger(), "Cannot getsockopt: " << strerror(errno));
+            return 0;
+        }
+        if ((result <= 0) || (result > 255)) {
+            LOG4CPLUS_ERROR(logger(), "bad TTL value: " << result);
+            result = 0;
+        }
+        return result;
+    }
+
+    bool SysHandle::setTTL(int ttl)
+    {
+        if (::setsockopt(sock_, IPPROTO_IP, IP_TTL, &ttl, sizeof(ttl)) < 0) {
+            LOG4CPLUS_ERROR(logger(), "cannot set TTL");
+            return false;
+        }
+        return true;
+    }
+
     void SysHandle::close(bool immediate)
     {
         if (sock_ != SYS_INVALID_SOCKET) {

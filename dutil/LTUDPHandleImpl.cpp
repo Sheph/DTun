@@ -153,6 +153,24 @@ namespace DTun
         return true;
     }
 
+    int LTUDPHandleImpl::getTTL() const
+    {
+        assert(conn_);
+        if (!conn_) {
+            return SYS_INVALID_SOCKET;
+        }
+        return conn_->handle()->getTTL();
+    }
+
+    bool LTUDPHandleImpl::setTTL(int ttl)
+    {
+        assert(conn_);
+        if (!conn_) {
+            return SYS_INVALID_SOCKET;
+        }
+        return conn_->handle()->setTTL(ttl);
+    }
+
     SYSSOCKET LTUDPHandleImpl::duplicate()
     {
         assert(conn_);

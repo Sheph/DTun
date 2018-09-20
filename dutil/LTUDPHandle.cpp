@@ -67,6 +67,16 @@ namespace DTun
         return impl_->duplicate();
     }
 
+    int LTUDPHandle::getTTL() const
+    {
+        return impl_->getTTL();
+    }
+
+    bool LTUDPHandle::setTTL(int ttl)
+    {
+        return impl_->setTTL(ttl);
+    }
+
     void LTUDPHandle::close(bool immediate)
     {
         if (impl_) {

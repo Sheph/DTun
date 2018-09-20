@@ -512,8 +512,8 @@ namespace DNode
                 boost::bind(&DMasterClient::onRecvMsgOther, this, _1, _2, header.msgCode),
                 true);
             break;
-        case DPROTOCOL_MSG_SYMM_NEXT:
-            buff_.resize(sizeof(DTun::DProtocolMsgSymmNext));
+        case DPROTOCOL_MSG_NEXT:
+            buff_.resize(sizeof(DTun::DProtocolMsgNext));
             conn_->read(&buff_[0], &buff_[0] + buff_.size(),
                 boost::bind(&DMasterClient::onRecvMsgOther, this, _1, _2, header.msgCode),
                 true);

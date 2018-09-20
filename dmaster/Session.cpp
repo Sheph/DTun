@@ -89,13 +89,13 @@ namespace DMaster
         sendMsg(DPROTOCOL_MSG_SYMM, &msg, sizeof(msg));
     }
 
-    void Session::sendSymmNext(const DTun::ConnId& connId)
+    void Session::sendNext(const DTun::ConnId& connId)
     {
-        DTun::DProtocolMsgSymmNext msg;
+        DTun::DProtocolMsgNext msg;
 
         msg.connId = DTun::toProtocolConnId(connId);
 
-        sendMsg(DPROTOCOL_MSG_SYMM_NEXT, &msg, sizeof(msg));
+        sendMsg(DPROTOCOL_MSG_NEXT, &msg, sizeof(msg));
     }
 
     void Session::sendReady(const DTun::ConnId& connId)
@@ -174,8 +174,8 @@ namespace DMaster
                 boost::bind(&Session::onRecvMsgOther, this, _1, _2, header.msgCode),
                 true);
             break;
-        case DPROTOCOL_MSG_SYMM_NEXT:
-            buff_.resize(sizeof(DTun::DProtocolMsgSymmNext));
+        case DPROTOCOL_MSG_NEXT:
+            buff_.resize(sizeof(DTun::DProtocolMsgNext));
             conn_->read(&buff_[0], &buff_[0] + buff_.size(),
                 boost::bind(&Session::onRecvMsgOther, this, _1, _2, header.msgCode),
                 true);

@@ -29,6 +29,10 @@ namespace DTun
 
         virtual SYSSOCKET duplicate();
 
+        virtual int getTTL() const;
+
+        virtual bool setTTL(int ttl);
+
         virtual void close(bool immediate = false);
 
         virtual bool canReuse() const;

@@ -73,7 +73,7 @@ namespace DMaster
 
         void onSessionReady(const boost::shared_ptr<Session>& sess, const DTun::ConnId& connId);
 
-        void onSessionSymmNext(const boost::shared_ptr<Session>& sess, const DTun::ConnId& connId);
+        void onSessionNext(const boost::shared_ptr<Session>& sess, const DTun::ConnId& connId);
 
         boost::shared_ptr<Session> findPersistentSession(DTun::UInt32 nodeId) const;
 

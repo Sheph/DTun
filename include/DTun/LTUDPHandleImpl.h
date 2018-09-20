@@ -45,6 +45,10 @@ namespace DTun
 
         bool getPeerName(UInt32& ip, UInt16& port) const;
 
+        int getTTL() const;
+
+        bool setTTL(int ttl);
+
         SYSSOCKET duplicate();
 
         void listen(int backlog, const SAcceptor::ListenCallback& callback);

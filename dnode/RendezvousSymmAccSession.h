@@ -32,7 +32,7 @@ namespace DNode
         void onHelloSend(int err);
         void onPingSend(int err, const boost::shared_ptr<std::vector<char> >& sndBuff);
         void onRecvPing(int err, int numBytes, DTun::UInt32 ip, DTun::UInt16 port, const boost::shared_ptr<std::vector<char> >& rcvBuff);
-        void onSymmNextTimeout();
+        void onNextTimeout();
         void onCheckStartTimeout();
         void onSendFinalTimeout(int cnt);
 
@@ -40,7 +40,7 @@ namespace DNode
 
         void sendReady();
 
-        void sendSymmNext();
+        void sendNext();
 
         DTun::SManager& localMgr_;
         DTun::SManager& remoteMgr_;

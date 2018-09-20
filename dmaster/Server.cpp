@@ -166,9 +166,9 @@ namespace DMaster
             onSessionReady(sess_shared, DTun::fromProtocolConnId(msgReady->connId));
             break;
         }
-        case DPROTOCOL_MSG_SYMM_NEXT: {
-            const DTun::DProtocolMsgSymmNext* msgSymmNext = (const DTun::DProtocolMsgSymmNext*)msg;
-            onSessionSymmNext(sess_shared, DTun::fromProtocolConnId(msgSymmNext->connId));
+        case DPROTOCOL_MSG_NEXT: {
+            const DTun::DProtocolMsgNext* msgNext = (const DTun::DProtocolMsgNext*)msg;
+            onSessionNext(sess_shared, DTun::fromProtocolConnId(msgNext->connId));
             break;
         }
         default:
@@ -378,9 +378,9 @@ namespace DMaster
         }
     }
 
-    void Server::onSessionSymmNext(const boost::shared_ptr<Session>& sess, const DTun::ConnId& connId)
+    void Server::onSessionNext(const boost::shared_ptr<Session>& sess, const DTun::ConnId& connId)
     {
-        LOG4CPLUS_TRACE(logger(), "Server::onSessionSymmNext(" << sess->nodeId() << ", "
+        LOG4CPLUS_TRACE(logger(), "Server::onSessionNext(" << sess->nodeId() << ", "
             << connId << ")");
 
         ConnMap::iterator it = conns_.find(connId);
@@ -390,11 +390,11 @@ namespace DMaster
         }
 
         if (sess == it->second.srcSess) {
-            it->second.dstSess->sendSymmNext(connId);
+            it->second.dstSess->sendNext(connId);
         } else if (sess == it->second.dstSess) {
-            it->second.srcSess->sendSymmNext(connId);
+            it->second.srcSess->sendNext(connId);
         } else {
-            LOG4CPLUS_ERROR(logger(), "cannot SymmNext connId = " << connId << ", not allowed");
+            LOG4CPLUS_ERROR(logger(), "cannot Next connId = " << connId << ", not allowed");
             return;
         }
     }

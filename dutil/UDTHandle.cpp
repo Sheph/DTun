@@ -89,6 +89,17 @@ namespace DTun
         return SYS_INVALID_SOCKET;
     }
 
+    int UDTHandle::getTTL() const
+    {
+        assert(false);
+        return 0;
+    }
+
+    bool UDTHandle::setTTL(int ttl)
+    {
+        return false;
+    }
+
     void UDTHandle::close(bool immediate)
     {
         if (sock_ != UDT::INVALID_SOCK) {

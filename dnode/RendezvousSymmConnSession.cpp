@@ -153,7 +153,7 @@ namespace DNode
 
             destIp_ = msgSymm->nodeIp;
             destPort_ = msgSymm->nodePort;
-        } else if (msgId == DPROTOCOL_MSG_SYMM_NEXT) {
+        } else if (msgId == DPROTOCOL_MSG_NEXT) {
             if (!callback_) {
                 return;
             }
@@ -228,7 +228,7 @@ namespace DNode
                 boost::bind(&RendezvousSymmConnSession::onPingSend, this, _1, sndBuff));
             portReservation_->use();
         } else {
-            sendSymmNext();
+            sendNext();
         }
     }
 
@@ -348,12 +348,12 @@ namespace DNode
             boost::bind(&RendezvousSymmConnSession::onServerSend, _1, sndBuff));
     }
 
-    void RendezvousSymmConnSession::sendSymmNext()
+    void RendezvousSymmConnSession::sendNext()
     {
         DTun::DProtocolHeader header;
-        DTun::DProtocolMsgSymmNext msg;
+        DTun::DProtocolMsgNext msg;
 
-        header.msgCode = DPROTOCOL_MSG_SYMM_NEXT;
+        header.msgCode = DPROTOCOL_MSG_NEXT;
         msg.connId = DTun::toProtocolConnId(connId());
 
         boost::shared_ptr<std::vector<char> > sndBuff =

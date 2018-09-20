@@ -179,7 +179,7 @@ namespace DNode
                     onPortReservation();
                 }
             }
-        } else if (msgId == DPROTOCOL_MSG_SYMM_NEXT) {
+        } else if (msgId == DPROTOCOL_MSG_NEXT) {
             if (!callback_) {
                 return;
             }
@@ -187,7 +187,7 @@ namespace DNode
             lock.unlock();
 
             localMgr_.reactor().post(
-                watch_->wrap(boost::bind(&RendezvousSymmAccSession::onSymmNextTimeout, this)),
+                watch_->wrap(boost::bind(&RendezvousSymmAccSession::onNextTimeout, this)),
                 ((stepIdx_ == 0) ? 0 : 1000));
         }
     }
@@ -352,7 +352,7 @@ namespace DNode
         ++stepIdx_;
         numPingSent_= 0;
 
-        sendSymmNext();
+        sendNext();
     }
 
     void RendezvousSymmAccSession::onRecvPing(int err, int numBytes, DTun::UInt32 ip, DTun::UInt16 port, const boost::shared_ptr<std::vector<char> >& rcvBuff)
@@ -413,9 +413,9 @@ namespace DNode
             boost::bind(&RendezvousSymmAccSession::onRecvPing, this, _1, _2, _3, _4, rcvBuff));
     }
 
-    void RendezvousSymmAccSession::onSymmNextTimeout()
+    void RendezvousSymmAccSession::onNextTimeout()
     {
-        LOG4CPLUS_TRACE(logger(), "RendezvousSymmAccSession::onSymmNextTimeout()");
+        LOG4CPLUS_TRACE(logger(), "RendezvousSymmAccSession::onNextTimeout()");
 
         masterSession_.reset();
         masterHandle_.reset();
@@ -450,7 +450,7 @@ namespace DNode
         DTun::UInt16 port = getCurrentPort();
 
         if (!port) {
-            LOG4CPLUS_WARN(logger(), "RendezvousSymmAccSession::onSymmNextTimeout(" << connId() << ", no more ports to try)");
+            LOG4CPLUS_WARN(logger(), "RendezvousSymmAccSession::onNextTimeout(" << connId() << ", no more ports to try)");
             Callback cb = callback_;
             callback_ = Callback();
             lock.unlock();
@@ -569,12 +569,12 @@ namespace DNode
             boost::bind(&RendezvousSymmAccSession::onSend, _1, sndBuff));
     }
 
-    void RendezvousSymmAccSession::sendSymmNext()
+    void RendezvousSymmAccSession::sendNext()
     {
         DTun::DProtocolHeader header;
-        DTun::DProtocolMsgSymmNext msg;
+        DTun::DProtocolMsgNext msg;
 
-        header.msgCode = DPROTOCOL_MSG_SYMM_NEXT;
+        header.msgCode = DPROTOCOL_MSG_NEXT;
         msg.connId = DTun::toProtocolConnId(connId());
 
         boost::shared_ptr<std::vector<char> > sndBuff =

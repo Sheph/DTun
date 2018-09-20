@@ -36,6 +36,8 @@ namespace DNode
 
         void sendReady();
 
+        void sendNext();
+
         DTun::SManager& localMgr_;
         DTun::SManager& remoteMgr_;
         std::string serverAddr_;
@@ -47,7 +49,9 @@ namespace DNode
         boost::mutex m_;
         bool ready_;
         int stepIdx_;
-        int numPingSent_;
+        int origTTL_;
+        int ttl_;
+        bool next_;
         std::vector<char> rcvBuff_;
         Callback callback_;
         DTun::UInt32 destIp_;
