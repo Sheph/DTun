@@ -90,7 +90,6 @@ namespace DTun
         int result = 0;
         socklen_t resultLen = sizeof(result);
         if (::getsockopt(sock_, IPPROTO_IP, IP_TTL, &result, &resultLen) < 0) {
-            result = errno;
             LOG4CPLUS_ERROR(logger(), "Cannot getsockopt: " << strerror(errno));
             return 0;
         }
