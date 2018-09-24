@@ -432,7 +432,7 @@ namespace DTun
             return ERR_OK;
         }
 
-        UInt16 actualPort = tcphdr->dest;
+        UInt16 actualPort = 0;
 
         PeerMap::const_iterator it = connInfo->peers.find(iphdr->dest.addr);
         if (it != connInfo->peers.end()) {
@@ -441,6 +441,8 @@ namespace DTun
                 actualPort = jt->second.port;
             }
         }
+
+        assert(actualPort != 0);
 
         boost::shared_ptr<std::vector<char> > sndBuff =
             boost::make_shared<std::vector<char> >(p->tot_len - iphdrLen);
