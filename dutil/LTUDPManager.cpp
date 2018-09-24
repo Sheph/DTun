@@ -509,6 +509,7 @@ namespace DTun
                         LOG4CPLUS_WARN(logger(), "Peer " << ipToString(srcIp) << ", in data without out data");
                         conn_shared->readFrom(&(*rcvBuff)[0] + sizeof(struct ip_hdr), &(*rcvBuff)[0] + rcvBuff->size() - sizeof(struct ip_hdr),
                             boost::bind(&LTUDPManager::onRecv, this, _1, _2, _3, _4, dstPort, connInfo, rcvBuff));
+                        pbuf_free(p);
                         return;
                     }
                     PeerInfo& peerInfo = peerIt->second;
@@ -526,6 +527,7 @@ namespace DTun
                             LOG4CPLUS_WARN(logger(), "Peer " << ipPortToString(srcIp, srcPort) << ", in data without out data");
                             conn_shared->readFrom(&(*rcvBuff)[0] + sizeof(struct ip_hdr), &(*rcvBuff)[0] + rcvBuff->size() - sizeof(struct ip_hdr),
                                 boost::bind(&LTUDPManager::onRecv, this, _1, _2, _3, _4, dstPort, connInfo, rcvBuff));
+                            pbuf_free(p);
                             return;
                         }
                     }
