@@ -270,7 +270,7 @@ namespace DTun
                 portInfo = &it->second;
                 portToUse = it->first;
                 break;
-            } else if (it->second.port == portToUse) {
+            } else if (it->first == portToUse) {
                 portToUse = htons(ntohs(portToUse) + 1);
             }
         }
