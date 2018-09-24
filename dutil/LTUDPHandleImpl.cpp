@@ -9,7 +9,9 @@ namespace DTun
     LTUDPHandleImpl::LTUDPHandleImpl(LTUDPManager& mgr)
     : mgr_(mgr)
     , pcb_(NULL)
-    , pcbPort_(0)
+    , pcbLocalPort_(0)
+    , pcbRemoteIp_(0)
+    , pcbRemotePort_(0)
     , eof_(false)
     , rcvBuff_(TCP_WND)
     {
@@ -19,7 +21,9 @@ namespace DTun
         const boost::shared_ptr<SConnection>& conn, struct tcp_pcb* pcb)
     : mgr_(mgr)
     , pcb_(pcb)
-    , pcbPort_(0)
+    , pcbLocalPort_(0)
+    , pcbRemoteIp_(0)
+    , pcbRemotePort_(0)
     , eof_(false)
     , rcvBuff_(TCP_WND)
     , conn_(conn)
@@ -28,8 +32,8 @@ namespace DTun
         uint16_t tcpPort;
         err_t err = tcp_tcp_get_tcp_addrinfo(pcb, 1, &tcpAddr, &tcpPort);
         assert(err == ERR_OK);
-        pcbPort_ = lwip_htons(tcpPort);
-        assert(pcbPort_ != 0);
+        pcbLocalPort_ = lwip_htons(tcpPort);
+        assert(pcbLocalPort_ != 0);
 
         tcp_arg(pcb_, this);
         tcp_recv(pcb_, &LTUDPHandleImpl::recvFunc);
@@ -40,7 +44,9 @@ namespace DTun
     LTUDPHandleImpl::~LTUDPHandleImpl()
     {
         assert(!pcb_);
-        assert(pcbPort_ == 0);
+        assert(pcbLocalPort_ == 0);
+        assert(pcbRemoteIp_ == 0);
+        assert(pcbRemotePort_ == 0);
         assert(!conn_);
     }
 
@@ -50,7 +56,9 @@ namespace DTun
         boost::shared_ptr<SConnection> res = conn_;
         conn_.reset();
         if (pcb_) {
-            mgr_.pcbUnbind(pcbPort_);
+            if (pcbRemoteIp_)
+                mgr_.pcbDisconnect(pcbLocalPort_, pcbRemoteIp_, pcbRemotePort_);
+            mgr_.pcbUnbind(pcbLocalPort_);
             tcp_arg(pcb_, NULL);
             if (!listenCallback_) {
                 tcp_recv(pcb_, NULL);
@@ -66,7 +74,9 @@ namespace DTun
                 }
             }
             pcb_ = NULL;
-            pcbPort_ = 0;
+            pcbLocalPort_ = 0;
+            pcbRemoteIp_ = 0;
+            pcbRemotePort_ = 0;
         }
         return res;
     }
@@ -217,7 +227,7 @@ namespace DTun
         tcp_arg(pcb_, this);
         tcp_accept(pcb_, &LTUDPHandleImpl::listenerAcceptFunc);
 
-        pcbPort_ = pcbPort;
+        pcbLocalPort_ = pcbPort;
         listenCallback_ = callback;
     }
 
@@ -281,26 +291,38 @@ namespace DTun
             return;
         }
 
+        uint16_t pcbRemotePort = mgr_.pcbConnect(pcbPort, ((const struct sockaddr_in*)res->ai_addr)->sin_addr.s_addr,
+            ((const struct sockaddr_in*)res->ai_addr)->sin_port);
+        if (!pcbRemotePort) {
+            tcp_close(pcb);
+            callback(ERR_IF);
+            return;
+        }
+
         ip_addr_t addr;
         ip_addr_set_ip4_u32(&addr, ((const struct sockaddr_in*)res->ai_addr)->sin_addr.s_addr);
 
         tcp_arg(pcb, this);
         tcp_err(pcb, &LTUDPHandleImpl::errorFunc);
-        err_t err = tcp_connect(pcb, &addr, lwip_ntohs(((const struct sockaddr_in*)res->ai_addr)->sin_port), &LTUDPHandleImpl::connectFunc);
-
-        freeaddrinfo(res);
+        err_t err = tcp_connect(pcb, &addr, lwip_ntohs(pcbRemotePort), &LTUDPHandleImpl::connectFunc);
 
         if (err != ERR_OK) {
             LOG4CPLUS_ERROR(logger(), "tcp_connect failed: " << (int)err);
+            mgr_.pcbDisconnect(pcbPort, ((const struct sockaddr_in*)res->ai_addr)->sin_addr.s_addr, pcbRemotePort);
             mgr_.pcbUnbind(pcbPort);
             tcp_close(pcb);
+            freeaddrinfo(res);
             callback(err);
             return;
         }
 
         pcb_ = pcb;
-        pcbPort_ = pcbPort;
+        pcbLocalPort_ = pcbPort;
+        pcbRemoteIp_ = ((const struct sockaddr_in*)res->ai_addr)->sin_addr.s_addr;
+        pcbRemotePort_ = pcbRemotePort;
         connectCallback_ = callback;
+
+        freeaddrinfo(res);
     }
 
     int LTUDPHandleImpl::write(const char* first, const char* last, int& numWritten)
@@ -476,9 +498,13 @@ namespace DTun
     {
         LTUDPHandleImpl* this_ = (LTUDPHandleImpl*)arg;
 
-        this_->mgr_.pcbUnbind(this_->pcbPort_);
+        if (this_->pcbRemoteIp_)
+            this_->mgr_.pcbDisconnect(this_->pcbLocalPort_, this_->pcbRemoteIp_, this_->pcbRemotePort_);
+        this_->mgr_.pcbUnbind(this_->pcbLocalPort_);
         this_->pcb_ = NULL;
-        this_->pcbPort_ = 0;
+        this_->pcbLocalPort_ = 0;
+        this_->pcbRemoteIp_ = 0;
+        this_->pcbRemotePort_ = 0;
 
         if (this_->connectCallback_) {
             LOG4CPLUS_TRACE(logger(), "LTUDP error(" << (int)err << ")");

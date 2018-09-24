@@ -45,16 +45,47 @@ namespace DTun
 
         uint16_t pcbBindConnector(struct tcp_pcb* pcb, uint16_t port);
 
+        uint16_t pcbConnect(uint16_t pcbLocalPort, uint32_t ip, uint16_t port);
+
+        void pcbDisconnect(uint16_t pcbLocalPort, uint32_t ip, uint16_t pcbRemotePort);
+
         void pcbUnbind(uint16_t pcbPort);
 
     private:
-        typedef std::map<UInt16, UInt16> PortMap;
+        class PortComparer: public std::binary_function<uint16_t, uint16_t, bool>
+        {
+        public:
+            bool operator()(uint16_t l, uint16_t r) const
+            {
+                return ntohs(l) < ntohs(r);
+            }
+        };
+
+        struct PortInfo
+        {
+            PortInfo()
+            : port(0), numActiveConns(0) {}
+
+            explicit PortInfo(UInt16 port)
+            : port(port), numActiveConns(0) {}
+
+            ~PortInfo()
+            {
+                assert(numActiveConns == 0);
+            }
+
+            UInt16 port;
+            int numActiveConns; // numer of active connections to that port, only when isAcceptor == false
+        };
+
+        typedef std::map<UInt16, PortInfo, PortComparer> PortMap;
 
         struct PeerInfo
         {
             PeerInfo() {}
 
             PortMap portMap; // send_from -> send_to
+            PortMap revPortMap; // dest local_port -> send_from, only when isAcceptor == false
         };
 
         typedef std::map<UInt32, PeerInfo> PeerMap;
@@ -71,7 +102,7 @@ namespace DTun
             boost::weak_ptr<SConnection> conn;
             bool isAcceptor;
             int numHandles;
-            PeerMap acceptorPeers;
+            PeerMap peers;
             uint16_t acceptorLocalPort;
         };
 
