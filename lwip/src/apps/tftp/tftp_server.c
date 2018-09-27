@@ -294,18 +294,27 @@ recv(void *arg, struct udp_pcb *upcb, struct pbuf *p, const ip_addr_t *addr, u16
       }
 
       blknum = lwip_ntohs(sbuf[1]);
-      pbuf_remove_header(p, TFTP_HEADER_LENGTH);
+      if (blknum == tftp_state.blknum) {
+        pbuf_remove_header(p, TFTP_HEADER_LENGTH);
 
-      ret = tftp_state.ctx->write(tftp_state.handle, p);
-      if (ret < 0) {
-        send_error(addr, port, TFTP_ERROR_ACCESS_VIOLATION, "error writing file");
-        close_handle();
-      } else {
+        ret = tftp_state.ctx->write(tftp_state.handle, p);
+        if (ret < 0) {
+          send_error(addr, port, TFTP_ERROR_ACCESS_VIOLATION, "error writing file");
+          close_handle();
+        } else {
+          send_ack(blknum);
+        }
+
+        if (p->tot_len < TFTP_MAX_PAYLOAD_SIZE) {
+          close_handle();
+        } else {
+          tftp_state.blknum++;
+        }
+      } else if ((u16_t)(blknum + 1) == tftp_state.blknum) {
+        /* retransmit of previous block, ack again (casting to u16_t to care for overflow) */
         send_ack(blknum);
-      }
-
-      if (p->tot_len < TFTP_MAX_PAYLOAD_SIZE) {
-        close_handle();
+      } else {
+        send_error(addr, port, TFTP_ERROR_UNKNOWN_TRFR_ID, "Wrong block number");
       }
       break;
     }
@@ -388,6 +397,7 @@ tftp_init(const struct tftp_context *ctx)
 {
   err_t ret;
 
+  /* LWIP_ASSERT_CORE_LOCKED(); is checked by udp_new() */
   struct udp_pcb *pcb = udp_new_ip_type(IPADDR_TYPE_ANY);
   if (pcb == NULL) {
     return ERR_MEM;
@@ -409,6 +419,17 @@ tftp_init(const struct tftp_context *ctx)
   udp_recv(pcb, recv, NULL);
 
   return ERR_OK;
+}
+
+/** @ingroup tftp
+ * Deinitialize ("turn off") TFTP server.
+ */
+void tftp_cleanup(void)
+{
+  LWIP_ASSERT("Cleanup called on non-initialized TFTP", tftp_state.upcb != NULL);
+  udp_remove(tftp_state.upcb);
+  close_handle();
+  memset(&tftp_state, 0, sizeof(tftp_state));
 }
 
 #endif /* LWIP_UDP */

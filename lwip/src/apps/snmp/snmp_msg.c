@@ -83,22 +83,20 @@ static u8_t v3_enabled = 1;
 static u8_t
 snmp_version_enabled(u8_t version)
 {
-  LWIP_ASSERT("Invalid SNMP version", (version == SNMP_VERSION_1) || (version == SNMP_VERSION_2c)
-#if LWIP_SNMP_V3
-              || (version == SNMP_VERSION_3)
-#endif
-             );
-
   if (version == SNMP_VERSION_1) {
     return v1_enabled;
   } else if (version == SNMP_VERSION_2c) {
     return v2c_enabled;
   }
 #if LWIP_SNMP_V3
-  else { /* version == SNMP_VERSION_3 */
+  else if (version == SNMP_VERSION_3) {
     return v3_enabled;
   }
 #endif
+  else {
+    LWIP_ASSERT("Invalid SNMP version", 0);
+    return 0;
+  }
 }
 
 u8_t
@@ -122,22 +120,19 @@ snmp_v3_enabled(void)
 static void
 snmp_version_enable(u8_t version, u8_t enable)
 {
-  LWIP_ASSERT("Invalid SNMP version", (version == SNMP_VERSION_1) || (version == SNMP_VERSION_2c)
-#if LWIP_SNMP_V3
-              || (version == SNMP_VERSION_3)
-#endif
-             );
-
   if (version == SNMP_VERSION_1) {
     v1_enabled = enable;
   } else if (version == SNMP_VERSION_2c) {
     v2c_enabled = enable;
   }
 #if LWIP_SNMP_V3
-  else { /* version == SNMP_VERSION_3 */
+  else if (version == SNMP_VERSION_3) {
     v3_enabled = enable;
   }
 #endif
+  else {
+    LWIP_ASSERT("Invalid SNMP version", 0);
+  }
 }
 
 void
@@ -182,6 +177,7 @@ snmp_get_community(void)
 void
 snmp_set_community(const char *const community)
 {
+  LWIP_ASSERT_CORE_LOCKED();
   LWIP_ASSERT("community string is too long!", strlen(community) <= SNMP_MAX_COMMUNITY_STR_LEN);
   snmp_community = community;
 }
@@ -219,6 +215,7 @@ snmp_get_community_trap(void)
 void
 snmp_set_community_write(const char *const community)
 {
+  LWIP_ASSERT_CORE_LOCKED();
   LWIP_ASSERT("community string must not be NULL", community != NULL);
   LWIP_ASSERT("community string is too long!", strlen(community) <= SNMP_MAX_COMMUNITY_STR_LEN);
   snmp_community_write = community;
@@ -235,6 +232,7 @@ snmp_set_community_write(const char *const community)
 void
 snmp_set_community_trap(const char *const community)
 {
+  LWIP_ASSERT_CORE_LOCKED();
   LWIP_ASSERT("community string is too long!", strlen(community) <= SNMP_MAX_COMMUNITY_STR_LEN);
   snmp_community_trap = community;
 }
@@ -246,6 +244,7 @@ snmp_set_community_trap(const char *const community)
 void
 snmp_set_write_callback(snmp_write_callback_fct write_callback, void *callback_arg)
 {
+  LWIP_ASSERT_CORE_LOCKED();
   snmp_write_callback     = write_callback;
   snmp_write_callback_arg = callback_arg;
 }
@@ -452,10 +451,10 @@ snmp_process_varbind(struct snmp_request *request, struct snmp_varbind *vb, u8_t
     }
   } else {
     s16_t len = node_instance.get_value(&node_instance, vb->value);
-    vb->type = node_instance.asn1_type;
 
     if (len >= 0) {
       vb->value_len = (u16_t)len; /* cast is OK because we checked >= 0 above */
+      vb->type = node_instance.asn1_type;
 
       LWIP_ASSERT("SNMP_MAX_VALUE_SIZE is configured too low", (vb->value_len & ~SNMP_GET_VALUE_RAW_DATA) <= SNMP_MAX_VALUE_SIZE);
       err = snmp_append_outbound_varbind(&request->outbound_pbuf_stream, vb);
@@ -1052,13 +1051,13 @@ snmp_parse_inbound_frame(struct snmp_request *request)
       }
       {
         s32_t time = snmpv3_get_engine_time_internal();
-        if (request->msg_authoritative_engine_time > time) {
+        if (request->msg_authoritative_engine_time > (time + 150)) {
           snmp_stats.notintimewindows++;
           request->msg_flags = SNMP_V3_AUTHNOPRIV;
           request->error_status = SNMP_ERR_NOTINTIMEWINDOW;
           return ERR_OK;
         } else if (time > 150) {
-          if (request->msg_authoritative_engine_time < time - 150) {
+          if (request->msg_authoritative_engine_time < (time - 150)) {
             snmp_stats.notintimewindows++;
             request->msg_flags = SNMP_V3_AUTHNOPRIV;
             request->error_status = SNMP_ERR_NOTINTIMEWINDOW;

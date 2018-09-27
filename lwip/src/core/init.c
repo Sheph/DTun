@@ -193,6 +193,9 @@ PACK_STRUCT_END
 #if (LWIP_TCP && ((LWIP_EVENT_API && LWIP_CALLBACK_API) || (!LWIP_EVENT_API && !LWIP_CALLBACK_API)))
 #error "One and exactly one of LWIP_EVENT_API and LWIP_CALLBACK_API has to be enabled in your lwipopts.h"
 #endif
+#if (LWIP_ALTCP && LWIP_EVENT_API)
+#error "The application layered tcp API does not work with LWIP_EVENT_API"
+#endif
 #if (MEM_LIBC_MALLOC && MEM_USE_POOLS)
 #error "MEM_LIBC_MALLOC and MEM_USE_POOLS may not both be simultaneously enabled in your lwipopts.h"
 #endif
@@ -235,16 +238,6 @@ PACK_STRUCT_END
 #endif
 #endif /* LWIP_NETCONN && LWIP_TCP */
 #if LWIP_SOCKET
-/* Check that the SO_* socket options and SOF_* lwIP-internal flags match */
-#if SO_REUSEADDR != SOF_REUSEADDR
-#error "WARNING: SO_REUSEADDR != SOF_REUSEADDR"
-#endif
-#if SO_KEEPALIVE != SOF_KEEPALIVE
-#error "WARNING: SO_KEEPALIVE != SOF_KEEPALIVE"
-#endif
-#if SO_BROADCAST != SOF_BROADCAST
-#error "WARNING: SO_BROADCAST != SOF_BROADCAST"
-#endif
 #endif /* LWIP_SOCKET */
 
 

@@ -53,9 +53,12 @@
 
 #include <string.h>
 
-#define ALTCP_TCP_ASSERT_CONN(conn) LWIP_ASSERT("conn->inner_conn == NULL", (conn)->inner_conn == NULL)
+#define ALTCP_TCP_ASSERT_CONN(conn) do { \
+  LWIP_ASSERT("conn->inner_conn == NULL", (conn)->inner_conn == NULL); \
+  LWIP_UNUSED_ARG(conn); /* for LWIP_NOASSERT */ } while(0)
 #define ALTCP_TCP_ASSERT_CONN_PCB(conn, tpcb) do { \
   LWIP_ASSERT("pcb mismatch", (conn)->state == tpcb); \
+  LWIP_UNUSED_ARG(tpcb); /* for LWIP_NOASSERT */ \
   ALTCP_TCP_ASSERT_CONN(conn); } while(0)
 
 
@@ -185,18 +188,31 @@ altcp_tcp_setup(struct altcp_pcb *conn, struct tcp_pcb *tpcb)
 struct altcp_pcb *
 altcp_tcp_new_ip_type(u8_t ip_type)
 {
-  struct altcp_pcb *ret = altcp_alloc();
-  if (ret != NULL) {
-    struct tcp_pcb *tpcb = tcp_new_ip_type(ip_type);
-    if (tpcb != NULL) {
+  /* Allocate the tcp pcb first to invoke the priority handling code
+     if we're out of pcbs */
+  struct tcp_pcb *tpcb = tcp_new_ip_type(ip_type);
+  if (tpcb != NULL) {
+    struct altcp_pcb *ret = altcp_alloc();
+    if (ret != NULL) {
       altcp_tcp_setup(ret, tpcb);
+      return ret;
     } else {
-      /* tcp_pcb allocation failed -> free the altcp_pcb too */
-      altcp_free(ret);
-      ret = NULL;
+      /* altcp_pcb allocation failed -> free the tcp_pcb too */
+      tcp_close(tpcb);
     }
   }
-  return ret;
+  return NULL;
+}
+
+/** altcp_tcp allocator function fitting to @ref altcp_allocator_t / @ref altcp_new.
+*
+* arg pointer is not used for TCP.
+*/
+struct altcp_pcb *
+altcp_tcp_alloc(void *arg, u8_t ip_type)
+{
+  LWIP_UNUSED_ARG(arg);
+  return altcp_tcp_new_ip_type(ip_type);
 }
 
 struct altcp_pcb *

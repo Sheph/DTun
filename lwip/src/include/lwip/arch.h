@@ -37,8 +37,6 @@
 #ifndef LWIP_HDR_ARCH_H
 #define LWIP_HDR_ARCH_H
 
-#include "arch/cc.h"
-
 #ifndef LITTLE_ENDIAN
 #define LITTLE_ENDIAN 1234
 #endif
@@ -47,11 +45,15 @@
 #define BIG_ENDIAN 4321
 #endif
 
+#include "arch/cc.h"
+
 /**
  * @defgroup compiler_abstraction Compiler/platform abstraction
  * @ingroup sys_layer
  * All defines related to this section must not be placed in lwipopts.h,
  * but in arch/cc.h!
+ * If the compiler does not provide memset() this file must include a
+ * definition of it, or include a file which defines it.
  * These options cannot be \#defined in lwipopts.h since they are not options
  * of lwIP itself, but options of the lwIP port to your system.
  * @{
@@ -201,6 +203,38 @@ typedef int ssize_t;
 #define SSIZE_MAX INT_MAX
 #endif /* SSIZE_MAX */
 
+/* some maximum values needed in lwip code */
+#define LWIP_UINT32_MAX 0xffffffff
+
+/** Define this to 1 in arch/cc.h of your port if your compiler does not provide
+ * the ctype.h header. If ctype.h is available, a few character functions
+ * are mapped to the appropriate functions (lwip_islower, lwip_isdigit...), if
+ * not, a private implementation is provided.
+ */
+#ifndef LWIP_NO_CTYPE_H
+#define LWIP_NO_CTYPE_H 0
+#endif
+
+#if LWIP_NO_CTYPE_H
+#define lwip_in_range(c, lo, up)  ((u8_t)(c) >= (lo) && (u8_t)(c) <= (up))
+#define lwip_isdigit(c)           lwip_in_range((c), '0', '9')
+#define lwip_isxdigit(c)          (lwip_isdigit(c) || lwip_in_range((c), 'a', 'f') || lwip_in_range((c), 'A', 'F'))
+#define lwip_islower(c)           lwip_in_range((c), 'a', 'z')
+#define lwip_isspace(c)           ((c) == ' ' || (c) == '\f' || (c) == '\n' || (c) == '\r' || (c) == '\t' || (c) == '\v')
+#define lwip_isupper(c)           lwip_in_range((c), 'A', 'Z')
+#define lwip_tolower(c)           (lwip_isupper(c) ? (c) - 'A' + 'a' : c)
+#define lwip_toupper(c)           (lwip_islower(c) ? (c) - 'a' + 'A' : c)
+#else
+#include <ctype.h>
+#define lwip_isdigit(c)           isdigit((unsigned char)(c))
+#define lwip_isxdigit(c)          isxdigit((unsigned char)(c))
+#define lwip_islower(c)           islower((unsigned char)(c))
+#define lwip_isspace(c)           isspace((unsigned char)(c))
+#define lwip_isupper(c)           isupper((unsigned char)(c))
+#define lwip_tolower(c)           tolower((unsigned char)(c))
+#define lwip_toupper(c)           toupper((unsigned char)(c))
+#endif
+
 /** C++ const_cast<target_type>(val) equivalent to remove constness from a value (GCC -Wcast-qual) */
 #ifndef LWIP_CONST_CAST
 #define LWIP_CONST_CAST(target_type, val) ((target_type)((ptrdiff_t)val))
@@ -216,6 +250,11 @@ typedef int ssize_t;
  */
 #ifndef LWIP_PTR_NUMERIC_CAST
 #define LWIP_PTR_NUMERIC_CAST(target_type, val) LWIP_CONST_CAST(target_type, val)
+#endif
+
+/** Avoid warnings/errors related to implicitly casting away packed attributes by doing a explicit cast */
+#ifndef LWIP_PACKED_CAST
+#define LWIP_PACKED_CAST(target_type, val) LWIP_CONST_CAST(target_type, val)
 #endif
 
 /** Allocates a memory buffer of specified size that is of sufficient size to align
