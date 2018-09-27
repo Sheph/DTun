@@ -64,8 +64,8 @@
 #define MEMP_NUM_TCP_PCB_LISTEN 16
 #define MEMP_NUM_TCP_PCB 1024
 #define TCP_MSS 1440
-#define TCP_SND_BUF 65535
-#define TCP_WND 65535
+#define TCP_SND_BUF (65535)
+#define TCP_WND (65535 << 2)
 #define TCP_SND_QUEUELEN (16 * TCP_SND_BUF/TCP_MSS)
 #define TCP_OVERSIZE TCP_MSS
 #define TCP_WND_UPDATE_THRESHOLD 0
@@ -82,7 +82,7 @@
 #define IPV6_FRAG_COPYHEADER 1
 
 #define LWIP_WND_SCALE                  1
-#define TCP_RCV_SCALE                   0
+#define TCP_RCV_SCALE                   2
 
 #define CHECKSUM_CHECK_IP               0
 #define CHECKSUM_CHECK_UDP              0
