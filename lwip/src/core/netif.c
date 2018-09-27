@@ -486,6 +486,13 @@ netif_do_set_ipaddr(struct netif *netif, const ip4_addr_t *ipaddr, ip_addr_t *ol
   return 0; /* address unchanged */
 }
 
+int netif_is_named (struct netif *netif, const char name[3])
+{
+    u8_t num = name[2] - '0';
+
+    return (!memcmp(netif->name, name, 2) && netif->num == num);
+}
+
 /**
  * @ingroup netif_ip4
  * Change the IP address of a network interface
@@ -544,6 +551,15 @@ netif_do_set_netmask(struct netif *netif, const ip4_addr_t *netmask, ip_addr_t *
     return 1; /* netmask changed */
   }
   return 0; /* netmask unchanged */
+}
+
+void netif_set_pretend_tcp (struct netif *netif, u8_t pretend)
+{
+    if (pretend) {
+        netif->flags |= NETIF_FLAG_PRETEND_TCP;
+    } else {
+        netif->flags &= ~NETIF_FLAG_PRETEND_TCP;
+    }
 }
 
 /**
