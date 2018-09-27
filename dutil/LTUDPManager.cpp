@@ -489,7 +489,7 @@ namespace DTun
                 iphdr->src.addr = srcIp;
                 iphdr->dest.addr = ip_addr_get_ip4_u32(&netif_.ip_addr);
                 IPH_CHKSUM_SET(iphdr, 0);
-                IPH_CHKSUM_SET(iphdr, inet_chksum(iphdr, sizeof(struct ip_hdr)));
+                //IPH_CHKSUM_SET(iphdr, inet_chksum(iphdr, sizeof(struct ip_hdr)));
 
                 if (connInfo->isAcceptor) {
                     boost::mutex::scoped_lock lock(m_);
@@ -567,7 +567,7 @@ namespace DTun
                 ip_addr_set_ip4_u32(&dstAddr, iphdr->dest.addr);
 
                 pbuf_header(p, -(s16_t)sizeof(struct ip_hdr));
-                uint16_t chksum = ip_chksum_pseudo(p, IP_PROTO_TCP, p->tot_len, &srcAddr, &dstAddr);
+                uint16_t chksum = 0; // ip_chksum_pseudo(p, IP_PROTO_TCP, p->tot_len, &srcAddr, &dstAddr);
                 tcphdr = (struct tcp_hdr*)p->payload;
                 tcphdr->chksum = chksum;
                 pbuf_header(p, sizeof(struct ip_hdr));

@@ -64,9 +64,10 @@
 #define MEMP_NUM_TCP_PCB_LISTEN 16
 #define MEMP_NUM_TCP_PCB 1024
 #define TCP_MSS 1440
-#define TCP_SND_BUF 16384
-#define TCP_SND_QUEUELEN (4 * (TCP_SND_BUF)/(TCP_MSS))
-// TODO: Make proper fix, I don't understand WHY it works, but it works.
+#define TCP_SND_BUF 65535
+#define TCP_WND 65535
+#define TCP_SND_QUEUELEN (16 * TCP_SND_BUF/TCP_MSS)
+#define TCP_OVERSIZE TCP_MSS
 #define TCP_WND_UPDATE_THRESHOLD 0
 
 #define MEM_LIBC_MALLOC 1
@@ -79,6 +80,15 @@
 // needed on 64-bit systems, enable it always so that the same configuration
 // is used regardless of the platform
 #define IPV6_FRAG_COPYHEADER 1
+
+#define LWIP_WND_SCALE                  1
+#define TCP_RCV_SCALE                   0
+
+#define CHECKSUM_CHECK_IP               0
+#define CHECKSUM_CHECK_UDP              0
+#define CHECKSUM_CHECK_TCP              0
+#define CHECKSUM_CHECK_ICMP             0
+#define CHECKSUM_CHECK_ICMP6            0
 
 /*
 #define LWIP_DEBUG 1
