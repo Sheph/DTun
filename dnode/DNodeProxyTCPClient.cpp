@@ -134,6 +134,15 @@ namespace DNode
         {
             LOG4CPLUS_TRACE(logger(), "ProxyTCPClient::onConnectionRegister(" << err << ", " << DTun::ipPortToString(remoteIp, remotePort) << ")");
 
+            if (!err) {
+                DTun::UInt32 ip;
+                DTun::UInt16 port;
+
+                handle->getSockName(ip, port);
+
+                LOG4CPLUS_INFO(logger(), "LOCAL PORT = " << ntohs(port) << ", PEER = " << DTun::ipPortToString(remoteIp, remotePort));
+            }
+
             boost::mutex::scoped_lock lock(m_);
             if (!reactorSignal_) {
                 return;
