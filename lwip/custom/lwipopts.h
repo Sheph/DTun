@@ -61,17 +61,19 @@
 #define LWIP_IPV6_MLD 0
 #define LWIP_IPV6_AUTOCONFIG 0
 
+#define PBUF_POOL_SIZE 1024
 #define MEMP_NUM_TCP_PCB_LISTEN 16
 #define MEMP_NUM_TCP_PCB 1024
 #define TCP_MSS 1440
-#define TCP_SND_BUF 16384
-#define TCP_SND_QUEUELEN (4 * (TCP_SND_BUF)/(TCP_MSS))
+#define TCP_WND 65535
+#define TCP_SND_BUF 65535
+#define TCP_SND_QUEUELEN (16 * TCP_SND_BUF/TCP_MSS)
 // TODO: Make proper fix, I don't understand WHY it works, but it works.
 #define TCP_WND_UPDATE_THRESHOLD 0
 
 #define MEM_LIBC_MALLOC 1
 #define MEMP_MEM_MALLOC 0
-#define MEMP_NUM_TCP_SEG 46
+#define MEMP_NUM_TCP_SEG 1024
 
 #define LWIP_PERF 0
 #define SYS_LIGHTWEIGHT_PROT 0
