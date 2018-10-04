@@ -28,6 +28,11 @@ namespace DNode
     bool ProxySession::start(const boost::shared_ptr<DTun::SHandle>& remoteHandle, DTun::UInt32 localIp, DTun::UInt16 localPort,
         DTun::UInt32 remoteIp, DTun::UInt16 remotePort, const DoneCallback& callback)
     {
+        DTun::UInt32 ip;
+        DTun::UInt16 port;
+        remoteHandle->getSockName(ip, port);
+        LOG4CPLUS_INFO(logger(), "LOCAL PORT = " << ntohs(port) << ", PEER = " << DTun::ipPortToString(remoteIp, remotePort));
+
         boost::mutex::scoped_lock lock(m_);
 
         remoteConnector_ = remoteHandle->createConnector();
