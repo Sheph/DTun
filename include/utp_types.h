@@ -120,4 +120,15 @@ typedef char * str;
 typedef uint8 bool;
 #endif
 
+typedef uint8 in_port_utp[16];
+
+#define	AF_INET_UTP 45
+
+struct sockaddr_in_utp
+{
+    sa_family_t sin_family;
+    in_port_utp sin_port;
+    struct in_addr sin_addr;
+};
+
 #endif //__UTP_TYPES_H__

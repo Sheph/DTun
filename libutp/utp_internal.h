@@ -60,7 +60,6 @@ enum bandwidth_type_t {
 
 struct PACKED_ATTRIBUTE RST_Info {
     PackedSockAddr addr;
-    uint32 connid;
     uint16 ack_nr;
     uint64 timestamp;
 };

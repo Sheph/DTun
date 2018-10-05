@@ -24,7 +24,7 @@ namespace DTun
 
         virtual void writeTo(const char* first, const char* last, UInt32 destIp, UInt16 destPort, const WriteCallback& callback) = 0;
 
-        virtual void readFrom(char* first, char* last, const ReadFromCallback& callback) = 0;
+        virtual void readFrom(char* first, char* last, const ReadFromCallback& callback, bool drain = false) = 0;
     };
 }
 

@@ -34,6 +34,7 @@ const char * utp_callback_names[] = {
     "UTP_ON_CONNECT",
     "UTP_ON_ERROR",
     "UTP_ON_READ",
+    "UTP_ON_SENT",
     "UTP_ON_OVERHEAD_STATISTICS",
     "UTP_ON_STATE_CHANGE",
     "UTP_GET_READ_BUFFER_SIZE",
@@ -48,6 +49,7 @@ const char * utp_callback_names[] = {
 };
 
 const char * utp_error_code_names[] = {
+    "UTP_ENONE",
     "UTP_ECONNREFUSED",
     "UTP_ECONNRESET",
     "UTP_ETIMEDOUT",

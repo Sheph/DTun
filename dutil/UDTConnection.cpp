@@ -60,7 +60,7 @@ namespace DTun
         LOG4CPLUS_FATAL(logger(), "writeTo not supported!");
     }
 
-    void UDTConnection::readFrom(char* first, char* last, const ReadFromCallback& callback)
+    void UDTConnection::readFrom(char* first, char* last, const ReadFromCallback& callback, bool drain)
     {
         assert(false);
         LOG4CPLUS_FATAL(logger(), "readFrom not supported!");

@@ -9,7 +9,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "")
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build, options are: None (CMAKE_CXX_FLAGS or CMAKE_C_FLAGS used) Debug Release RelWithDebInfo MinSizeRel." FORCE)
 endif ()
 
-option(UTP_DEBUG "UTP Debug" TRUE)
+set(UTP_DEBUG TRUE)
 
 #out dir
 
@@ -98,6 +98,12 @@ set (COMMON_HEADERS
     ${DTUN_INCLUDE_DIR}/DTun/LTUDPHandle.h
     ${DTUN_INCLUDE_DIR}/DTun/LTUDPHandleImpl.h
     ${DTUN_INCLUDE_DIR}/DTun/LTUDPManager.h
+    ${DTUN_INCLUDE_DIR}/DTun/UTPAcceptor.h
+    ${DTUN_INCLUDE_DIR}/DTun/UTPConnection.h
+    ${DTUN_INCLUDE_DIR}/DTun/UTPConnector.h
+    ${DTUN_INCLUDE_DIR}/DTun/UTPHandle.h
+    ${DTUN_INCLUDE_DIR}/DTun/UTPHandleImpl.h
+    ${DTUN_INCLUDE_DIR}/DTun/UTPManager.h
     ${DTUN_INCLUDE_DIR}/DTun/OpWatch.h
     ${DTUN_INCLUDE_DIR}/DTun/Utils.h
 )

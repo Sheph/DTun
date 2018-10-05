@@ -35,7 +35,7 @@ struct PACKED_ATTRIBUTE PackedSockAddr {
     } _in;
 
     // Host byte order
-    uint16 _port;
+    in_port_utp _port;
 
     #define _sin4 _in._in6d[3]	// IPv4 is stored where it goes if mapped
 
@@ -51,7 +51,7 @@ struct PACKED_ATTRIBUTE PackedSockAddr {
     PackedSockAddr(const SOCKADDR_STORAGE* sa, socklen_t len);
     PackedSockAddr(void);
 
-    SOCKADDR_STORAGE get_sockaddr_storage(socklen_t *len) const;
+    struct sockaddr_in_utp get_sockaddr_storage(socklen_t *len) const;
     cstr fmt(str s, size_t len) const;
 
     uint32 compute_hash() const;

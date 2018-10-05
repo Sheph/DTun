@@ -1,18 +1,18 @@
-#ifndef _DTUN_LTUDPCONNECTION_H_
-#define _DTUN_LTUDPCONNECTION_H_
+#ifndef _DTUN_UTPCONNECTION_H_
+#define _DTUN_UTPCONNECTION_H_
 
 #include "DTun/SConnection.h"
-#include "DTun/LTUDPHandle.h"
+#include "DTun/UTPHandle.h"
 #include "DTun/OpWatch.h"
 #include <list>
 
 namespace DTun
 {
-    class DTUN_API LTUDPConnection : public SConnection
+    class DTUN_API UTPConnection : public SConnection
     {
     public:
-        explicit LTUDPConnection(const boost::shared_ptr<LTUDPHandle>& handle);
-        ~LTUDPConnection();
+        explicit UTPConnection(const boost::shared_ptr<UTPHandle>& handle);
+        ~UTPConnection();
 
         virtual boost::shared_ptr<SHandle> handle() const { return handle_; }
 
@@ -53,7 +53,7 @@ namespace DTun
 
         void onHandleRead();
 
-        boost::shared_ptr<LTUDPHandle> handle_;
+        boost::shared_ptr<UTPHandle> handle_;
         boost::shared_ptr<OpWatch> watch_;
         std::list<WriteReq> writeQueue_;
         std::list<ReadReq> readQueue_;
