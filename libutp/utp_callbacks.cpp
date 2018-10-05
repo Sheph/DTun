@@ -24,13 +24,13 @@
 
 #include "utp_callbacks.h"
 
-int utp_call_on_firewall(utp_context *ctx, const struct sockaddr *address, socklen_t address_len)
+int utp_call_on_firewall(utp_context *ctx, utp_socket *socket, const struct sockaddr *address, socklen_t address_len)
 {
     utp_callback_arguments args;
     if (!ctx->callbacks[UTP_ON_FIREWALL]) return 0;
     args.callback_type = UTP_ON_FIREWALL;
     args.context = ctx;
-    args.socket = NULL;
+    args.socket = socket;
     args.address = address;
     args.address_len = address_len;
     return (int)ctx->callbacks[UTP_ON_FIREWALL](&args);
@@ -79,6 +79,17 @@ void utp_call_on_read(utp_context *ctx, utp_socket *socket, const byte *buf, siz
     args.buf = buf;
     args.len = len;
     ctx->callbacks[UTP_ON_READ](&args);
+}
+
+void utp_call_on_sent(utp_context *ctx, utp_socket *socket, size_t len)
+{
+    utp_callback_arguments args;
+    if (!ctx->callbacks[UTP_ON_SENT]) return;
+    args.callback_type = UTP_ON_SENT;
+    args.context = ctx;
+    args.socket = socket;
+    args.len = len;
+    ctx->callbacks[UTP_ON_SENT](&args);
 }
 
 void utp_call_on_overhead_statistics(utp_context *ctx, utp_socket *socket, int send, size_t len, int type)

@@ -28,6 +28,7 @@
 #include <errno.h>
 #include <limits.h> // for UINT_MAX
 #include <time.h>
+#include <list>
 
 #include "utp_types.h"
 #include "utp_packedsockaddr.h"
@@ -547,6 +548,7 @@ struct UTPSocket {
     int32 clock_drift_raw;
 
     SizableCircularBuffer inbuf, outbuf;
+    std::list<int> outbuf_sizes;
 
     #ifdef _DEBUG
     // Public per-socket statistics, returned by utp_get_stats()
@@ -626,14 +628,14 @@ struct UTPSocket {
     size_t get_udp_mtu()
     {
         socklen_t len;
-        SOCKADDR_STORAGE sa = addr.get_sockaddr_storage(&len);
+        struct sockaddr_in_utp sa = addr.get_sockaddr_storage(&len);
         return utp_call_get_udp_mtu(this->ctx, this, (const struct sockaddr *)&sa, len);
     }
 
     size_t get_udp_overhead()
     {
         socklen_t len;
-        SOCKADDR_STORAGE sa = addr.get_sockaddr_storage(&len);
+        struct sockaddr_in_utp sa = addr.get_sockaddr_storage(&len);
         return utp_call_get_udp_overhead(this->ctx, this, (const struct sockaddr *)&sa, len);
     }
 
@@ -648,9 +650,9 @@ struct UTPSocket {
 
     void send_keep_alive();
 
-    static void send_rst(utp_context *ctx,
+    /*static void send_rst(utp_context *ctx,
                          const PackedSockAddr &addr, uint32 conn_id_send,
-                         uint16 ack_nr, uint16 seq_nr);
+                         uint16 ack_nr, uint16 seq_nr);*/
 
     void send_packet(OutgoingPacket *pkt);
 
@@ -704,12 +706,12 @@ static void utp_register_sent_packet(utp_context *ctx, size_t length)
     }
 }
 
-void send_to_addr(utp_context *ctx, const byte *p, size_t len, const PackedSockAddr &addr, int flags = 0)
+void send_to_addr(utp_context *ctx, utp_socket* s, const byte *p, size_t len, const PackedSockAddr &addr, int flags = 0)
 {
     socklen_t tolen;
-    SOCKADDR_STORAGE to = addr.get_sockaddr_storage(&tolen);
+    struct sockaddr_in_utp to = addr.get_sockaddr_storage(&tolen);
     utp_register_sent_packet(ctx, len);
-    utp_call_sendto(ctx, NULL, p, len, (const struct sockaddr *)&to, tolen, flags);
+    utp_call_sendto(ctx, s, p, len, (const struct sockaddr *)&to, tolen, flags);
 }
 
 void UTPSocket::schedule_ack()
@@ -764,7 +766,7 @@ void UTPSocket::send_data(byte* b, size_t length, bandwidth_type_t type, uint32 
         addrfmt(addr, addrbuf), (uint)length, conn_id_send, time, reply_micro, flagnames[flags2],
         seq_nr, ack_nr);
 #endif
-    send_to_addr(ctx, b, length, addr, flags);
+    send_to_addr(ctx, this, b, length, addr, flags);
     removeSocketFromAckList(this);
 }
 
@@ -843,7 +845,7 @@ void UTPSocket::send_keep_alive()
     ack_nr++;
 }
 
-void UTPSocket::send_rst(utp_context *ctx,
+/*void UTPSocket::send_rst(utp_context *ctx,
     const PackedSockAddr &addr, uint32 conn_id_send, uint16 ack_nr, uint16 seq_nr)
 {
     PacketFormatV1 pf1;
@@ -861,8 +863,8 @@ void UTPSocket::send_rst(utp_context *ctx,
 
 //	LOG_DEBUG("%s: Sending RST id:%u seq_nr:%u ack_nr:%u", addrfmt(addr, addrbuf), conn_id_send, seq_nr, ack_nr);
 //	LOG_DEBUG("send %s len:%u id:%u", addrfmt(addr, addrbuf), (uint)len, conn_id_send);
-    send_to_addr(ctx, (const byte*)&pf1, len, addr);
-}
+    send_to_addr(ctx, this, (const byte*)&pf1, len, addr);
+}*/
 
 void UTPSocket::send_packet(OutgoingPacket *pkt)
 {
@@ -1089,6 +1091,7 @@ void UTPSocket::write_outgoing_packet(size_t payload, uint flags, struct utp_iov
             p1->seq_nr = seq_nr;
             seq_nr++;
             cur_window_packets++;
+            outbuf_sizes.push_back(pkt->payload);
         }
 
         payload -= added;
@@ -1182,7 +1185,10 @@ void UTPSocket::check_timeouts()
             // A malicious client can also spoof the destination address of a ST_SYN bringing us to this state.
             // Kill the connection and do not notify the upper layer
             if (state == CS_SYN_RECV) {
-                state = CS_DESTROY;
+                if (close_requested)
+                    state = CS_DESTROY;
+                else
+                    state = CS_RESET;
                 utp_call_on_error(ctx, this, UTP_ETIMEDOUT);
                 return;
             }
@@ -2139,6 +2145,8 @@ size_t utp_process_incoming(UTPSocket *conn, const byte *packet, size_t len, boo
     if (actual_delay != 0 && acked_bytes >= 1)
         conn->apply_ccontrol(acked_bytes, actual_delay, min_rtt);
 
+    int bytes_to_report = 0;
+
     // sanity check, the other end should never ack packets
     // past the point we've sent
     if (acks <= conn->cur_window_packets) {
@@ -2208,6 +2216,9 @@ size_t utp_process_incoming(UTPSocket *conn, const byte *packet, size_t len, boo
                 break;
             }
             conn->cur_window_packets--;
+            assert(!conn->outbuf_sizes.empty());
+            bytes_to_report += conn->outbuf_sizes.front();
+            conn->outbuf_sizes.pop_front();
 
             #if UTP_DEBUG_LOGGING
             conn->log(UTP_LOG_DEBUG, "decementing cur_window_packets:%u", conn->cur_window_packets);
@@ -2228,6 +2239,9 @@ size_t utp_process_incoming(UTPSocket *conn, const byte *packet, size_t len, boo
         // has the EACK send bug older versions of uTP had
         while (conn->cur_window_packets > 0 && !conn->outbuf.get(conn->seq_nr - conn->cur_window_packets)) {
             conn->cur_window_packets--;
+            assert(!conn->outbuf_sizes.empty());
+            bytes_to_report += conn->outbuf_sizes.front();
+            conn->outbuf_sizes.pop_front();
 
             #if UTP_DEBUG_LOGGING
             conn->log(UTP_LOG_DEBUG, "decementing cur_window_packets:%u", conn->cur_window_packets);
@@ -2296,6 +2310,11 @@ size_t utp_process_incoming(UTPSocket *conn, const byte *packet, size_t len, boo
     conn->log(UTP_LOG_DEBUG, "acks:%d acked_bytes:%u seq_nr:%u cur_window:%u cur_window_packets:%u ",
         acks, (uint)acked_bytes, conn->seq_nr, (uint)conn->cur_window, conn->cur_window_packets);
     #endif
+
+    if ((conn->state == CS_CONNECTED ||
+        conn->state == CS_CONNECTED_FULL) && (bytes_to_report > 0)) {
+        utp_call_on_sent(conn->ctx, conn, bytes_to_report);
+    }
 
     // In case the ack dropped the current window below
     // the max_window size, Mark the socket as writable
@@ -2483,22 +2502,24 @@ inline byte UTP_Version(PacketFormatV1 const* pf)
 
 UTPSocket::~UTPSocket()
 {
-    #if UTP_DEBUG_LOGGING
-    log(UTP_LOG_DEBUG, "Killing socket");
-    #endif
+    if (state != CS_UNINITIALIZED) {
+        #if UTP_DEBUG_LOGGING
+        log(UTP_LOG_DEBUG, "Killing socket");
+        #endif
 
-    utp_call_on_state_change(ctx, this, UTP_STATE_DESTROYING);
+        utp_call_on_state_change(ctx, this, UTP_STATE_DESTROYING);
 
-    if (ctx->last_utp_socket == this) {
-        ctx->last_utp_socket = NULL;
+        if (ctx->last_utp_socket == this) {
+            ctx->last_utp_socket = NULL;
+        }
+
+        // Remove object from the global hash table
+        UTPSocketKeyData* kd = ctx->utp_sockets->Delete(UTPSocketKey(addr, conn_id_recv));
+        assert(kd);
+
+        // remove the socket from ack_sockets if it was there also
+        removeSocketFromAckList(this);
     }
-
-    // Remove object from the global hash table
-    UTPSocketKeyData* kd = ctx->utp_sockets->Delete(UTPSocketKey(addr, conn_id_recv));
-    assert(kd);
-
-    // remove the socket from ack_sockets if it was there also
-    removeSocketFromAckList(this);
 
     // Free all memory occupied by the socket object.
     for (size_t i = 0; i <= inbuf.mask; i++) {
@@ -2601,6 +2622,10 @@ utp_socket*	utp_create_socket(utp_context *ctx)
     conn->cur_window			= 0;
     conn->eof_pkt				= 0;
     conn->last_maxed_out_window	= 0;
+    conn->mtu_discover_time     = 0;
+    conn->mtu_ceiling           = 0;
+    conn->mtu_floor             = 0;
+    conn->mtu_last              = 0;
     conn->mtu_probe_seq			= 0;
     conn->mtu_probe_size		= 0;
     conn->current_delay_sum		= 0;
@@ -2798,6 +2823,7 @@ int utp_connect(utp_socket *conn, const struct sockaddr *to, socklen_t tolen)
     conn->outbuf.put(conn->seq_nr, pkt);
     conn->seq_nr++;
     conn->cur_window_packets++;
+    conn->outbuf_sizes.push_back(0);
 
     #if UTP_DEBUG_LOGGING
     conn->log(UTP_LOG_DEBUG, "incrementing cur_window_packets:%u", conn->cur_window_packets);
@@ -2944,7 +2970,7 @@ int utp_process_udp(utp_context *ctx, const byte *buffer, size_t len, const stru
         r.ack_nr = seq_nr;
         r.timestamp = ctx->current_ms;
 
-        UTPSocket::send_rst(ctx, addr, id, seq_nr, utp_call_get_random(ctx, NULL));
+        //UTPSocket::send_rst(ctx, addr, id, seq_nr, utp_call_get_random(ctx, NULL));
         return 1;
     }
 
@@ -2973,7 +2999,8 @@ int utp_process_udp(utp_context *ctx, const byte *buffer, size_t len, const stru
             return 1;
         }
         // true means yes, block connection.  false means no, don't block.
-        if (utp_call_on_firewall(ctx, to, tolen)) {
+        UTPSocket* tmp_sock = utp_create_socket(ctx);
+        if (utp_call_on_firewall(ctx, tmp_sock, to, tolen)) {
 
             #if UTP_DEBUG_LOGGING
             ctx->log(UTP_LOG_DEBUG, NULL, "rejected incoming connection, firewall callback returned true");
@@ -2989,6 +3016,10 @@ int utp_process_udp(utp_context *ctx, const byte *buffer, size_t len, const stru
         conn->seq_nr = utp_call_get_random(ctx, NULL);
         conn->fast_resend_seq_nr = conn->seq_nr;
         conn->state = CS_SYN_RECV;
+        conn->rto_timeout = conn->ctx->current_ms + 3000;
+        conn->userdata = tmp_sock->userdata;
+
+        utp_close(tmp_sock);
 
         const size_t read = utp_process_incoming(conn, buffer, len, true);
 
@@ -3327,7 +3358,7 @@ int utp_getpeername(utp_socket *conn, struct sockaddr *addr, socklen_t *addrlen)
     if (conn->state == CS_UNINITIALIZED) return -1;
 
     socklen_t len;
-    const SOCKADDR_STORAGE sa = conn->addr.get_sockaddr_storage(&len);
+    struct sockaddr_in_utp sa = conn->addr.get_sockaddr_storage(&len);
     *addrlen = min(len, *addrlen);
     memcpy(addr, &sa, *addrlen);
     return 0;
@@ -3360,8 +3391,12 @@ void utp_close(UTPSocket *conn)
     assert(conn);
     if (!conn) return;
 
-    assert(conn->state != CS_UNINITIALIZED
-        && conn->state != CS_DESTROY);
+    if (conn->state == CS_UNINITIALIZED) {
+        delete conn;
+        return;
+    }
+
+    assert(conn->state != CS_DESTROY);
 
     #if UTP_DEBUG_LOGGING
     conn->log(UTP_LOG_DEBUG, "UTP_Close in state:%s", statenames[conn->state]);
@@ -3393,6 +3428,13 @@ void utp_close(UTPSocket *conn)
     #if UTP_DEBUG_LOGGING
     conn->log(UTP_LOG_DEBUG, "UTP_Close end in state:%s", statenames[conn->state]);
     #endif
+}
+
+void utp_socket_issue_deferred_acks(UTPSocket *conn)
+{
+    if (conn->ida >= 0) {
+        conn->send_ack();
+    }
 }
 
 void utp_shutdown(UTPSocket *conn, int how)
@@ -3450,9 +3492,14 @@ void struct_utp_context::log(int level, utp_socket *socket, char const *fmt, ...
     }
 
     va_list va;
+    char buf[4096];
+
     va_start(va, fmt);
-    log_unchecked(socket, fmt, va);
+    vsnprintf(buf, 4096, fmt, va);
+    buf[4095] = '\0';
     va_end(va);
+
+    utp_call_log(this, socket, (const byte *)buf);
 }
 
 void struct_utp_context::log_unchecked(utp_socket *socket, char const *fmt, ...)

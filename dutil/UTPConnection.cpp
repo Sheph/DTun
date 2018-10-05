@@ -1,58 +1,58 @@
-#include "DTun/LTUDPConnection.h"
-#include "DTun/LTUDPManager.h"
+#include "DTun/UTPConnection.h"
+#include "DTun/UTPManager.h"
 #include "Logger.h"
 #include <boost/make_shared.hpp>
 #include <boost/bind.hpp>
 
 namespace DTun
 {
-    LTUDPConnection::LTUDPConnection(const boost::shared_ptr<LTUDPHandle>& handle)
+    UTPConnection::UTPConnection(const boost::shared_ptr<UTPHandle>& handle)
     : handle_(handle)
     , watch_(boost::make_shared<OpWatch>(boost::ref(handle->reactor())))
     {
         handle_->impl()->setWriteCallback(
-            watch_->wrap<int, int>(boost::bind(&LTUDPConnection::onHandleWrite, this, _1, _2)));
+            watch_->wrap<int, int>(boost::bind(&UTPConnection::onHandleWrite, this, _1, _2)));
         handle_->impl()->setReadCallback(
-            watch_->wrap(boost::bind(&LTUDPConnection::onHandleRead, this)));
+            watch_->wrap(boost::bind(&UTPConnection::onHandleRead, this)));
     }
 
-    LTUDPConnection::~LTUDPConnection()
+    UTPConnection::~UTPConnection()
     {
         close();
     }
 
-    void LTUDPConnection::close(bool immediate)
+    void UTPConnection::close(bool immediate)
     {
         if (watch_->close()) {
             handle_->close(immediate);
         }
     }
 
-    void LTUDPConnection::write(const char* first, const char* last, const WriteCallback& callback)
+    void UTPConnection::write(const char* first, const char* last, const WriteCallback& callback)
     {
         handle_->reactor().post(watch_->wrap(
-            boost::bind(&LTUDPConnection::onWrite, this, first, last, callback)));
+            boost::bind(&UTPConnection::onWrite, this, first, last, callback)));
     }
 
-    void LTUDPConnection::read(char* first, char* last, const ReadCallback& callback, bool readAll)
+    void UTPConnection::read(char* first, char* last, const ReadCallback& callback, bool readAll)
     {
         handle_->reactor().post(watch_->wrap(
-            boost::bind(&LTUDPConnection::onRead, this, first, last, callback, readAll)));
+            boost::bind(&UTPConnection::onRead, this, first, last, callback, readAll)));
     }
 
-    void LTUDPConnection::writeTo(const char* first, const char* last, UInt32 destIp, UInt16 destPort, const WriteCallback& callback)
+    void UTPConnection::writeTo(const char* first, const char* last, UInt32 destIp, UInt16 destPort, const WriteCallback& callback)
     {
         assert(false);
         LOG4CPLUS_FATAL(logger(), "writeTo not supported!");
     }
 
-    void LTUDPConnection::readFrom(char* first, char* last, const ReadFromCallback& callback, bool drain)
+    void UTPConnection::readFrom(char* first, char* last, const ReadFromCallback& callback, bool drain)
     {
         assert(false);
         LOG4CPLUS_FATAL(logger(), "readFrom not supported!");
     }
 
-    void LTUDPConnection::onWrite(const char* first, const char* last, const WriteCallback& callback)
+    void UTPConnection::onWrite(const char* first, const char* last, const WriteCallback& callback)
     {
         WriteReq req;
 
@@ -68,7 +68,7 @@ namespace DTun
         }
     }
 
-    void LTUDPConnection::onRead(char* first, char* last, const ReadCallback& callback, bool readAll)
+    void UTPConnection::onRead(char* first, char* last, const ReadCallback& callback, bool readAll)
     {
         ReadReq req;
 
@@ -85,11 +85,11 @@ namespace DTun
         }
     }
 
-    void LTUDPConnection::onHandleWrite(int err, int numBytes)
+    void UTPConnection::onHandleWrite(int err, int numBytes)
     {
         // capture 'handle_', always check it first because
         // 'cb' might have deleted 'this'.
-        boost::shared_ptr<LTUDPHandle> handle = handle_;
+        boost::shared_ptr<UTPHandle> handle = handle_;
 
         if (err) {
             writeOutQueue_.clear();
@@ -151,11 +151,11 @@ namespace DTun
         }
     }
 
-    void LTUDPConnection::onHandleRead()
+    void UTPConnection::onHandleRead()
     {
         // capture 'handle_', always check it first because
         // 'cb' might have deleted 'this'.
-        boost::shared_ptr<LTUDPHandle> handle = handle_;
+        boost::shared_ptr<UTPHandle> handle = handle_;
 
         while (handle->impl() && !readQueue_.empty()) {
             ReadReq* req = &readQueue_.front();

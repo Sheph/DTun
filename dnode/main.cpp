@@ -6,6 +6,7 @@
 #include "DTun/UDTManager.h"
 #include "DTun/SysManager.h"
 #include "DTun/LTUDPManager.h"
+#include "DTun/UTPManager.h"
 #include "DTun/Utils.h"
 #include "DTun/StreamAppConfig.h"
 #include <boost/thread.hpp>
@@ -49,6 +50,7 @@ int main(int argc, char* argv[])
     std::string logLevel = "TRACE";
     std::string appConfigFile = "config.ini";
     bool ltudp = false;
+    bool utp = false;
 
     try {
         boost::program_options::options_description desc("Options");
@@ -56,7 +58,8 @@ int main(int argc, char* argv[])
         desc.add_options()
             ("log4cplus_level", boost::program_options::value<std::string>(&logLevel), "Log level")
             ("app_config", boost::program_options::value<std::string>(&appConfigFile), "App config")
-            ("ltudp", "LTUDP");
+            ("ltudp", "LTUDP")
+            ("utp", "UTP");
 
         boost::program_options::store(boost::program_options::command_line_parser(
             argc, argv).options(desc).allow_unregistered().run(), vm);
@@ -64,6 +67,7 @@ int main(int argc, char* argv[])
         boost::program_options::notify(vm);
 
         ltudp = (vm.count("ltudp") > 0);
+        utp = (vm.count("utp") > 0);
     } catch (const boost::program_options::error& e) {
         std::cerr << "Invalid command line arguments: " << e.what() << std::endl;
         return 1;
@@ -106,7 +110,7 @@ int main(int argc, char* argv[])
 
         boost::scoped_ptr<DTun::UDTReactor> udtReactor;
 
-        if (!ltudp) {
+        if (!ltudp && !utp) {
             udtReactor.reset(new DTun::UDTReactor());
 
             if (!udtReactor->start()) {
@@ -134,6 +138,13 @@ int main(int argc, char* argv[])
                 if (!ltudpMgr->start()) {
                     return 1;
                 }
+            } else if (utp) {
+                DTun::UTPManager* utpMgr;
+                innerRemoteMgr.reset(new DTun::SysManager(sysReactor));
+                remoteMgr.reset(utpMgr = new DTun::UTPManager(*innerRemoteMgr));
+                if (!utpMgr->start()) {
+                    return 1;
+                }
             } else {
                 remoteMgr.reset(new DTun::UDTManager(*udtReactor));
             }
@@ -146,7 +157,7 @@ int main(int argc, char* argv[])
                 return 1;
             }
 
-            if (!ltudp) {
+            if (!ltudp && !utp) {
                 udtReactorThread.reset(new boost::thread(
                     boost::bind(&udtReactorThreadFn, boost::ref(*udtReactor))));
             }
@@ -166,11 +177,11 @@ int main(int argc, char* argv[])
             DNode::theRemoteMgr = NULL;
         }
 
-        if (!ltudp) {
+        if (!ltudp && !utp) {
             udtReactor->stop();
         }
         sysReactor.stop();
-        if (!ltudp) {
+        if (!ltudp && !utp) {
             udtReactorThread->join();
         }
         sysReactorThread->join();

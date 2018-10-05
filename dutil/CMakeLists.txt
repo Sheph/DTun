@@ -22,10 +22,16 @@ set(SOURCES
     LTUDPHandle.cpp
     LTUDPHandleImpl.cpp
     LTUDPManager.cpp
+    UTPAcceptor.cpp
+    UTPConnection.cpp
+    UTPConnector.cpp
+    UTPHandle.cpp
+    UTPHandleImpl.cpp
+    UTPManager.cpp
     OpWatch.cpp
     Utils.cpp
 )
 
 add_library(dutil SHARED ${SOURCES})
 
-target_link_libraries(dutil PRIVATE lwip udt PUBLIC ${LOG4CPLUS_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${Boost_SYSTEM_LIBRARY} ${Boost_THREAD_LIBRARY} ${Boost_CHRONO_LIBRARY} ${Boost_PROGRAM_OPTIONS_LIBRARY} rt)
+target_link_libraries(dutil PRIVATE lwip udt utp PUBLIC ${LOG4CPLUS_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${Boost_SYSTEM_LIBRARY} ${Boost_THREAD_LIBRARY} ${Boost_CHRONO_LIBRARY} ${Boost_PROGRAM_OPTIONS_LIBRARY} rt)

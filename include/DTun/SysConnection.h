@@ -20,7 +20,7 @@ namespace DTun
 
         virtual void writeTo(const char* first, const char* last, UInt32 destIp, UInt16 destPort, const WriteCallback& callback);
 
-        virtual void readFrom(char* first, char* last, const ReadFromCallback& callback);
+        virtual void readFrom(char* first, char* last, const ReadFromCallback& callback, bool drain = false);
 
         virtual void close(bool immediate = false);
 
@@ -45,10 +45,11 @@ namespace DTun
             char* last;
             ReadCallback callback;
             ReadFromCallback fromCallback;
+            bool drain;
         };
 
         void handleReadNormal(ReadReq* req);
-        void handleReadFrom(ReadReq* req);
+        bool handleReadFrom(ReadReq* req);
 
         mutable boost::mutex m_;
         std::list<WriteReq> writeQueue_;

@@ -57,7 +57,8 @@ extern const char *utp_state_names[];
 
 // Errors codes that can be passed to UTP_ON_ERROR callback
 enum {
-    UTP_ECONNREFUSED = 0,
+    UTP_ENONE = 0,
+    UTP_ECONNREFUSED,
     UTP_ECONNRESET,
     UTP_ETIMEDOUT,
 };
@@ -71,6 +72,7 @@ enum {
     UTP_ON_CONNECT,
     UTP_ON_ERROR,
     UTP_ON_READ,
+    UTP_ON_SENT,
     UTP_ON_OVERHEAD_STATISTICS,
     UTP_ON_STATE_CHANGE,
     UTP_GET_READ_BUFFER_SIZE,
@@ -175,6 +177,7 @@ utp_socket_stats* utp_get_stats					(utp_socket *s);
 utp_context*	utp_get_context					(utp_socket *s);
 void			utp_shutdown					(utp_socket *s, int how);
 void			utp_close						(utp_socket *s);
+void			utp_socket_issue_deferred_acks	(utp_socket *s);
 
 #ifdef __cplusplus
 }

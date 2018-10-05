@@ -52,6 +52,7 @@ namespace DTun
         req.first = first;
         req.last = last;
         req.callback = callback;
+        req.drain = false;
 
         {
             boost::mutex::scoped_lock lock(m_);
@@ -79,13 +80,14 @@ namespace DTun
         reactor().update(this);
     }
 
-    void SysConnection::readFrom(char* first, char* last, const ReadFromCallback& callback)
+    void SysConnection::readFrom(char* first, char* last, const ReadFromCallback& callback, bool drain)
     {
         ReadReq req;
 
         req.first = first;
         req.last = last;
         req.fromCallback = callback;
+        req.drain = drain;
 
         {
             boost::mutex::scoped_lock lock(m_);
@@ -130,8 +132,30 @@ namespace DTun
 
         if (req->callback) {
             handleReadNormal(req);
-        } else {
+        } else if (!req->drain) {
             handleReadFrom(req);
+        } else {
+            // capture 'handle', always check it first because
+            // 'cb' might have deleted 'this'.
+            boost::shared_ptr<SysHandle> handle = sysHandle();
+
+            // read until UDP socket is drained or error occurs or
+            // no outstanding read requests.
+
+            while (true) {
+                if (!handleReadFrom(req)) {
+                    break;
+                }
+                if (handle->sock() == SYS_INVALID_SOCKET) {
+                    break;
+                }
+
+                boost::mutex::scoped_lock lock(m_);
+                if (readQueue_.empty()) {
+                    break;
+                }
+                req = &readQueue_.front();
+            }
         }
     }
 
@@ -230,7 +254,7 @@ namespace DTun
         }
     }
 
-    void SysConnection::handleReadFrom(ReadReq* req)
+    bool SysConnection::handleReadFrom(ReadReq* req)
     {
         ReadFromCallback cb;
 
@@ -238,8 +262,24 @@ namespace DTun
         socklen_t saLen = sizeof(sa);
 
         int res;
-        if ((res = ::recvfrom(sysHandle()->sock(), req->first, req->last - req->first, 0, (struct sockaddr*)&sa, &saLen)) == -1) {
+        if ((res = ::recvfrom(sysHandle()->sock(), req->first, req->last - req->first, (req->drain ? MSG_DONTWAIT : 0), (struct sockaddr*)&sa, &saLen)) == -1) {
             int err = errno;
+
+            if (req->drain && (err == EAGAIN || err == EWOULDBLOCK)) {
+                cb = req->fromCallback;
+
+                {
+                    boost::mutex::scoped_lock lock(m_);
+                    readQueue_.pop_front();
+                }
+
+                reactor().update(this);
+
+                cb(0, 0, 0, 0);
+
+                return false;
+            }
+
             LOG4CPLUS_TRACE(logger(), "Cannot readFrom sys socket: " << strerror(err));
 
             cb = req->fromCallback;
@@ -252,7 +292,7 @@ namespace DTun
             reactor().update(this);
 
             cb(err, 0, 0, 0);
-            return;
+            return false;
         }
 
         cb = req->fromCallback;
@@ -264,8 +304,8 @@ namespace DTun
 
         reactor().update(this);
 
-        if (cb) {
-            cb(0, res, sa.sin_addr.s_addr, sa.sin_port);
-        }
+        cb(0, res, sa.sin_addr.s_addr, sa.sin_port);
+
+        return true;
     }
 }
