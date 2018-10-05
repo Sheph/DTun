@@ -9,6 +9,8 @@ if (CMAKE_BUILD_TYPE STREQUAL "")
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build, options are: None (CMAKE_CXX_FLAGS or CMAKE_C_FLAGS used) Debug Release RelWithDebInfo MinSizeRel." FORCE)
 endif ()
 
+option(UTP_DEBUG "UTP Debug" TRUE)
+
 #out dir
 
 set(DTUN_OUT_DIR ${DTUN_BINARY_DIR}/out)
@@ -55,9 +57,15 @@ add_definitions(-DBADVPN_USE_EPOLL)
 add_definitions(-DBADVPN_BREACTOR_BADVPN)
 add_definitions(-DBADVPN_USE_SIGNALFD)
 add_definitions(-D_GNU_SOURCE)
+if (UTP_DEBUG)
+    add_definitions(-D_DEBUG)
+    add_definitions(-DUTP_DEBUG_LOGGING)
+endif ()
 
 set (COMMON_HEADERS
     ${DTUN_INCLUDE_DIR}/udt.h
+    ${DTUN_INCLUDE_DIR}/utp.h
+    ${DTUN_INCLUDE_DIR}/utp_types.h
     ${DTUN_INCLUDE_DIR}/DTun/AppConfig.h
     ${DTUN_INCLUDE_DIR}/DTun/DProtocol.h
     ${DTUN_INCLUDE_DIR}/DTun/SAcceptor.h
@@ -100,6 +108,7 @@ include_directories(
 )
 
 add_subdirectory(udt)
+add_subdirectory(libutp)
 add_subdirectory(dutil)
 add_subdirectory(lwip)
 add_subdirectory(dnode)
