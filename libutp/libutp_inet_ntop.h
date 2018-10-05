@@ -29,7 +29,7 @@
 // Defined in:
 // ut_utils/src/sockaddr.cpp
 // libutp/win32_inet_ntop.obj
-// 
+//
 // When we drop support for XP we can just #include <ws2tcpip.h>, and use the system functions
 // For now, we will always use our functions on windows, on all builds
 // The reason is: we would like the debug build to behave as much as the release build as possible

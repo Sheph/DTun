@@ -75,16 +75,16 @@ typedef uint (*utp_hash_equal_t)(const void *key_a, const void *key_b, size_t ke
 // N is the number of buckets.
 //
 struct utp_hash_t {
-	utp_link_t N;
-	byte K;
-	byte E;
-	size_t count;
-	utp_hash_compute_t hash_compute;
-	utp_hash_equal_t hash_equal;
-	utp_link_t allocated;
-	utp_link_t used;
-	utp_link_t free;
-	utp_link_t inits[0];
+    utp_link_t N;
+    byte K;
+    byte E;
+    size_t count;
+    utp_hash_compute_t hash_compute;
+    utp_hash_equal_t hash_equal;
+    utp_link_t allocated;
+    utp_link_t used;
+    utp_link_t free;
+    utp_link_t inits[0];
 };
 
 #ifdef _MSC_VER
@@ -92,10 +92,10 @@ struct utp_hash_t {
 #endif
 
 struct utp_hash_iterator_t {
-	utp_link_t bucket;
-	utp_link_t elem;
+    utp_link_t bucket;
+    utp_link_t elem;
 
-	utp_hash_iterator_t() : bucket(0xffffffff), elem(0xffffffff) {}
+    utp_hash_iterator_t() : bucket(0xffffffff), elem(0xffffffff) {}
 };
 
 uint utp_hash_mem(const void *keyp, size_t keysize);
@@ -110,37 +110,37 @@ void *utp_hash_iterate(utp_hash_t *hash, utp_hash_iterator_t *iter);
 void utp_hash_free_mem(utp_hash_t *hash);
 
 /*
-	This HashTable requires that T have at least sizeof(K)+sizeof(utp_link_t) bytes.
-	Usually done like this:
+    This HashTable requires that T have at least sizeof(K)+sizeof(utp_link_t) bytes.
+    Usually done like this:
 
-	struct K {
-		int whatever;
-	};
+    struct K {
+        int whatever;
+    };
 
-	struct T {
-		K wtf;
-		utp_link_t link; // also wtf
-	};
+    struct T {
+        K wtf;
+        utp_link_t link; // also wtf
+    };
 */
 
 template<typename K, typename T> class utpHashTable {
-	utp_hash_t *hash;
+    utp_hash_t *hash;
 public:
-	static uint compare(const void *k1, const void *k2, size_t ks) {
-		return *((K*)k1) == *((K*)k2);
-	}
-	static uint32 compute_hash(const void *k, size_t ks) {
-		return ((K*)k)->compute_hash();
-	}
-	void Init() { hash = NULL; }
-	bool Allocated() { return (hash != NULL); }
-	void Free() { utp_hash_free_mem(hash); hash = NULL; }
-	void Create(int N, int initial) { hash = utp_hash_create(N, sizeof(K), sizeof(T), initial, &compute_hash, &compare); }
-	T *Lookup(const K &key) { return (T*)utp_hash_lookup(hash, &key); }
-	T *Add(const K &key) { return (T*)utp_hash_add(&hash, &key); }
-	T *Delete(const K &key) { return (T*)utp_hash_del(hash, &key); }
-	T *Iterate(utp_hash_iterator_t &iterator) { return (T*)utp_hash_iterate(hash, &iterator); }
-	size_t GetCount() { return hash->count; }
+    static uint compare(const void *k1, const void *k2, size_t ks) {
+        return *((K*)k1) == *((K*)k2);
+    }
+    static uint32 compute_hash(const void *k, size_t ks) {
+        return ((K*)k)->compute_hash();
+    }
+    void Init() { hash = NULL; }
+    bool Allocated() { return (hash != NULL); }
+    void Free() { utp_hash_free_mem(hash); hash = NULL; }
+    void Create(int N, int initial) { hash = utp_hash_create(N, sizeof(K), sizeof(T), initial, &compute_hash, &compare); }
+    T *Lookup(const K &key) { return (T*)utp_hash_lookup(hash, &key); }
+    T *Add(const K &key) { return (T*)utp_hash_add(&hash, &key); }
+    T *Delete(const K &key) { return (T*)utp_hash_del(hash, &key); }
+    T *Iterate(utp_hash_iterator_t &iterator) { return (T*)utp_hash_iterate(hash, &iterator); }
+    size_t GetCount() { return hash->count; }
 };
 
 #endif //__UTP_HASH_H__

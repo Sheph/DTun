@@ -34,116 +34,116 @@ typedef struct UTPSocket					utp_socket;
 typedef struct struct_utp_context			utp_context;
 
 enum {
-	UTP_UDP_DONTFRAG = 2,	// Used to be a #define as UDP_IP_DONTFRAG
+    UTP_UDP_DONTFRAG = 2,	// Used to be a #define as UDP_IP_DONTFRAG
 };
 
 enum {
-	// socket has reveived syn-ack (notification only for outgoing connection completion)
-	// this implies writability
-	UTP_STATE_CONNECT = 1,
+    // socket has reveived syn-ack (notification only for outgoing connection completion)
+    // this implies writability
+    UTP_STATE_CONNECT = 1,
 
-	// socket is able to send more data
-	UTP_STATE_WRITABLE = 2,
+    // socket is able to send more data
+    UTP_STATE_WRITABLE = 2,
 
-	// connection closed
-	UTP_STATE_EOF = 3,
+    // connection closed
+    UTP_STATE_EOF = 3,
 
-	// socket is being destroyed, meaning all data has been sent if possible.
-	// it is not valid to refer to the socket after this state change occurs
-	UTP_STATE_DESTROYING = 4,
+    // socket is being destroyed, meaning all data has been sent if possible.
+    // it is not valid to refer to the socket after this state change occurs
+    UTP_STATE_DESTROYING = 4,
 };
 
 extern const char *utp_state_names[];
 
 // Errors codes that can be passed to UTP_ON_ERROR callback
 enum {
-	UTP_ECONNREFUSED = 0,
-	UTP_ECONNRESET,
-	UTP_ETIMEDOUT,
+    UTP_ECONNREFUSED = 0,
+    UTP_ECONNRESET,
+    UTP_ETIMEDOUT,
 };
 
 extern const char *utp_error_code_names[];
 
 enum {
-	// callback names
-	UTP_ON_FIREWALL = 0,
-	UTP_ON_ACCEPT,
-	UTP_ON_CONNECT,
-	UTP_ON_ERROR,
-	UTP_ON_READ,
-	UTP_ON_OVERHEAD_STATISTICS,
-	UTP_ON_STATE_CHANGE,
-	UTP_GET_READ_BUFFER_SIZE,
-	UTP_ON_DELAY_SAMPLE,
-	UTP_GET_UDP_MTU,
-	UTP_GET_UDP_OVERHEAD,
-	UTP_GET_MILLISECONDS,
-	UTP_GET_MICROSECONDS,
-	UTP_GET_RANDOM,
-	UTP_LOG,
-	UTP_SENDTO,
+    // callback names
+    UTP_ON_FIREWALL = 0,
+    UTP_ON_ACCEPT,
+    UTP_ON_CONNECT,
+    UTP_ON_ERROR,
+    UTP_ON_READ,
+    UTP_ON_OVERHEAD_STATISTICS,
+    UTP_ON_STATE_CHANGE,
+    UTP_GET_READ_BUFFER_SIZE,
+    UTP_ON_DELAY_SAMPLE,
+    UTP_GET_UDP_MTU,
+    UTP_GET_UDP_OVERHEAD,
+    UTP_GET_MILLISECONDS,
+    UTP_GET_MICROSECONDS,
+    UTP_GET_RANDOM,
+    UTP_LOG,
+    UTP_SENDTO,
 
-	// context and socket options that may be set/queried
+    // context and socket options that may be set/queried
     UTP_LOG_NORMAL,
     UTP_LOG_MTU,
     UTP_LOG_DEBUG,
-	UTP_SNDBUF,
-	UTP_RCVBUF,
-	UTP_TARGET_DELAY,
+    UTP_SNDBUF,
+    UTP_RCVBUF,
+    UTP_TARGET_DELAY,
 
-	UTP_ARRAY_SIZE,	// must be last
+    UTP_ARRAY_SIZE,	// must be last
 };
 
 extern const char *utp_callback_names[];
 
 typedef struct {
-	utp_context *context;
-	utp_socket *socket;
-	size_t len;
-	uint32 flags;
-	int callback_type;
-	const byte *buf;
+    utp_context *context;
+    utp_socket *socket;
+    size_t len;
+    uint32 flags;
+    int callback_type;
+    const byte *buf;
 
-	union {
-		const struct sockaddr *address;
-		int send;
-		int sample_ms;
-		int error_code;
-		int state;
-	};
+    union {
+        const struct sockaddr *address;
+        int send;
+        int sample_ms;
+        int error_code;
+        int state;
+    };
 
-	union {
-		socklen_t address_len;
-		int type;
-	};
+    union {
+        socklen_t address_len;
+        int type;
+    };
 } utp_callback_arguments;
 
 typedef uint64 utp_callback_t(utp_callback_arguments *);
 
 // Returned by utp_get_context_stats()
 typedef struct {
-	uint32 _nraw_recv[5];	// total packets recieved less than 300/600/1200/MTU bytes fpr all connections (context-wide)
-	uint32 _nraw_send[5];	// total packets sent     less than 300/600/1200/MTU bytes for all connections (context-wide)
+    uint32 _nraw_recv[5];	// total packets recieved less than 300/600/1200/MTU bytes fpr all connections (context-wide)
+    uint32 _nraw_send[5];	// total packets sent     less than 300/600/1200/MTU bytes for all connections (context-wide)
 } utp_context_stats;
 
 // Returned by utp_get_stats()
 typedef struct {
-	uint64 nbytes_recv;	// total bytes received
-	uint64 nbytes_xmit;	// total bytes transmitted
-	uint32 rexmit;		// retransmit counter
-	uint32 fastrexmit;	// fast retransmit counter
-	uint32 nxmit;		// transmit counter
-	uint32 nrecv;		// receive counter (total)
-	uint32 nduprecv;	// duplicate receive counter
-	uint32 mtu_guess;	// Best guess at MTU
+    uint64 nbytes_recv;	// total bytes received
+    uint64 nbytes_xmit;	// total bytes transmitted
+    uint32 rexmit;		// retransmit counter
+    uint32 fastrexmit;	// fast retransmit counter
+    uint32 nxmit;		// transmit counter
+    uint32 nrecv;		// receive counter (total)
+    uint32 nduprecv;	// duplicate receive counter
+    uint32 mtu_guess;	// Best guess at MTU
 } utp_socket_stats;
 
 #define UTP_IOV_MAX 1024
 
 // For utp_writev, to writes data from multiple buffers
 struct utp_iovec {
-	void *iov_base;
-	size_t iov_len;
+    void *iov_base;
+    size_t iov_len;
 };
 
 // Public Functions

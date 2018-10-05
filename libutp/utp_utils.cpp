@@ -26,17 +26,17 @@
 #include "utp_types.h"
 
 #ifdef WIN32
-	#define WIN32_LEAN_AND_MEAN
-	#include <windows.h>
-	#include <winsock2.h>
-	#include <ws2tcpip.h>
+    #define WIN32_LEAN_AND_MEAN
+    #include <windows.h>
+    #include <winsock2.h>
+    #include <ws2tcpip.h>
 #else //!WIN32
-	#include <time.h>
-	#include <sys/time.h>		// Linux needs both time.h and sys/time.h
+    #include <time.h>
+    #include <sys/time.h>		// Linux needs both time.h and sys/time.h
 #endif
 
 #if defined(__APPLE__)
-	#include <mach/mach_time.h>
+    #include <mach/mach_time.h>
 #endif
 
 #include "utp_utils.h"
@@ -54,63 +54,63 @@ static double counterPerMicrosecond;
 
 static uint64 UTGetTickCount64()
 {
-	if (pt2GetTickCount64) {
-		return pt2GetTickCount64();
-	}
-	if (pt2RealGetTickCount) {
-		uint64 v = pt2RealGetTickCount();
-		// fix return value from GetTickCount
-		return (DWORD)v | ((v >> 0x18) & 0xFFFFFFFF00000000);
-	}
-	return (uint64)GetTickCount();
+    if (pt2GetTickCount64) {
+        return pt2GetTickCount64();
+    }
+    if (pt2RealGetTickCount) {
+        uint64 v = pt2RealGetTickCount();
+        // fix return value from GetTickCount
+        return (DWORD)v | ((v >> 0x18) & 0xFFFFFFFF00000000);
+    }
+    return (uint64)GetTickCount();
 }
 
 static void Time_Initialize()
 {
-	HMODULE kernel32 = GetModuleHandleA("kernel32.dll");
-	pt2GetTickCount64 = (GetTickCount64Proc*)GetProcAddress(kernel32, "GetTickCount64");
-	// not a typo. GetTickCount actually returns 64 bits
-	pt2RealGetTickCount = (GetTickCount64Proc*)GetProcAddress(kernel32, "GetTickCount");
+    HMODULE kernel32 = GetModuleHandleA("kernel32.dll");
+    pt2GetTickCount64 = (GetTickCount64Proc*)GetProcAddress(kernel32, "GetTickCount64");
+    // not a typo. GetTickCount actually returns 64 bits
+    pt2RealGetTickCount = (GetTickCount64Proc*)GetProcAddress(kernel32, "GetTickCount");
 
-	uint64 frequency;
-	QueryPerformanceCounter((LARGE_INTEGER*)&startPerformanceCounter);
-	QueryPerformanceFrequency((LARGE_INTEGER*)&frequency);
-	counterPerMicrosecond = (double)frequency / 1000000.0f;
-	startGetTickCount = UTGetTickCount64();
+    uint64 frequency;
+    QueryPerformanceCounter((LARGE_INTEGER*)&startPerformanceCounter);
+    QueryPerformanceFrequency((LARGE_INTEGER*)&frequency);
+    counterPerMicrosecond = (double)frequency / 1000000.0f;
+    startGetTickCount = UTGetTickCount64();
 }
 
 static int64 abs64(int64 x) { return x < 0 ? -x : x; }
 
 static uint64 __GetMicroseconds()
 {
-	static bool time_init = false;
-	if (!time_init) {
-		time_init = true;
-		Time_Initialize();
-	}
+    static bool time_init = false;
+    if (!time_init) {
+        time_init = true;
+        Time_Initialize();
+    }
 
-	uint64 counter;
-	uint64 tick;
+    uint64 counter;
+    uint64 tick;
 
-	QueryPerformanceCounter((LARGE_INTEGER*) &counter);
-	tick = UTGetTickCount64();
+    QueryPerformanceCounter((LARGE_INTEGER*) &counter);
+    tick = UTGetTickCount64();
 
-	// unfortunately, QueryPerformanceCounter is not guaranteed
-	// to be monotonic. Make it so.
-	int64 ret = (int64)(((int64)counter - (int64)startPerformanceCounter) / counterPerMicrosecond);
-	// if the QPC clock leaps more than one second off GetTickCount64()
-	// something is seriously fishy. Adjust QPC to stay monotonic
-	int64 tick_diff = tick - startGetTickCount;
-	if (abs64(ret / 100000 - tick_diff / 100) > 10) {
-		startPerformanceCounter -= (uint64)((int64)(tick_diff * 1000 - ret) * counterPerMicrosecond);
-		ret = (int64)((counter - startPerformanceCounter) / counterPerMicrosecond);
-	}
-	return ret;
+    // unfortunately, QueryPerformanceCounter is not guaranteed
+    // to be monotonic. Make it so.
+    int64 ret = (int64)(((int64)counter - (int64)startPerformanceCounter) / counterPerMicrosecond);
+    // if the QPC clock leaps more than one second off GetTickCount64()
+    // something is seriously fishy. Adjust QPC to stay monotonic
+    int64 tick_diff = tick - startGetTickCount;
+    if (abs64(ret / 100000 - tick_diff / 100) > 10) {
+        startPerformanceCounter -= (uint64)((int64)(tick_diff * 1000 - ret) * counterPerMicrosecond);
+        ret = (int64)((counter - startPerformanceCounter) / counterPerMicrosecond);
+    }
+    return ret;
 }
 
 static inline uint64 UTP_GetMilliseconds()
 {
-	return GetTickCount();
+    return GetTickCount();
 }
 
 #else //!WIN32
@@ -118,27 +118,27 @@ static inline uint64 UTP_GetMilliseconds()
 static inline uint64 UTP_GetMicroseconds(void);
 static inline uint64 UTP_GetMilliseconds()
 {
-	return UTP_GetMicroseconds() / 1000;
+    return UTP_GetMicroseconds() / 1000;
 }
 
 #if defined(__APPLE__)
 
 static uint64 __GetMicroseconds()
 {
-	// http://developer.apple.com/mac/library/qa/qa2004/qa1398.html
-	// http://www.macresearch.org/tutorial_performance_and_time
-	static mach_timebase_info_data_t sTimebaseInfo;
-	static uint64_t start_tick = 0;
-	uint64_t tick;
-	// Returns a counter in some fraction of a nanoseconds
-	tick = mach_absolute_time();
-	if (sTimebaseInfo.denom == 0) {
-		// Get the timer ratio to convert mach_absolute_time to nanoseconds
-		mach_timebase_info(&sTimebaseInfo);
-		start_tick = tick;
-	}
-	// Calculate the elapsed time, convert it to microseconds and return it.
-	return ((tick - start_tick) * sTimebaseInfo.numer) / (sTimebaseInfo.denom * 1000);
+    // http://developer.apple.com/mac/library/qa/qa2004/qa1398.html
+    // http://www.macresearch.org/tutorial_performance_and_time
+    static mach_timebase_info_data_t sTimebaseInfo;
+    static uint64_t start_tick = 0;
+    uint64_t tick;
+    // Returns a counter in some fraction of a nanoseconds
+    tick = mach_absolute_time();
+    if (sTimebaseInfo.denom == 0) {
+        // Get the timer ratio to convert mach_absolute_time to nanoseconds
+        mach_timebase_info(&sTimebaseInfo);
+        start_tick = tick;
+    }
+    // Calculate the elapsed time, convert it to microseconds and return it.
+    return ((tick - start_tick) * sTimebaseInfo.numer) / (sTimebaseInfo.denom * 1000);
 }
 
 #else // !__APPLE__
@@ -153,31 +153,31 @@ static uint64 __GetMicroseconds()
 
 static uint64_t __GetMicroseconds()
 {
-	struct timeval tv;
+    struct timeval tv;
 
-	#if defined(_POSIX_TIMERS) && _POSIX_TIMERS > 0 && defined(CLOCK_MONOTONIC)
-		static int have_posix_clocks = -1;
-		int rc;
+    #if defined(_POSIX_TIMERS) && _POSIX_TIMERS > 0 && defined(CLOCK_MONOTONIC)
+        static int have_posix_clocks = -1;
+        int rc;
 
-		if (have_posix_clocks < 0) {
-			struct timespec ts;
-			rc = clock_gettime(CLOCK_MONOTONIC, &ts);
-			if (rc < 0) {
-				have_posix_clocks = 0;
-			} else {
-				have_posix_clocks = 1;
-			}
-		}
+        if (have_posix_clocks < 0) {
+            struct timespec ts;
+            rc = clock_gettime(CLOCK_MONOTONIC, &ts);
+            if (rc < 0) {
+                have_posix_clocks = 0;
+            } else {
+                have_posix_clocks = 1;
+            }
+        }
 
-		if (have_posix_clocks) {
-			struct timespec ts;
-			rc = clock_gettime(CLOCK_MONOTONIC, &ts);
-			return uint64(ts.tv_sec) * 1000000 + uint64(ts.tv_nsec) / 1000;
-		}
-	#endif
+        if (have_posix_clocks) {
+            struct timespec ts;
+            rc = clock_gettime(CLOCK_MONOTONIC, &ts);
+            return uint64(ts.tv_sec) * 1000000 + uint64(ts.tv_nsec) / 1000;
+        }
+    #endif
 
-	gettimeofday(&tv, NULL);
-	return uint64(tv.tv_sec) * 1000000 + tv.tv_usec;
+    gettimeofday(&tv, NULL);
+    return uint64(tv.tv_sec) * 1000000 + tv.tv_usec;
 }
 
 #endif //!__APPLE__
@@ -187,7 +187,7 @@ static uint64_t __GetMicroseconds()
 /*
  * Whew.  Okay.  After that #ifdef maze above, we now know we have a working
  * __GetMicroseconds() implementation on all platforms.
- * 
+ *
  * Because there are a number of assertions in libutp that will cause a crash
  * if monotonic time isn't monotonic, now apply some safety checks.  While in
  * principle we're already protecting ourselves in cases where non-monotonic
@@ -196,16 +196,16 @@ static uint64_t __GetMicroseconds()
 
 static inline uint64 UTP_GetMicroseconds()
 {
-	static uint64 offset = 0, previous = 0;
+    static uint64 offset = 0, previous = 0;
 
-	uint64 now = __GetMicroseconds() + offset;
-	if (previous > now) {
-		/* Eek! */
-		offset += previous - now;
-		now = previous;
-	}
-	previous = now;
-	return now;
+    uint64 now = __GetMicroseconds() + offset;
+    if (previous > now) {
+        /* Eek! */
+        offset += previous - now;
+        now = previous;
+    }
+    previous = now;
+    return now;
 }
 
 #define ETHERNET_MTU 1500
@@ -230,25 +230,25 @@ static inline uint64 UTP_GetMicroseconds()
 #define UDP_TEREDO_MTU (TEREDO_MTU - IPV6_HEADER_SIZE - UDP_HEADER_SIZE)
 
 uint64 utp_default_get_udp_mtu(utp_callback_arguments *args) {
-	// Since we don't know the local address of the interface,
-	// be conservative and assume all IPv6 connections are Teredo.
-	return (args->address->sa_family == AF_INET6) ? UDP_TEREDO_MTU : UDP_IPV4_MTU;
+    // Since we don't know the local address of the interface,
+    // be conservative and assume all IPv6 connections are Teredo.
+    return (args->address->sa_family == AF_INET6) ? UDP_TEREDO_MTU : UDP_IPV4_MTU;
 }
 
 uint64 utp_default_get_udp_overhead(utp_callback_arguments *args) {
-	// Since we don't know the local address of the interface,
-	// be conservative and assume all IPv6 connections are Teredo.
-	return (args->address->sa_family == AF_INET6) ? UDP_TEREDO_OVERHEAD : UDP_IPV4_OVERHEAD;
+    // Since we don't know the local address of the interface,
+    // be conservative and assume all IPv6 connections are Teredo.
+    return (args->address->sa_family == AF_INET6) ? UDP_TEREDO_OVERHEAD : UDP_IPV4_OVERHEAD;
 }
 
 uint64 utp_default_get_random(utp_callback_arguments *args) {
-	return rand();
+    return rand();
 }
 
 uint64 utp_default_get_milliseconds(utp_callback_arguments *args) {
-	return UTP_GetMilliseconds();
+    return UTP_GetMilliseconds();
 }
 
 uint64 utp_default_get_microseconds(utp_callback_arguments *args) {
-	return UTP_GetMicroseconds();
+    return UTP_GetMicroseconds();
 }
