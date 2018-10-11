@@ -1028,6 +1028,8 @@ void UTPSocket::write_outgoing_packet(size_t payload, uint flags, struct utp_iov
             outbuf.put(seq_nr - 1, pkt);
             append = false;
             assert(!pkt->need_resend);
+            assert(!outbuf_sizes.empty());
+            outbuf_sizes.back() = pkt->payload + added;
         } else {
             // Create the packet to send.
             added = payload;

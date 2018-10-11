@@ -338,6 +338,7 @@ namespace DTun
         LOG4CPLUS_TRACE(logger(), "UTP onSent(" << numBytes << ")");
 
         if (connectCallback_) {
+            assert(numBytes == 1);
             SConnector::ConnectCallback cb = connectCallback_;
             connectCallback_ = SConnector::ConnectCallback();
             cb(0);
