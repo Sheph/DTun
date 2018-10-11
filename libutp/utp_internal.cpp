@@ -99,15 +99,15 @@ char addrbuf[65];
 
 
 // these packet sizes are including the uTP header wich
-// is either 20 or 23 bytes depending on version
+// is either (20 + 16) or (23 + 16) bytes depending on version
 #define PACKET_SIZE_EMPTY_BUCKET 0
-#define PACKET_SIZE_EMPTY 23
+#define PACKET_SIZE_EMPTY (23 + 16)
 #define PACKET_SIZE_SMALL_BUCKET 1
-#define PACKET_SIZE_SMALL 373
+#define PACKET_SIZE_SMALL (373 + 16)
 #define PACKET_SIZE_MID_BUCKET 2
-#define PACKET_SIZE_MID 723
+#define PACKET_SIZE_MID (723 + 16)
 #define PACKET_SIZE_BIG_BUCKET 3
-#define PACKET_SIZE_BIG 1400
+#define PACKET_SIZE_BIG (1400 + 16)
 #define PACKET_SIZE_HUGE_BUCKET 4
 
 struct PACKED_ATTRIBUTE PacketFormatV1 {
@@ -3064,9 +3064,9 @@ static UTPSocket* parse_icmp_payload(utp_context *ctx, const byte *buffer, size_
     const PackedSockAddr addr((const SOCKADDR_STORAGE*)to, tolen);
 
     // ICMP packets are only required to quote the first 8 bytes of the layer4
-    // payload.  The UDP payload is 8 bytes, and the UTP header is another 20
+    // payload.  The UDP payload is 8 bytes, and the UTP header is another (20 + 16)
     // bytes.  So, in order to find the entire UTP header, we need the ICMP
-    // packet to quote 28 bytes.
+    // packet to quote (28 + 16) bytes.
     if (len < sizeof(PacketFormatV1)) {
         #if UTP_DEBUG_LOGGING
         ctx->log(UTP_LOG_DEBUG, NULL, "Ignoring ICMP from %s: runt length %d", addrfmt(addr, addrbuf), len);
