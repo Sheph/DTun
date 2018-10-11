@@ -111,6 +111,7 @@ char addrbuf[65];
 #define PACKET_SIZE_HUGE_BUCKET 4
 
 struct PACKED_ATTRIBUTE PacketFormatV1 {
+    in_port_utp __port__;
     // packet_type (4 high bits)
     // protocol version (4 low bits)
     byte ver_type;
@@ -2771,7 +2772,7 @@ int utp_connect(utp_socket *conn, const struct sockaddr *to, socklen_t tolen)
 
     assert(conn->cur_window_packets == 0);
     assert(conn->outbuf.get(conn->seq_nr) == NULL);
-    assert(sizeof(PacketFormatV1) == 20);
+    assert(sizeof(PacketFormatV1) == 36);
 
     conn->state = CS_SYN_SENT;
     conn->ctx->current_ms = utp_call_get_milliseconds(conn->ctx, conn);

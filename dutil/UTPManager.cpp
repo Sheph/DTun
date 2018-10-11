@@ -390,10 +390,10 @@ namespace DTun
         assert(actualPort != 0);
 
         boost::shared_ptr<std::vector<char> > sndBuff =
-            boost::make_shared<std::vector<char> >(sizeof(in_port_utp) + args->len);
+            boost::make_shared<std::vector<char> >(args->len);
 
+        memcpy(&(*sndBuff)[0], args->buf, args->len);
         memcpy(&(*sndBuff)[0], &addr->sin_port[0], sizeof(in_port_utp));
-        memcpy(&(*sndBuff)[0] + sizeof(in_port_utp), args->buf, args->len);
 
         conn->writeTo(&(*sndBuff)[0], &(*sndBuff)[0] + sndBuff->size(),
             addr->sin_addr.s_addr, actualPort,
@@ -605,7 +605,7 @@ namespace DTun
             memcpy(&addr.sin_port[0], &(*rcvBuff)[0], sizeof(in_port_utp));
 
             inRecv_ = true;
-            if (!utp_process_udp(ctx_, (const byte*)(&(*rcvBuff)[0] + sizeof(in_port_utp)), numBytes - sizeof(in_port_utp),
+            if (!utp_process_udp(ctx_, (const byte*)(&(*rcvBuff)[0]), numBytes,
                 (const struct sockaddr *)&addr, sizeof(addr))) {
                 inRecv_ = false;
                 LOG4CPLUS_WARN(logger(), "UDP packet not handled by UTP. Ignoring.");
