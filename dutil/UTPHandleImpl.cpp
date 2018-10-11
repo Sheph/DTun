@@ -265,6 +265,9 @@ namespace DTun
 
             if (utpSock_) {
                 utp_read_drained(utpSock_);
+                if (rcvBuff_.empty() && !mgr_.isInRecv()) {
+                    utp_socket_issue_deferred_acks(utpSock_);
+                }
             }
         }
 

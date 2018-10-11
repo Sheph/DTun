@@ -12,7 +12,8 @@
 #include <boost/circular_buffer.hpp>
 #include "utp.h"
 
-#define DTUN_RCV_BUFF_SIZE (1024 * 1024)
+#define DTUN_RCV_BUFF_SIZE (128 * 1024)
+#define DTUN_SND_BUFF_SIZE (128 * 1024)
 
 namespace DTun
 {

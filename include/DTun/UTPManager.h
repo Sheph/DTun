@@ -37,6 +37,8 @@ namespace DTun
 
         bool haveTransportConnection(UInt16 port) const;
 
+        inline bool isInRecv() const { return inRecv_; }
+
         utp_socket* bindAcceptor(UInt16 localPort, UTPHandleImpl* handle);
 
         utp_socket* bindConnector(UInt16 localPort, UTPHandleImpl* handle, UInt32 ip, UInt16 port);
@@ -121,6 +123,7 @@ namespace DTun
         int numAliveHandles_;
         ConnectionCache connCache_;
         HandleMap toKillHandles_;
+        bool inRecv_;
     };
 }
 

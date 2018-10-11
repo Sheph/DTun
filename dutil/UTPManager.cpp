@@ -99,6 +99,7 @@ namespace DTun
     : innerMgr_(mgr)
     , ctx_(NULL)
     , numAliveHandles_(0)
+    , inRecv_(false)
     {
     }
 
@@ -150,6 +151,7 @@ namespace DTun
         utp_context_set_userdata(ctx_, this);
 
         utp_context_set_option(ctx_, UTP_RCVBUF, DTUN_RCV_BUFF_SIZE);
+        utp_context_set_option(ctx_, UTP_SNDBUF, DTUN_SND_BUFF_SIZE);
 
         utp_set_callback(ctx_, UTP_LOG, &utpLogFunc);
         utp_set_callback(ctx_, UTP_SENDTO, &utpSendToFunc);
@@ -602,10 +604,13 @@ namespace DTun
             addr.sin_addr.s_addr = srcIp;
             memcpy(&addr.sin_port[0], &(*rcvBuff)[0], sizeof(in_port_utp));
 
+            inRecv_ = true;
             if (!utp_process_udp(ctx_, (const byte*)(&(*rcvBuff)[0] + sizeof(in_port_utp)), numBytes - sizeof(in_port_utp),
                 (const struct sockaddr *)&addr, sizeof(addr))) {
+                inRecv_ = false;
                 LOG4CPLUS_WARN(logger(), "UDP packet not handled by UTP. Ignoring.");
             }
+            inRecv_ = false;
         } else if (numBytes == 4) {
             uint8_t a = (*rcvBuff)[0];
             uint8_t b = (*rcvBuff)[1];
