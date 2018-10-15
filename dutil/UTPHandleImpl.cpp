@@ -10,7 +10,7 @@ namespace DTun
     : mgr_(mgr)
     , utpSock_(NULL)
     , eof_(false)
-    , rcvBuff_(DTUN_RCV_BUFF_SIZE)
+    , rcvBuff_(DTUN_RCV_BUFF_SIZE + 4096)
     , localPort_(0)
     , waitDummy_(false)
     {
@@ -21,7 +21,7 @@ namespace DTun
     : mgr_(mgr)
     , utpSock_(utpSock)
     , eof_(false)
-    , rcvBuff_(DTUN_RCV_BUFF_SIZE)
+    , rcvBuff_(DTUN_RCV_BUFF_SIZE + 4096)
     , conn_(conn)
     , waitDummy_(true)
     {
@@ -359,6 +359,7 @@ namespace DTun
 
         if (numBytes > (int)(rcvBuff_.capacity() - rcvBuff_.size())) {
             LOG4CPLUS_FATAL(logger(), "too much data, " << numBytes - (int)(rcvBuff_.capacity() - rcvBuff_.size()) << " extra bytes");
+            assert(0);
             return;
         }
 
