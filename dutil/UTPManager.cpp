@@ -348,25 +348,52 @@ namespace DTun
 
         const struct sockaddr_in_utp* addr = (const struct sockaddr_in_utp*)args->address;
 
-        UTPSocketUserData* ud = (UTPSocketUserData*)utp_get_userdata(args->socket);
+        UInt16 localPort = 0;
 
-        /*LOG4CPLUS_TRACE(logger(), "utpSendToFunc(" << args->len
-            << ", from=" << ntohs(ud->localPort)
+        if (args->socket) {
+            UTPSocketUserData* ud = (UTPSocketUserData*)utp_get_userdata(args->socket);
+            localPort = ud->localPort;
+        } else {
+            UTPPort in_port;
+            memcpy(&in_port[0], &addr->sin_port[0],  sizeof(in_port_utp));
+
+            boost::mutex::scoped_lock lock(this_->m_);
+            for (ConnectionCache::iterator it = this_->connCache_.begin(); it != this_->connCache_.end(); ++it) {
+                PeerMap::iterator pIt = it->second->peers.find(addr->sin_addr.s_addr);
+                if (pIt == it->second->peers.end()) {
+                    continue;
+                }
+                if (pIt->second.portMap.count(in_port) > 0) {
+                    localPort = it->first;
+                    break;
+                }
+            }
+
+            if (!localPort) {
+                LOG4CPLUS_TRACE(logger(), "No transport "
+                    << "to=" << DTun::ipToString(addr->sin_addr.s_addr)
+                    << (boost::format(":%02x%02x") % (int)addr->sin_port[0] % (int)addr->sin_port[1]));
+                return 0;
+            }
+        }
+
+        LOG4CPLUS_TRACE(logger(), "utpSendToFunc(" << args->len
+            << ", from=" << ntohs(localPort)
             << ", to=" << DTun::ipToString(addr->sin_addr.s_addr)
-            << (boost::format(":%02x%02x") % (int)addr->sin_port[0] % (int)addr->sin_port[1]) << ")");*/
+            << (boost::format(":%02x%02x") % (int)addr->sin_port[0] % (int)addr->sin_port[1]) << ")");
 
         boost::shared_ptr<ConnectionInfo> connInfo;
 
         {
             boost::mutex::scoped_lock lock(this_->m_);
-            ConnectionCache::const_iterator it = this_->connCache_.find(ud->localPort);
+            ConnectionCache::const_iterator it = this_->connCache_.find(localPort);
             if (it != this_->connCache_.end()) {
                 connInfo = it->second;
             }
         }
 
         if (!connInfo) {
-            LOG4CPLUS_TRACE(logger(), "No transport from=" << ntohs(ud->localPort)
+            LOG4CPLUS_TRACE(logger(), "No transport from=" << ntohs(localPort)
                 << ", to=" << DTun::ipToString(addr->sin_addr.s_addr)
                 << (boost::format(":%02x%02x") % (int)addr->sin_port[0] % (int)addr->sin_port[1]));
             return 0;

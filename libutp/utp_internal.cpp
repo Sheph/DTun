@@ -651,9 +651,9 @@ struct UTPSocket {
 
     void send_keep_alive();
 
-    /*static void send_rst(utp_context *ctx,
+    static void send_rst(utp_context *ctx,
                          const PackedSockAddr &addr, uint32 conn_id_send,
-                         uint16 ack_nr, uint16 seq_nr);*/
+                         uint16 ack_nr, uint16 seq_nr);
 
     void send_packet(OutgoingPacket *pkt);
 
@@ -846,7 +846,7 @@ void UTPSocket::send_keep_alive()
     ack_nr++;
 }
 
-/*void UTPSocket::send_rst(utp_context *ctx,
+void UTPSocket::send_rst(utp_context *ctx,
     const PackedSockAddr &addr, uint32 conn_id_send, uint16 ack_nr, uint16 seq_nr)
 {
     PacketFormatV1 pf1;
@@ -862,10 +862,10 @@ void UTPSocket::send_keep_alive()
     pf1.windowsize = 0;
     len = sizeof(PacketFormatV1);
 
-//	LOG_DEBUG("%s: Sending RST id:%u seq_nr:%u ack_nr:%u", addrfmt(addr, addrbuf), conn_id_send, seq_nr, ack_nr);
-//	LOG_DEBUG("send %s len:%u id:%u", addrfmt(addr, addrbuf), (uint)len, conn_id_send);
-    send_to_addr(ctx, this, (const byte*)&pf1, len, addr);
-}*/
+//LOG_DEBUG("%s: Sending RST id:%u seq_nr:%u ack_nr:%u", addrfmt(addr, addrbuf), conn_id_send, seq_nr, ack_nr);
+//LOG_DEBUG("send %s len:%u id:%u", addrfmt(addr, addrbuf), (uint)len, conn_id_send);
+    send_to_addr(ctx, NULL, (const byte*)&pf1, len, addr);
+}
 
 void UTPSocket::send_packet(OutgoingPacket *pkt)
 {
@@ -2973,7 +2973,7 @@ int utp_process_udp(utp_context *ctx, const byte *buffer, size_t len, const stru
         r.ack_nr = seq_nr;
         r.timestamp = ctx->current_ms;
 
-        //UTPSocket::send_rst(ctx, addr, id, seq_nr, utp_call_get_random(ctx, NULL));
+        UTPSocket::send_rst(ctx, addr, id, seq_nr, utp_call_get_random(ctx, NULL));
         return 1;
     }
 
