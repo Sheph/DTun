@@ -377,10 +377,10 @@ namespace DTun
             }
         }
 
-        LOG4CPLUS_TRACE(logger(), "utpSendToFunc(" << args->len
+        /*LOG4CPLUS_TRACE(logger(), "utpSendToFunc(" << args->len
             << ", from=" << ntohs(localPort)
             << ", to=" << DTun::ipToString(addr->sin_addr.s_addr)
-            << (boost::format(":%02x%02x") % (int)addr->sin_port[0] % (int)addr->sin_port[1]) << ")");
+            << (boost::format(":%02x%02x") % (int)addr->sin_port[0] % (int)addr->sin_port[1]) << ")");*/
 
         boost::shared_ptr<ConnectionInfo> connInfo;
 
