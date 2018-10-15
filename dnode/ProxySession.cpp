@@ -6,14 +6,17 @@
 #include <boost/make_shared.hpp>
 #include <boost/bind.hpp>
 
+#define DTUN_PROXY_BUFF_SIZE (64 * 1024)
+#define DTUN_PROXY_CHUNK_SIZE (4 * 1024)
+
 namespace DNode
 {
     ProxySession::ProxySession(DTun::SManager& remoteMgr, DTun::SManager& localMgr)
     : remoteMgr_(remoteMgr)
     , localMgr_(localMgr)
-    , localSndBuff_(32 * 1024)
+    , localSndBuff_(DTUN_PROXY_BUFF_SIZE)
     , localSndBuffBytes_(0)
-    , remoteSndBuff_(32 * 1024)
+    , remoteSndBuff_(DTUN_PROXY_BUFF_SIZE)
     , remoteSndBuffBytes_(0)
     , connected_(false)
     , done_(false)
@@ -260,7 +263,7 @@ namespace DNode
 
     void ProxySession::recvLocal()
     {
-        int toRecv = remoteSndBuff_.capacity() - remoteSndBuffBytes_;
+        int toRecv = std::min((int)(remoteSndBuff_.capacity() - remoteSndBuffBytes_), DTUN_PROXY_CHUNK_SIZE);
 
         if (toRecv <= 0) {
             return;
@@ -293,7 +296,7 @@ namespace DNode
 
     void ProxySession::recvRemote()
     {
-        int toRecv = localSndBuff_.capacity() - localSndBuffBytes_;
+        int toRecv = std::min((int)(localSndBuff_.capacity() - localSndBuffBytes_), DTUN_PROXY_CHUNK_SIZE);
 
         if (toRecv <= 0) {
             return;
