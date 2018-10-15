@@ -30,7 +30,7 @@ namespace DTun
             const boost::shared_ptr<SConnection>& conn, utp_socket* utpSock);
         ~UTPHandleImpl();
 
-        boost::shared_ptr<SConnection> kill(bool sameThreadOnly, bool abort, UInt16& localPort);
+        boost::shared_ptr<SConnection> kill(bool sameThreadOnly, bool abort);
 
         inline UTPManager& mgr() { return mgr_; }
 

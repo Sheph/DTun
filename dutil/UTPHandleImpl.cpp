@@ -37,14 +37,10 @@ namespace DTun
         assert(localPort_ == 0);
     }
 
-    boost::shared_ptr<SConnection> UTPHandleImpl::kill(bool sameThreadOnly, bool abort, UInt16& localPort)
+    boost::shared_ptr<SConnection> UTPHandleImpl::kill(bool sameThreadOnly, bool abort)
     {
         assert(!sameThreadOnly || mgr_.reactor().isSameThread());
         boost::shared_ptr<SConnection> res = conn_;
-        localPort = localPort_;
-        if (res) {
-            assert(localPort);
-        }
         conn_.reset();
         localPort_ = 0;
         if (utpSock_) {

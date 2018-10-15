@@ -53,7 +53,6 @@ namespace DTun
 
     UTPManager::ConnectionInfo::~ConnectionInfo()
     {
-        assert(numHandles == 0);
         if (utpSocks.empty()) {
             for (PeerMap::const_iterator it = peers.begin(); it != peers.end(); ++it) {
                 for (PortMap::const_iterator jt = it->second.portMap.begin(); jt != it->second.portMap.end(); ++jt) {
@@ -64,10 +63,10 @@ namespace DTun
         }
     }
 
-    bool UTPManager::ConnectionInfo::removeUtpSock(utp_socket* utpSock)
+    void UTPManager::ConnectionInfo::removeUtpSock(utp_socket* utpSock)
     {
         if (utpSocks.erase(utpSock) != 1) {
-            return false;
+            return;
         }
 
         struct sockaddr_in_utp addr;
@@ -90,8 +89,6 @@ namespace DTun
         if (it->second.portMap.empty()) {
             peers.erase(it);
         }
-
-        return true;
     }
 
     UTPManager::UTPManager(SManager& mgr)
@@ -121,17 +118,17 @@ namespace DTun
         // close all connections, i/o will no longer take place
         for (ConnectionCache::iterator it = connCache.begin(); it != connCache.end(); ++it) {
             boost::shared_ptr<SConnection> conn = it->second->conn.lock();
-            assert(conn);
-            conn->close();
+            if (conn) {
+                conn->close();
+            }
         }
-
-        connCache.clear();
 
         // no i/o, no timers, it's safe to kill handles even from another thread
         onKillHandles(false);
 
         utp_destroy(ctx_);
 
+        connCache.clear();
         connCache_.clear();
         assert(toKillHandles_.empty());
         assert(numAliveHandles_ == 0);
@@ -247,8 +244,7 @@ namespace DTun
         if (it == connCache_.end()) {
             return false;
         }
-        assert(!it->second->conn.expired());
-        return true;
+        return !it->second->conn.expired();
     }
 
     utp_socket* UTPManager::bindAcceptor(UInt16 localPort, UTPHandleImpl* handle)
@@ -400,7 +396,12 @@ namespace DTun
         }
 
         boost::shared_ptr<SConnection> conn = connInfo->conn.lock();
-        assert(conn);
+        if (!conn) {
+            LOG4CPLUS_TRACE(logger(), "No transport from=" << ntohs(localPort)
+                << ", to=" << DTun::ipToString(addr->sin_addr.s_addr)
+                << (boost::format(":%02x%02x") % (int)addr->sin_port[0] % (int)addr->sin_port[1]));
+            return 0;
+        }
 
         UInt16 actualPort = 0;
 
@@ -470,13 +471,8 @@ namespace DTun
             boost::mutex::scoped_lock lock(this_->m_);
             ConnectionCache::iterator it = this_->connCache_.find(ud->localPort);
 
-            if ((it != this_->connCache_.end()) && it->second->removeUtpSock(args->socket) &&
-                (it->second->numHandles == 0) && it->second->utpSocks.empty()) {
-                boost::shared_ptr<SConnection> conn = it->second->conn.lock();
-                assert(conn);
-                this_->connCache_.erase(it);
-                lock.unlock();
-                conn->close();
+            if (it != this_->connCache_.end()) {
+                it->second->removeUtpSock(args->socket);
             }
 
             utp_set_userdata(args->socket, NULL);
@@ -565,7 +561,6 @@ namespace DTun
             assert(conn);
             acceptorHandle = it->second->acceptorHandle;
             assert(acceptorHandle);
-            ++it->second->numHandles;
             bool inserted = it->second->utpSocks.insert(args->socket).second;
             assert(inserted);
             ++this_->numAliveHandles_;
@@ -594,7 +589,9 @@ namespace DTun
         const boost::shared_ptr<std::vector<char> >& rcvBuff)
     {
         boost::shared_ptr<SConnection> conn_shared = connInfo->conn.lock();
-        assert(conn_shared);
+        if (!conn_shared) {
+            return;
+        }
 
         if (numBytes < (int)sizeof(in_port_utp)) {
             //LOG4CPLUS_TRACE(logger(), "UTPManager::onRecv(" << err << ", " << numBytes << ", src=" << ipPortToString(srcIp, srcPort) << ", dst=" << portToString(dstPort) << ")");
@@ -682,6 +679,8 @@ namespace DTun
     {
         utp_check_timeouts(ctx_);
 
+        reapConnCache();
+
         innerMgr_.reactor().post(
             watch_->wrap(boost::bind(&UTPManager::onUTPTimeout, this)), 500);
     }
@@ -698,37 +697,30 @@ namespace DTun
         }
 
         for (HandleMap::iterator it = toKillHandles.begin(); it != toKillHandles.end(); ++it) {
-            UInt16 localPort = 0;
-            boost::shared_ptr<SConnection> conn = it->first->kill(sameThreadOnly, it->second, localPort);
-            if (conn) {
-                removeTransportConnectionInternal(localPort);
-            }
+            boost::shared_ptr<SConnection> conn = it->first->kill(sameThreadOnly, it->second);
             if (sameThreadOnly && conn) {
                 // Unfortunately we can't use 0 timeout even with abort, transport needs to be alive for some time to send stuff,
                 // but we can at least make timeout smaller...
                 innerMgr_.reactor().post(
-                    watch_->wrap(boost::bind(&UTPManager::onTransportConnectionKill, this, conn, localPort)), (it->second ? 250 : 1000));
-            } else if (conn) {
-                onTransportConnectionKill(conn, localPort);
+                    watch_->wrap(boost::bind(&UTPManager::onTransportConnectionKill, this, conn)), (it->second ? 250 : 1000));
             }
         }
     }
 
-    void UTPManager::onTransportConnectionKill(const boost::shared_ptr<SConnection>& conn, UInt16 localPort)
+    void UTPManager::onTransportConnectionKill(const boost::shared_ptr<SConnection>& conn)
     {
         //LOG4CPLUS_TRACE(logger(), "onTransportConnectionKill(" << conn.get() << ")");
+    }
 
+    void UTPManager::reapConnCache()
+    {
         boost::mutex::scoped_lock lock(m_);
-        ConnectionCache::iterator it = connCache_.find(localPort);
-        if ((it == connCache_.end()) || (it->second->numHandles > 0)) {
-            return;
-        }
-
-        boost::shared_ptr<SConnection> conn2 = it->second->conn.lock();
-        assert(conn2);
-
-        if ((conn2 == conn) && (conn.use_count() == 2)) {
-            connCache_.erase(it);
+        for (ConnectionCache::iterator it = connCache_.begin(); it != connCache_.end();) {
+            if (it->second->conn.lock()) {
+                ++it;
+            } else {
+                connCache_.erase(it++);
+            }
         }
     }
 
@@ -754,9 +746,10 @@ namespace DTun
         if (!isAny) {
             ConnectionCache::iterator it = connCache_.find(name4->sin_port);
             if (it != connCache_.end()) {
-                ++it->second->numHandles;
                 res = it->second->conn.lock();
-                assert(res);
+                if (!res) {
+                    connCache_.erase(it);
+                }
             }
         }
 
@@ -782,6 +775,13 @@ namespace DTun
             res = handle->createConnection();
 
             boost::shared_ptr<ConnectionInfo> connInfo = boost::make_shared<ConnectionInfo>(res);
+            if (isAny) {
+                ConnectionCache::iterator it = connCache_.find(port);
+                if (it != connCache_.end()) {
+                    assert(!it->second->conn.lock());
+                    connCache_.erase(it);
+                }
+            }
             bool inserted = connCache_.insert(std::make_pair(port, connInfo)).second;
             assert(inserted);
             if (!inserted) {
@@ -800,14 +800,5 @@ namespace DTun
         }
 
         return res;
-    }
-
-    void UTPManager::removeTransportConnectionInternal(UInt16 localPort)
-    {
-        boost::mutex::scoped_lock lock(m_);
-        ConnectionCache::const_iterator it = connCache_.find(localPort);
-        assert(it != connCache_.end());
-        assert(it->second->numHandles > 0);
-        --it->second->numHandles;
     }
 }

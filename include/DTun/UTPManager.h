@@ -76,18 +76,16 @@ namespace DTun
             ConnectionInfo() {}
             explicit ConnectionInfo(const boost::shared_ptr<SConnection>& conn)
             : conn(conn)
-            , acceptorHandle(NULL)
-            , numHandles(1) {}
+            , acceptorHandle(NULL) {}
 
             ~ConnectionInfo();
 
-            bool removeUtpSock(utp_socket* utpSock);
+            void removeUtpSock(utp_socket* utpSock);
 
             boost::weak_ptr<SConnection> conn;
             UTPHandleImpl* acceptorHandle;
             PeerMap peers;
             std::set<utp_socket*> utpSocks;
-            int numHandles;
         };
 
         typedef std::map<boost::shared_ptr<UTPHandleImpl>, bool> HandleMap;
@@ -121,12 +119,12 @@ namespace DTun
 
         void onKillHandles(bool sameThreadOnly);
 
-        void onTransportConnectionKill(const boost::shared_ptr<SConnection>& conn, UInt16 localPort);
+        void onTransportConnectionKill(const boost::shared_ptr<SConnection>& conn);
+
+        void reapConnCache();
 
         // 's' is consumed.
         boost::shared_ptr<SConnection> createTransportConnectionInternal(const struct sockaddr* name, int namelen, SYSSOCKET s);
-
-        void removeTransportConnectionInternal(UInt16 localPort);
 
         SManager& innerMgr_;
         boost::shared_ptr<OpWatch> watch_;
