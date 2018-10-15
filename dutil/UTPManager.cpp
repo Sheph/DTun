@@ -60,8 +60,7 @@ namespace DTun
                     LOG4CPLUS_ERROR(logger(), "STALE ROUTE " << DTun::ipToString(it->first) << (boost::format(":%02x%02x") % (int)jt->first[0] % (int)jt->first[1]));
                 }
             }
-            //TODO: fixme
-            //assert(peers.empty());
+            assert(peers.empty());
         }
     }
 
@@ -238,7 +237,7 @@ namespace DTun
         PortMap::const_iterator kt = jt->second.portMap.find(utpPort);
         assert(kt != jt->second.portMap.end());
 
-        return kt->second;
+        return kt->second.port;
     }
 
     bool UTPManager::haveTransportConnection(UInt16 port) const
@@ -307,7 +306,8 @@ namespace DTun
         UTPPort utpPort;
         memcpy(&utpPort[0], &addr.sin_port[0], sizeof(in_port_utp));
 
-        peerInfo.portMap[utpPort] = port;
+        peerInfo.portMap[utpPort].port = port;
+        peerInfo.portMap[utpPort].active = true;
 
         lock.unlock();
 
@@ -410,7 +410,7 @@ namespace DTun
             memcpy(&utpPort[0], &addr->sin_port[0], sizeof(in_port_utp));
             PortMap::const_iterator jt = it->second.portMap.find(utpPort);
             if (jt != it->second.portMap.end()) {
-                actualPort = jt->second;
+                actualPort = jt->second.port;
             }
         }
 
@@ -529,16 +529,14 @@ namespace DTun
             if (pIt == it->second->peers.end()) {
                 continue;
             }
-            if (pIt->second.portMap.count(in_port) > 0) {
+            PortMap::iterator pmIt = pIt->second.portMap.find(in_port);
+            if (pmIt != pIt->second.portMap.end()) {
                 if (!it->second->acceptorHandle) {
-                    pIt->second.portMap.erase(in_port);
-                    if (pIt->second.portMap.empty()) {
-                        it->second->peers.erase(pIt);
-                    }
                     return 1;
                 } else {
                     UTPSocketUserData* ud = new UTPSocketUserData(it->first, NULL);
                     utp_set_userdata(args->socket, ud);
+                    pmIt->second.active = true;
                     return 0;
                 }
             }
@@ -618,12 +616,12 @@ namespace DTun
                 PeerInfo& peerInfo = connInfo->peers[srcIp];
                 PortMap::iterator it = peerInfo.portMap.find(in_port);
                 if (it == peerInfo.portMap.end()) {
-                    peerInfo.portMap.insert(std::make_pair(in_port, srcPort));
+                    peerInfo.portMap.insert(std::make_pair(in_port, PortInfo(srcPort)));
                 } else {
-                    if (it->second != srcPort) {
-                        LOG4CPLUS_WARN(logger(), "Port " << ntohs(it->second) << " remapped to " << ntohs(srcPort) << " at " << ipToString(srcIp));
+                    if (it->second.port != srcPort) {
+                        LOG4CPLUS_WARN(logger(), "Port " << ntohs(it->second.port) << " remapped to " << ntohs(srcPort) << " at " << ipToString(srcIp));
                     }
-                    it->second = srcPort;
+                    it->second.port = srcPort;
                 }
             }
 
@@ -640,6 +638,16 @@ namespace DTun
                 LOG4CPLUS_WARN(logger(), "UDP packet not handled by UTP. Ignoring.");
             }
             inRecv_ = false;
+
+            boost::mutex::scoped_lock lock(m_);
+            PeerInfo& peerInfo = connInfo->peers[srcIp];
+            PortMap::iterator it = peerInfo.portMap.find(in_port);
+            if ((it != peerInfo.portMap.end()) && !it->second.active) {
+                peerInfo.portMap.erase(it);
+                if (peerInfo.portMap.empty()) {
+                    connInfo->peers.erase(srcIp);
+                }
+            }
         } else if (numBytes == 4) {
             uint8_t a = (*rcvBuff)[0];
             uint8_t b = (*rcvBuff)[1];

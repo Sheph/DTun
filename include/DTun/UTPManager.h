@@ -47,7 +47,20 @@ namespace DTun
 
     private:
         typedef boost::array<uint8_t, 16> UTPPort;
-        typedef std::map<UTPPort, UInt16> PortMap;
+
+        struct PortInfo
+        {
+            PortInfo()
+            : port(0), active(false) {}
+
+            explicit PortInfo(UInt16 port)
+            : port(port), active(false) {}
+
+            UInt16 port;
+            bool active;
+        };
+
+        typedef std::map<UTPPort, PortInfo> PortMap;
 
         struct PeerInfo
         {
