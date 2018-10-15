@@ -358,7 +358,7 @@ namespace DTun
         LOG4CPLUS_TRACE(logger(), "UTP onRead(" << numBytes << ")");
 
         if (numBytes > (int)(rcvBuff_.capacity() - rcvBuff_.size())) {
-            LOG4CPLUS_FATAL(logger(), "too much data");
+            LOG4CPLUS_FATAL(logger(), "too much data, " << numBytes - (int)(rcvBuff_.capacity() - rcvBuff_.size()) << " extra bytes");
             return;
         }
 

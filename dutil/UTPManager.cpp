@@ -423,8 +423,9 @@ namespace DTun
 
         switch (args->state) {
         case UTP_STATE_CONNECT:
-            assert(ud->handle);
-            ud->handle->onConnect();
+            if (ud->handle) {
+                ud->handle->onConnect();
+            }
             break;
         case UTP_STATE_WRITABLE:
             if (ud->handle) {
@@ -432,8 +433,9 @@ namespace DTun
             }
             break;
         case UTP_STATE_EOF:
-            assert(ud->handle);
-            ud->handle->onEOF();
+            if (ud->handle) {
+                ud->handle->onEOF();
+            }
             break;
         case UTP_STATE_DESTROYING: {
             assert(ud->localPort);
