@@ -367,6 +367,7 @@ namespace DTun
 
         if (waitDummy_) {
             rcvBuff_.erase_begin(1);
+            utp_read_drained(utpSock_);
             waitDummy_ = false;
             if (writeCallback_) {
                 writeCallback_(0, 0);
