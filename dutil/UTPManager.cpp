@@ -645,10 +645,10 @@ namespace DTun
 
     void UTPManager::onUTPTimeout()
     {
+        utp_check_timeouts(ctx_);
+
         innerMgr_.reactor().post(
             watch_->wrap(boost::bind(&UTPManager::onUTPTimeout, this)), 500);
-
-        utp_check_timeouts(ctx_);
     }
 
     void UTPManager::onKillHandles(bool sameThreadOnly)
