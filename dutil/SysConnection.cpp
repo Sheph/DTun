@@ -161,8 +161,6 @@ namespace DTun
 
     void SysConnection::handleWrite()
     {
-        boost::shared_ptr<SysHandle> handle = sysHandle();
-
         WriteReq* req;
 
         {
@@ -175,60 +173,48 @@ namespace DTun
 
         int res;
 
-        while (true) {
-            if (req->destIp) {
-                struct sockaddr_in sa;
-                memset(&sa, 0, sizeof(sa));
-                sa.sin_family = AF_INET;
-                sa.sin_addr.s_addr = req->destIp;
-                sa.sin_port = req->destPort;
+        if (req->destIp) {
+            struct sockaddr_in sa;
+            memset(&sa, 0, sizeof(sa));
+            sa.sin_family = AF_INET;
+            sa.sin_addr.s_addr = req->destIp;
+            sa.sin_port = req->destPort;
 
-                res = ::sendto(sysHandle()->sock(), req->first, req->last - req->first, 0, (const struct sockaddr*)&sa, sizeof(sa));
-            } else {
-                res = ::send(sysHandle()->sock(), req->first, req->last - req->first, 0);
+            res = ::sendto(sysHandle()->sock(), req->first, req->last - req->first, 0, (const struct sockaddr*)&sa, sizeof(sa));
+        } else {
+            res = ::send(sysHandle()->sock(), req->first, req->last - req->first, 0);
+        }
+
+        if (res == -1) {
+            int err = errno;
+            LOG4CPLUS_TRACE(logger(), "Cannot write sys socket: " << err);
+
+            cb = req->callback;
+
+            {
+                boost::mutex::scoped_lock lock(m_);
+                writeQueue_.pop_front();
             }
 
-            if (res == -1) {
-                int err = errno;
-                LOG4CPLUS_TRACE(logger(), "Cannot write sys socket: " << err);
+            reactor().update(this);
 
-                cb = req->callback;
+            cb(err);
+            return;
+        }
 
-                {
-                    boost::mutex::scoped_lock lock(m_);
-                    writeQueue_.pop_front();
-                }
+        req->first += res;
 
-                reactor().update(this);
+        if (req->first >= req->last) {
+            cb = req->callback;
 
-                cb(err);
-                return;
+            {
+                boost::mutex::scoped_lock lock(m_);
+                writeQueue_.pop_front();
             }
 
-            req->first += res;
+            reactor().update(this);
 
-            if (req->first >= req->last) {
-                cb = req->callback;
-
-                {
-                    boost::mutex::scoped_lock lock(m_);
-                    writeQueue_.pop_front();
-                }
-
-                reactor().update(this);
-
-                cb(0);
-            }
-
-            if (handle->sock() == SYS_INVALID_SOCKET) {
-                break;
-            }
-
-            boost::mutex::scoped_lock lock(m_);
-            if (writeQueue_.empty()) {
-                break;
-            }
-            req = &writeQueue_.front();
+            cb(0);
         }
     }
 
