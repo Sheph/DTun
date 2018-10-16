@@ -109,6 +109,8 @@ namespace DTun
 
         static uint64 utpGetReadBufferSizeFunc(utp_callback_arguments* args);
 
+        static uint64 utpGetMTUFunc(utp_callback_arguments* args);
+
         void onRecv(int err, int numBytes, UInt32 srcIp, UInt16 srcPort,
             UInt16 dstPort, const boost::shared_ptr<ConnectionInfo>& connInfo,
             const boost::shared_ptr<std::vector<char> >& rcvBuff);

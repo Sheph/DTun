@@ -158,6 +158,7 @@ namespace DTun
         utp_set_callback(ctx_, UTP_ON_FIREWALL, &utpOnFirewallFunc);
         utp_set_callback(ctx_, UTP_ON_ACCEPT, &utpOnAcceptFunc);
         utp_set_callback(ctx_, UTP_GET_READ_BUFFER_SIZE, &utpGetReadBufferSizeFunc);
+        utp_set_callback(ctx_, UTP_GET_UDP_MTU, &utpGetMTUFunc);
 #if UTP_VERBOSE
         utp_context_set_option(ctx_, UTP_LOG_NORMAL, 1);
         utp_context_set_option(ctx_, UTP_LOG_MTU, 1);
@@ -582,6 +583,14 @@ namespace DTun
             return ud->handle->getReadBufferSize();
         else
             return 0;
+    }
+
+    uint64 UTPManager::utpGetMTUFunc(utp_callback_arguments* args)
+    {
+        // TODO: quick WAR for yota min MTU, do MTU discovery instead.
+        // MTU discovery actuallu works, but I don't know how to disable DF flag
+        // in linux, setsockopt doesn't work...
+        return 1372;
     }
 
     void UTPManager::onRecv(int err, int numBytes, UInt32 srcIp, UInt16 srcPort,
