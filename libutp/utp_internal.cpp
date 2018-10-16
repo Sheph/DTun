@@ -72,7 +72,8 @@
 #define RST_INFO_TIMEOUT 10000
 #define RST_INFO_LIMIT 1000
 // 29 seconds determined from measuring many home NAT devices
-#define KEEPALIVE_INTERVAL 29000
+#define KEEPALIVE_INTERVAL 5000
+#define KEEPALIVE_CNT 4
 
 
 #define SEQ_NR_MASK 0xFFFF
@@ -1275,6 +1276,14 @@ void UTPSocket::check_timeouts()
                 (uint)max_window, (uint)cur_window, (uint)get_packet_size());
             #endif
             utp_call_on_state_change(this->ctx, this, UTP_STATE_WRITABLE);
+        }
+
+        if ((state >= CS_CONNECTED) && ((int)(ctx->current_ms - last_got_packet) >= (KEEPALIVE_INTERVAL * KEEPALIVE_CNT))) {
+            if (close_requested)
+                state = CS_DESTROY;
+            else
+                state = CS_RESET;
+            utp_call_on_error(ctx, this, UTP_ETIMEDOUT);
         }
 
         if (state >= CS_CONNECTED && !fin_sent) {
