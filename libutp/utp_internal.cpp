@@ -100,15 +100,15 @@ char addrbuf[65];
 
 
 // these packet sizes are including the uTP header wich
-// is either (20 + 16) or (23 + 16) bytes depending on version
+// is either (20 + 16 - 2) or (23 + 16 - 2) bytes depending on version
 #define PACKET_SIZE_EMPTY_BUCKET 0
-#define PACKET_SIZE_EMPTY (23 + 16)
+#define PACKET_SIZE_EMPTY (23 + 16 - 2)
 #define PACKET_SIZE_SMALL_BUCKET 1
-#define PACKET_SIZE_SMALL (373 + 16)
+#define PACKET_SIZE_SMALL (373 + 16 - 2)
 #define PACKET_SIZE_MID_BUCKET 2
-#define PACKET_SIZE_MID (723 + 16)
+#define PACKET_SIZE_MID (723 + 16 - 2)
 #define PACKET_SIZE_BIG_BUCKET 3
-#define PACKET_SIZE_BIG (1400 + 16)
+#define PACKET_SIZE_BIG (1400 + 16 - 2)
 #define PACKET_SIZE_HUGE_BUCKET 4
 
 struct PACKED_ATTRIBUTE PacketFormatV1 {
@@ -123,8 +123,6 @@ struct PACKED_ATTRIBUTE PacketFormatV1 {
 
     // Type of the first extension header
     byte ext;
-    // connection ID
-    uint16_big connid;
     uint32_big tv_usec;
     uint32_big reply_micro;
     // receive window size in bytes
@@ -498,11 +496,6 @@ struct UTPSocket {
     // When the window size is set to zero, start this timer. It will send a new packet every 30secs.
     uint64 zerowindow_time;
 
-    uint32 conn_seed;
-    // Connection ID for packets I receive
-    uint32 conn_id_recv;
-    // Connection ID for packets I send
-    uint32 conn_id_send;
     // Last rcv window we advertised, in bytes
     size_t last_rcv_win;
 
@@ -578,7 +571,7 @@ struct UTPSocket {
         va_end(va);
         buf[4095] = '\0';
 
-        snprintf(buf2, 4096, "%p %s %06u %s", this, addrfmt(addr, addrbuf), conn_id_recv, buf);
+        snprintf(buf2, 4096, "%p %s %s", this, addrfmt(addr, addrbuf), buf);
         buf2[4095] = '\0';
 
         ctx->log_unchecked(this, buf2);
@@ -764,8 +757,8 @@ void UTPSocket::send_data(byte* b, size_t length, bandwidth_type_t type, uint32 
     int flags2 = b1->type();
     uint16 seq_nr = b1->seq_nr;
     uint16 ack_nr = b1->ack_nr;
-    log(UTP_LOG_DEBUG, "send %s len:%u id:%u timestamp:" I64u " reply_micro:%u flags:%s seq_nr:%u ack_nr:%u",
-        addrfmt(addr, addrbuf), (uint)length, conn_id_send, time, reply_micro, flagnames[flags2],
+    log(UTP_LOG_DEBUG, "send %s len:%u timestamp:" I64u " reply_micro:%u flags:%s seq_nr:%u ack_nr:%u",
+        addrfmt(addr, addrbuf), (uint)length, time, reply_micro, flagnames[flags2],
         seq_nr, ack_nr);
 #endif
     send_to_addr(ctx, this, b, length, addr, flags);
@@ -782,7 +775,6 @@ void UTPSocket::send_ack(bool synack)
     pfa.pf.set_version(1);
     pfa.pf.set_type(ST_STATE);
     pfa.pf.ext = 0;
-    pfa.pf.connid = conn_id_send;
     pfa.pf.ack_nr = ack_nr;
     pfa.pf.seq_nr = seq_nr;
     pfa.pf.windowsize = (uint32)last_rcv_win;
@@ -823,11 +815,11 @@ void UTPSocket::send_ack(bool synack)
         len += 4 + 2;
 
         #if UTP_DEBUG_LOGGING
-        log(UTP_LOG_DEBUG, "Sending EACK %u [%u] bits:[%032b]", ack_nr, conn_id_send, m);
+        log(UTP_LOG_DEBUG, "Sending EACK %u bits:[%032b]", ack_nr, m);
         #endif
     } else {
         #if UTP_DEBUG_LOGGING
-        log(UTP_LOG_DEBUG, "Sending ACK %u [%u]", ack_nr, conn_id_send);
+        log(UTP_LOG_DEBUG, "Sending ACK %u", ack_nr);
         #endif
     }
 
@@ -840,7 +832,7 @@ void UTPSocket::send_keep_alive()
     ack_nr--;
 
     #if UTP_DEBUG_LOGGING
-    log(UTP_LOG_DEBUG, "Sending KeepAlive ACK %u [%u]", ack_nr, conn_id_send);
+    log(UTP_LOG_DEBUG, "Sending KeepAlive ACK %u", ack_nr);
     #endif
 
     send_ack();
@@ -857,7 +849,6 @@ void UTPSocket::send_rst(utp_context *ctx,
     pf1.set_version(1);
     pf1.set_type(ST_RESET);
     pf1.ext = 0;
-    pf1.connid = conn_id_send;
     pf1.ack_nr = ack_nr;
     pf1.seq_nr = seq_nr;
     pf1.windowsize = 0;
@@ -1084,7 +1075,6 @@ void UTPSocket::write_outgoing_packet(size_t payload, uint flags, struct utp_iov
         p1->set_version(1);
         p1->set_type(flags);
         p1->ext = 0;
-        p1->connid = conn_id_send;
         p1->windowsize = (uint32)last_rcv_win;
         p1->ack_nr = ack_nr;
 
@@ -2530,7 +2520,7 @@ UTPSocket::~UTPSocket()
         }
 
         // Remove object from the global hash table
-        UTPSocketKeyData* kd = ctx->utp_sockets->Delete(UTPSocketKey(addr, conn_id_recv));
+        UTPSocketKeyData* kd = ctx->utp_sockets->Delete(UTPSocketKey(addr, 0));
         assert(kd);
 
         // remove the socket from ack_sockets if it was there also
@@ -2559,29 +2549,11 @@ void UTP_FreeAll(struct UTPSocketHT *utp_sockets) {
 
 void utp_initialize_socket(	utp_socket *conn,
                             const struct sockaddr *addr,
-                            socklen_t addrlen,
-                            bool need_seed_gen,
-                            uint32 conn_seed,
-                            uint32 conn_id_recv,
-                            uint32 conn_id_send)
+                            socklen_t addrlen)
 {
     PackedSockAddr psaddr = PackedSockAddr((const SOCKADDR_STORAGE*)addr, addrlen);
 
-    if (need_seed_gen) {
-        do {
-            conn_seed = utp_call_get_random(conn->ctx, conn);
-            // we identify v1 and higher by setting the first two bytes to 0x0001
-            conn_seed &= 0xffff;
-        } while (conn->ctx->utp_sockets->Lookup(UTPSocketKey(psaddr, conn_seed)));
-
-        conn_id_recv += conn_seed;
-        conn_id_send += conn_seed;
-    }
-
     conn->state					= CS_IDLE;
-    conn->conn_seed				= conn_seed;
-    conn->conn_id_recv			= conn_id_recv;
-    conn->conn_id_send			= conn_id_send;
     conn->addr					= psaddr;
     conn->ctx->current_ms		= utp_call_get_milliseconds(conn->ctx, NULL);
     conn->last_got_packet		= conn->ctx->current_ms;
@@ -2598,7 +2570,7 @@ void utp_initialize_socket(	utp_socket *conn,
     conn->mtu_reset();
     conn->mtu_last = conn->mtu_ceiling;
 
-    conn->ctx->utp_sockets->Add(UTPSocketKey(conn->addr, conn->conn_id_recv))->socket = conn;
+    conn->ctx->utp_sockets->Add(UTPSocketKey(conn->addr, 0))->socket = conn;
 
     // we need to fit one packet in the window when we start the connection
     conn->max_window = conn->get_packet_size();
@@ -2781,11 +2753,11 @@ int utp_connect(utp_socket *conn, const struct sockaddr *to, socklen_t tolen)
         return -1;
     }
 
-    utp_initialize_socket(conn, to, tolen, true, 0, 0, 1);
+    utp_initialize_socket(conn, to, tolen);
 
     assert(conn->cur_window_packets == 0);
     assert(conn->outbuf.get(conn->seq_nr) == NULL);
-    assert(sizeof(PacketFormatV1) == 36);
+    assert(sizeof(PacketFormatV1) == 34);
 
     conn->state = CS_SYN_SENT;
     conn->ctx->current_ms = utp_call_get_milliseconds(conn->ctx, conn);
@@ -2793,10 +2765,10 @@ int utp_connect(utp_socket *conn, const struct sockaddr *to, socklen_t tolen)
     // Create and send a connect message
 
     // used in parse_log.py
-    conn->log(UTP_LOG_NORMAL, "UTP_Connect conn_seed:%u packet_size:%u (B) "
+    conn->log(UTP_LOG_NORMAL, "UTP_Connect packet_size:%u (B) "
             "target_delay:%u (ms) delay_history:%u "
             "delay_base_history:%u (minutes)",
-            conn->conn_seed, PACKET_SIZE, conn->target_delay / 1000,
+            PACKET_SIZE, conn->target_delay / 1000,
             CUR_DELAY_SIZE, DELAY_BASE_HISTORY);
 
     // Setup initial timeout timer.
@@ -2820,7 +2792,6 @@ int utp_connect(utp_socket *conn, const struct sockaddr *to, socklen_t tolen)
     p1->set_version(1);
     p1->set_type(ST_SYN);
     p1->ext = 0;
-    p1->connid = conn->conn_id_recv;
     p1->windowsize = (uint32)conn->last_rcv_win;
     p1->seq_nr = conn->seq_nr;
     pkt->transmissions = 0;
@@ -2872,7 +2843,6 @@ int utp_process_udp(utp_context *ctx, const byte *buffer, size_t len, const stru
 
     const PacketFormatV1 *pf1 = (PacketFormatV1*)buffer;
     const byte version = UTP_Version(pf1);
-    const uint32 id = uint32(pf1->connid);
 
     if (version != 1) {
         #if UTP_DEBUG_LOGGING
@@ -2882,12 +2852,12 @@ int utp_process_udp(utp_context *ctx, const byte *buffer, size_t len, const stru
         return 0;
     }
 
-    #if UTP_DEBUG_LOGGING
-    ctx->log(UTP_LOG_DEBUG, NULL, "recv %s len:%u id:%u", addrfmt(addr, addrbuf), (uint)len, id);
-    ctx->log(UTP_LOG_DEBUG, NULL, "recv id:%u seq_nr:%u ack_nr:%u", id, (uint)pf1->seq_nr, (uint)pf1->ack_nr);
-    #endif
-
     const byte flags = pf1->type();
+
+    #if UTP_DEBUG_LOGGING
+    ctx->log(UTP_LOG_DEBUG, NULL, "recv %s len:%u", addrfmt(addr, addrbuf), (uint)len);
+    ctx->log(UTP_LOG_DEBUG, NULL, "recv seq_nr:%u ack_nr:%u", (uint)pf1->seq_nr, (uint)pf1->ack_nr);
+    #endif
 
     if (flags == ST_RESET) {
         // id is either our recv id or our send id
@@ -2896,9 +2866,7 @@ int utp_process_udp(utp_context *ctx, const byte *buffer, size_t len, const stru
         // we have to check every case
 
         UTPSocketKeyData* keyData;
-        if ( (keyData = ctx->utp_sockets->Lookup(UTPSocketKey(addr, id))) ||
-            ((keyData = ctx->utp_sockets->Lookup(UTPSocketKey(addr, id + 1))) && keyData->socket->conn_id_send == id) ||
-            ((keyData = ctx->utp_sockets->Lookup(UTPSocketKey(addr, id - 1))) && keyData->socket->conn_id_send == id))
+        if ((keyData = ctx->utp_sockets->Lookup(UTPSocketKey(addr, 0))))
         {
             UTPSocket* conn = keyData->socket;
 
@@ -2925,10 +2893,10 @@ int utp_process_udp(utp_context *ctx, const byte *buffer, size_t len, const stru
     else if (flags != ST_SYN) {
         UTPSocket* conn = NULL;
 
-        if (ctx->last_utp_socket && ctx->last_utp_socket->addr == addr && ctx->last_utp_socket->conn_id_recv == id) {
+        if (ctx->last_utp_socket && ctx->last_utp_socket->addr == addr) {
             conn = ctx->last_utp_socket;
         } else {
-            UTPSocketKeyData* keyData = ctx->utp_sockets->Lookup(UTPSocketKey(addr, id));
+            UTPSocketKeyData* keyData = ctx->utp_sockets->Lookup(UTPSocketKey(addr, 0));
             if (keyData) {
                 conn = keyData->socket;
                 ctx->last_utp_socket = conn;
@@ -2953,8 +2921,7 @@ int utp_process_udp(utp_context *ctx, const byte *buffer, size_t len, const stru
         ctx->current_ms = utp_call_get_milliseconds(ctx, NULL);
 
         for (size_t i = 0; i < ctx->rst_info.GetCount(); i++) {
-            if ((ctx->rst_info[i].connid == id)   &&
-                (ctx->rst_info[i].addr   == addr) &&
+            if ((ctx->rst_info[i].addr   == addr) &&
                 (ctx->rst_info[i].ack_nr == seq_nr))
             {
                 ctx->rst_info[i].timestamp = ctx->current_ms;
@@ -2982,11 +2949,10 @@ int utp_process_udp(utp_context *ctx, const byte *buffer, size_t len, const stru
 
         RST_Info &r = ctx->rst_info.Append();
         r.addr = addr;
-        r.connid = id;
         r.ack_nr = seq_nr;
         r.timestamp = ctx->current_ms;
 
-        UTPSocket::send_rst(ctx, addr, id, seq_nr, utp_call_get_random(ctx, NULL));
+        UTPSocket::send_rst(ctx, addr, 0, seq_nr, utp_call_get_random(ctx, NULL));
         return 1;
     }
 
@@ -2996,7 +2962,7 @@ int utp_process_udp(utp_context *ctx, const byte *buffer, size_t len, const stru
         ctx->log(UTP_LOG_DEBUG, NULL, "Incoming connection from %s", addrfmt(addr, addrbuf));
         #endif
 
-        UTPSocketKeyData* keyData = ctx->utp_sockets->Lookup(UTPSocketKey(addr, id + 1));
+        UTPSocketKeyData* keyData = ctx->utp_sockets->Lookup(UTPSocketKey(addr, 0));
         if (keyData) {
 
             #if UTP_DEBUG_LOGGING
@@ -3027,7 +2993,7 @@ int utp_process_udp(utp_context *ctx, const byte *buffer, size_t len, const stru
 
         // Create a new UTP socket to handle this new connection
         UTPSocket *conn = utp_create_socket(ctx);
-        utp_initialize_socket(conn, to, tolen, false, id, id+1, id);
+        utp_initialize_socket(conn, to, tolen);
         conn->ack_nr = seq_nr;
         conn->seq_nr = utp_call_get_random(ctx, NULL);
         conn->fast_resend_seq_nr = conn->seq_nr;
@@ -3077,9 +3043,9 @@ static UTPSocket* parse_icmp_payload(utp_context *ctx, const byte *buffer, size_
     const PackedSockAddr addr((const SOCKADDR_STORAGE*)to, tolen);
 
     // ICMP packets are only required to quote the first 8 bytes of the layer4
-    // payload.  The UDP payload is 8 bytes, and the UTP header is another (20 + 16)
+    // payload.  The UDP payload is 8 bytes, and the UTP header is another (20 + 16 - 2)
     // bytes.  So, in order to find the entire UTP header, we need the ICMP
-    // packet to quote (28 + 16) bytes.
+    // packet to quote (28 + 16 - 2) bytes.
     if (len < sizeof(PacketFormatV1)) {
         #if UTP_DEBUG_LOGGING
         ctx->log(UTP_LOG_DEBUG, NULL, "Ignoring ICMP from %s: runt length %d", addrfmt(addr, addrbuf), len);
@@ -3089,7 +3055,6 @@ static UTPSocket* parse_icmp_payload(utp_context *ctx, const byte *buffer, size_
 
     const PacketFormatV1 *pf = (PacketFormatV1*)buffer;
     const byte version = UTP_Version(pf);
-    const uint32 id = uint32(pf->connid);
 
     if (version != 1) {
         #if UTP_DEBUG_LOGGING
@@ -3100,15 +3065,13 @@ static UTPSocket* parse_icmp_payload(utp_context *ctx, const byte *buffer, size_
 
     UTPSocketKeyData* keyData;
 
-    if ( (keyData = ctx->utp_sockets->Lookup(UTPSocketKey(addr, id))) ||
-        ((keyData = ctx->utp_sockets->Lookup(UTPSocketKey(addr, id + 1))) && keyData->socket->conn_id_send == id) ||
-        ((keyData = ctx->utp_sockets->Lookup(UTPSocketKey(addr, id - 1))) && keyData->socket->conn_id_send == id))
+    if ((keyData = ctx->utp_sockets->Lookup(UTPSocketKey(addr, 0))))
     {
         return keyData->socket;
     }
 
     #if UTP_DEBUG_LOGGING
-    ctx->log(UTP_LOG_DEBUG, NULL, "Ignoring ICMP from %s: No matching connection found for id %u", addrfmt(addr, addrbuf), id);
+    ctx->log(UTP_LOG_DEBUG, NULL, "Ignoring ICMP from %s: No matching connection found", addrfmt(addr, addrbuf));
     #endif
     return NULL;
 }
