@@ -1198,7 +1198,7 @@ void UTPSocket::check_timeouts()
             }
 
             // We initiated the connection but the other side failed to respond before the rto
-            if (retransmit_count >= 4 || (state == CS_SYN_SENT && retransmit_count >= 2)) {
+            if (retransmit_count >= 4 || (state == CS_SYN_SENT && retransmit_count >= 4)) {
                 // 4 consecutive transmissions have timed out. Kill it. If we
                 // haven't even connected yet, give up after only 2 consecutive
                 // failed transmissions.
@@ -2800,7 +2800,7 @@ int utp_connect(utp_socket *conn, const struct sockaddr *to, socklen_t tolen)
             CUR_DELAY_SIZE, DELAY_BASE_HISTORY);
 
     // Setup initial timeout timer.
-    conn->retransmit_timeout = 3000;
+    conn->retransmit_timeout = 300;
     conn->rto_timeout = conn->ctx->current_ms + conn->retransmit_timeout;
     conn->last_rcv_win = conn->get_rcv_window();
 
