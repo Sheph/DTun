@@ -2338,6 +2338,10 @@ size_t utp_process_incoming(UTPSocket *conn, const byte *packet, size_t len, boo
     // The connection is not in a state that can accept data?
     if (conn->state != CS_CONNECTED &&
         conn->state != CS_CONNECTED_FULL) {
+        if (conn->fin_sent_acked && (conn->state == CS_DESTROY) && (seqnr == 0) && (pk_flags == ST_FIN)) {
+            conn->ack_nr++;
+            conn->send_ack();
+        }
         return 0;
     }
 
