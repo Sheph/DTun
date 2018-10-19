@@ -10,6 +10,11 @@
 
 #define UTP_VERBOSE 1
 
+#define UTP_PFLAGS_DIR(pflags) ((uint8_t)(pflags) & 0x1)
+#define UTP_PFLAGS_LASTFRAG(pflags) (((uint8_t)(pflags) >> 1) & 0x1)
+#define UTP_PFLAGS_FRAGIDX(pflags) (((uint8_t)(pflags) >> 2) & UTP_PFLAGS_FRAGIDX_MAX)
+#define UTP_PFLAGS(dir, lastFrag, fragIdx) ((uint8_t)((dir) & 0x1) | ((uint8_t)((lastFrag) & 0x1) << 1) | ((uint8_t)((fragIdx) & UTP_PFLAGS_FRAGIDX_MAX) << 2))
+
 namespace DTun
 {
     static int readRandom(void* buffer, uint32_t num_bytes)
@@ -35,6 +40,22 @@ namespace DTun
 
         return 1;
     }
+
+    #pragma pack(1)
+    struct UTPHeader
+    {
+        union
+        {
+            in_port_utp port;
+            struct
+            {
+                uint8 pflags;
+                uint8 port_remainder[15];
+            };
+        };
+        uint16_t seq_nr;
+    };
+    #pragma pack()
 
     struct UTPSocketUserData
     {
@@ -158,7 +179,6 @@ namespace DTun
         utp_set_callback(ctx_, UTP_ON_FIREWALL, &utpOnFirewallFunc);
         utp_set_callback(ctx_, UTP_ON_ACCEPT, &utpOnAcceptFunc);
         utp_set_callback(ctx_, UTP_GET_READ_BUFFER_SIZE, &utpGetReadBufferSizeFunc);
-        utp_set_callback(ctx_, UTP_GET_UDP_MTU, &utpGetMTUFunc);
 #if UTP_VERBOSE
         utp_context_set_option(ctx_, UTP_LOG_NORMAL, 1);
         utp_context_set_option(ctx_, UTP_LOG_MTU, 1);
@@ -284,6 +304,7 @@ namespace DTun
             LOG4CPLUS_ERROR(logger(), "Cannot generate port");
             return NULL;
         }
+        addr.sin_port[0] = 0;
 
         boost::mutex::scoped_lock lock(m_);
         ConnectionCache::iterator cIt = connCache_.find(localPort);
@@ -345,11 +366,17 @@ namespace DTun
 
         const struct sockaddr_in_utp* addr = (const struct sockaddr_in_utp*)args->address;
 
+        int fragmentSize = 0;
+
         UInt16 localPort = 0;
 
         if (args->socket) {
             UTPSocketUserData* ud = (UTPSocketUserData*)utp_get_userdata(args->socket);
             localPort = ud->localPort;
+            int mtuGuess = utp_getsockopt(args->socket, UTP_MTU_GUESS);
+            if (((args->flags & UTP_UDP_DONTFRAG) == 0) && ((int)args->len > mtuGuess)) {
+                fragmentSize = mtuGuess;
+            }
         } else {
             UTPPort in_port;
             memcpy(&in_port[0], &addr->sin_port[0],  sizeof(in_port_utp));
@@ -418,15 +445,7 @@ namespace DTun
 
         assert(actualPort != 0);
 
-        boost::shared_ptr<std::vector<char> > sndBuff =
-            boost::make_shared<std::vector<char> >(args->len);
-
-        memcpy(&(*sndBuff)[0], args->buf, args->len);
-        memcpy(&(*sndBuff)[0], &addr->sin_port[0], sizeof(in_port_utp));
-
-        conn->writeTo(&(*sndBuff)[0], &(*sndBuff)[0] + sndBuff->size(),
-            addr->sin_addr.s_addr, actualPort,
-            boost::bind(&UTPManager::onSend, this_, _1, sndBuff));
+        this_->sendUTP(conn, addr->sin_addr.s_addr, actualPort, addr->sin_port, (const char*)args->buf, args->len, fragmentSize);
 
         return 0;
     }
@@ -585,14 +604,6 @@ namespace DTun
             return 0;
     }
 
-    uint64 UTPManager::utpGetMTUFunc(utp_callback_arguments* args)
-    {
-        // TODO: quick WAR for yota min MTU, do MTU discovery instead.
-        // MTU discovery actuallu works, but I don't know how to disable DF flag
-        // in linux, setsockopt doesn't work...
-        return 1372;
-    }
-
     void UTPManager::onRecv(int err, int numBytes, UInt32 srcIp, UInt16 srcPort,
         UInt16 dstPort, const boost::shared_ptr<ConnectionInfo>& connInfo,
         const boost::shared_ptr<std::vector<char> >& rcvBuff)
@@ -602,7 +613,7 @@ namespace DTun
             return;
         }
 
-        if (numBytes < (int)sizeof(in_port_utp)) {
+        if (numBytes < (int)sizeof(UTPHeader)) {
             //LOG4CPLUS_TRACE(logger(), "UTPManager::onRecv(" << err << ", " << numBytes << ", src=" << ipPortToString(srcIp, srcPort) << ", dst=" << portToString(dstPort) << ")");
         }
 
@@ -611,40 +622,113 @@ namespace DTun
             return;
         }
 
-        if (numBytes >= (int)sizeof(in_port_utp)) {
-            UTPPort in_port;
-            memcpy(&in_port[0], &(*rcvBuff)[0], sizeof(in_port_utp));
+        if (numBytes >= (int)sizeof(UTPHeader)) {
+            const UTPHeader* header = (const UTPHeader*)&(*rcvBuff)[0];
 
-            //LOG4CPLUS_TRACE(logger(), "UTPManager::onRecv(" << err << ", " << numBytes << ", src=" << ipPortToString(srcIp, srcPort) << (boost::format(":%02x%02x") % (int)in_port[0] % (int)in_port[1]) << ", dst=" << portToString(dstPort) << ")");
+            UTPPort in_port;
+            memcpy(&in_port[0], header->port, sizeof(in_port_utp));
+            in_port[0] = UTP_PFLAGS(UTP_PFLAGS_DIR(header->pflags), 0, 0);
+
+            uint16_t seqNr = header->seq_nr;
+            bool isLast = UTP_PFLAGS_LASTFRAG(header->pflags);
+            int fragIdx = UTP_PFLAGS_FRAGIDX(header->pflags);
+
+            if (isLast && (fragIdx == 0)) {
+                //LOG4CPLUS_TRACE(logger(), "UTPManager::onRecv(" << err << ", " << numBytes << ", src=" << ipPortToString(srcIp, srcPort) << (boost::format(":%02x%02x") % (int)in_port[0] % (int)in_port[1]) << ", dst=" << portToString(dstPort) << ")");
+            }
+
+            const char* packetData = &(*rcvBuff)[0];
+            int packetSize = numBytes;
+            bool defraged = true;
 
             {
                 boost::mutex::scoped_lock lock(m_);
                 PeerInfo& peerInfo = connInfo->peers[srcIp];
                 PortMap::iterator it = peerInfo.portMap.find(in_port);
                 if (it == peerInfo.portMap.end()) {
-                    peerInfo.portMap.insert(std::make_pair(in_port, PortInfo(srcPort)));
+                    it = peerInfo.portMap.insert(std::make_pair(in_port, PortInfo(srcPort))).first;
                 } else {
                     if (it->second.port != srcPort) {
                         LOG4CPLUS_WARN(logger(), "Port " << ntohs(it->second.port) << " remapped to " << ntohs(srcPort) << " at " << ipToString(srcIp));
                     }
                     it->second.port = srcPort;
                 }
+                if (it->second.fragSeqNr && ((seqNr != *it->second.fragSeqNr) || (isLast && (fragIdx == 0)))) {
+                    // new seg_nr or non-fragmented packet, reset.
+                    it->second.fragSeqNr.reset();
+                    for (size_t i = 0; i < sizeof(it->second.frags)/sizeof(it->second.frags[0]); ++i) {
+                        it->second.frags[i].reset();
+                    }
+                }
+                if (!isLast || (fragIdx != 0)) {
+                    if (!it->second.active) {
+                        LOG4CPLUS_WARN(logger(), "Fragmented packet without a connection");
+                        defraged = false;
+                        goto out;
+                    }
+
+                    it->second.fragSeqNr = seqNr;
+                    if (fragIdx == 0) {
+                        it->second.frags[fragIdx].buff.resize(numBytes);
+                        memcpy(&it->second.frags[fragIdx].buff[0], &(*rcvBuff)[0], numBytes);
+                    } else {
+                        it->second.frags[fragIdx].buff.resize(numBytes - sizeof(*header));
+                        memcpy(&it->second.frags[fragIdx].buff[0], &(*rcvBuff)[0] + sizeof(*header), numBytes - sizeof(*header));
+                    }
+                    it->second.frags[fragIdx].last = isLast;
+
+                    defraged = false;
+                    for (size_t i = 0; i < sizeof(it->second.frags)/sizeof(it->second.frags[0]); ++i) {
+                        if (it->second.frags[i].buff.empty()) {
+                            break;
+                        }
+                        if (it->second.frags[i].last) {
+                            defraged = true;
+                            break;
+                        }
+                    }
+
+                    if (defraged) {
+                        defragBuff.clear();
+                        for (size_t i = 0; i < sizeof(it->second.frags)/sizeof(it->second.frags[0]); ++i) {
+                            defragBuff.insert(defragBuff.end(), it->second.frags[i].buff.begin(), it->second.frags[i].buff.end());
+                            if (it->second.frags[i].last) {
+                                break;
+                            }
+                        }
+                        packetData = &defragBuff[0];
+                        packetSize = defragBuff.size();
+                        it->second.fragSeqNr.reset();
+                        for (size_t i = 0; i < sizeof(it->second.frags)/sizeof(it->second.frags[0]); ++i) {
+                            it->second.frags[i].reset();
+                        }
+                    }
+                }
+            }
+
+            if (!isLast || (fragIdx != 0)) {
+                LOG4CPLUS_INFO(logger(), "UTPManager::onRecv(" << err << ", " << numBytes << ", src=" << ipPortToString(srcIp, srcPort) << (boost::format(":%02x%02x") % (int)in_port[0] % (int)in_port[1]) << ", dst=" << portToString(dstPort) << ", isLast=" << isLast << ", fragIdx=" << fragIdx << ", defraged=" << defraged << ")");
+            }
+
+            if (!defraged) {
+                goto out2;
             }
 
             struct sockaddr_in_utp addr;
 
             addr.sin_family = AF_INET_UTP;
             addr.sin_addr.s_addr = srcIp;
-            memcpy(&addr.sin_port[0], &(*rcvBuff)[0], sizeof(in_port_utp));
+            memcpy(&addr.sin_port[0], &in_port[0], sizeof(in_port_utp));
 
             inRecv_ = true;
-            if (!utp_process_udp(ctx_, (const byte*)(&(*rcvBuff)[0]), numBytes,
+            if (!utp_process_udp(ctx_, (const byte*)packetData, packetSize,
                 (const struct sockaddr *)&addr, sizeof(addr))) {
                 inRecv_ = false;
                 LOG4CPLUS_WARN(logger(), "UDP packet not handled by UTP. Ignoring.");
             }
             inRecv_ = false;
 
+    out:
             boost::mutex::scoped_lock lock(m_);
             PeerInfo& peerInfo = connInfo->peers[srcIp];
             PortMap::iterator it = peerInfo.portMap.find(in_port);
@@ -673,6 +757,7 @@ namespace DTun
             LOG4CPLUS_WARN(logger(), "UTPManager::onRecv too short " << numBytes);
         }
 
+    out2:
         conn_shared->readFrom(&(*rcvBuff)[0], &(*rcvBuff)[0] + rcvBuff->size(),
             boost::bind(&UTPManager::onRecv, this, _1, _2, _3, _4, dstPort, connInfo, rcvBuff), true);
     }
@@ -730,6 +815,56 @@ namespace DTun
             } else {
                 connCache_.erase(it++);
             }
+        }
+    }
+
+    void UTPManager::sendUTP(const boost::shared_ptr<SConnection>& conn, uint32_t ip, uint16_t actualPort, const in_port_utp utpPort,
+        const char* data, int len, int fragmentSize)
+    {
+        if (fragmentSize <= 0) {
+            fragmentSize = len;
+        }
+
+        assert(len >= (int)sizeof(UTPHeader));
+
+        if (fragmentSize < len) {
+            LOG4CPLUS_INFO(logger(), "sendUTP large dgram(total=" << len << ", frag=" << fragmentSize << ")");
+        }
+
+        uint16_t seq_nr = ((const UTPHeader*)data)->seq_nr;
+
+        int fragIdx = 0;
+
+        while (len > 0) {
+            int sz = std::min(fragmentSize, len);
+            int isLast = (len - sz) == 0;
+
+            boost::shared_ptr<std::vector<char> > sndBuff;
+            UTPHeader* header;
+
+            if (fragIdx == 0) {
+                sndBuff = boost::make_shared<std::vector<char> >(sz);
+                memcpy(&(*sndBuff)[0], data, sz);
+                header = (UTPHeader*)&(*sndBuff)[0];
+            } else {
+                sndBuff = boost::make_shared<std::vector<char> >(sz + sizeof(UTPHeader));
+                memcpy(&(*sndBuff)[0], data + sizeof(UTPHeader), sz);
+                header = (UTPHeader*)&(*sndBuff)[0];
+                header->seq_nr = seq_nr;
+            }
+
+            assert(fragIdx <= UTP_PFLAGS_FRAGIDX_MAX);
+
+            memcpy(&header->port[0], &utpPort[0], sizeof(in_port_utp));
+            header->pflags = UTP_PFLAGS(1 - UTP_PFLAGS_DIR(utpPort[0]), isLast, fragIdx);
+
+            conn->writeTo(&(*sndBuff)[0], &(*sndBuff)[0] + sndBuff->size(),
+                ip, actualPort,
+                boost::bind(&UTPManager::onSend, this, _1, sndBuff));
+
+            len -= sz;
+            data += sz;
+            ++fragIdx;
         }
     }
 
