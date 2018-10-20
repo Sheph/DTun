@@ -92,7 +92,6 @@ enum {
     UTP_SNDBUF,
     UTP_RCVBUF,
     UTP_TARGET_DELAY,
-    UTP_MTU_GUESS,
 
     UTP_ARRAY_SIZE,	// must be last
 };

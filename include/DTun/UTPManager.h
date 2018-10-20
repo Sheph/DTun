@@ -8,8 +8,6 @@
 #include "utp.h"
 #include <set>
 
-#define UTP_PFLAGS_FRAGIDX_MAX 0x3
-
 namespace DTun
 {
     class UTPHandleImpl;
@@ -50,21 +48,6 @@ namespace DTun
     private:
         typedef boost::array<uint8_t, 16> UTPPort;
 
-        struct FragInfo
-        {
-            FragInfo()
-            : last(false) {}
-
-            void reset()
-            {
-                buff.clear();
-                last = false;
-            }
-
-            std::vector<char> buff;
-            bool last;
-        };
-
         struct PortInfo
         {
             PortInfo()
@@ -75,8 +58,6 @@ namespace DTun
 
             UInt16 port;
             bool active;
-            boost::optional<uint16_t> fragSeqNr;
-            FragInfo frags[UTP_PFLAGS_FRAGIDX_MAX + 1];
         };
 
         typedef std::map<UTPPort, PortInfo> PortMap;
@@ -128,6 +109,8 @@ namespace DTun
 
         static uint64 utpGetReadBufferSizeFunc(utp_callback_arguments* args);
 
+        static uint64 utpGetMTUFunc(utp_callback_arguments* args);
+
         void onRecv(int err, int numBytes, UInt32 srcIp, UInt16 srcPort,
             UInt16 dstPort, const boost::shared_ptr<ConnectionInfo>& connInfo,
             const boost::shared_ptr<std::vector<char> >& rcvBuff);
@@ -142,9 +125,6 @@ namespace DTun
 
         void reapConnCache();
 
-        void sendUTP(const boost::shared_ptr<SConnection>& conn, uint32_t ip, uint16_t actualPort, const in_port_utp utpPort,
-            const char* data, int len, int fragmentSize);
-
         // 's' is consumed.
         boost::shared_ptr<SConnection> createTransportConnectionInternal(const struct sockaddr* name, int namelen, SYSSOCKET s);
 
@@ -157,7 +137,6 @@ namespace DTun
         ConnectionCache connCache_;
         HandleMap toKillHandles_;
         bool inRecv_;
-        std::vector<char> defragBuff;
     };
 }
 
