@@ -887,7 +887,8 @@ void UTPSocket::send_packet(OutgoingPacket *pkt)
     if (mtu_discover_time < (uint64)cur_time) {
         // it's time to reset our MTU assupmtions
         // and trigger a new search
-        mtu_reset();
+        // DON'T do MTU update, we'll handle it ourselves.
+        //mtu_reset();
     }
 
     // don't use packets that are larger then mtu_ceiling
@@ -1323,7 +1324,7 @@ void UTPSocket::mtu_reset()
 {
     mtu_ceiling = get_udp_mtu();
     // Less would not pass TCP...
-    mtu_floor = 576;
+    mtu_floor = mtu_last = mtu_ceiling;
     log(UTP_LOG_MTU, "MTU [RESET] floor:%d ceiling:%d current:%d"
         , mtu_floor, mtu_ceiling, mtu_last);
     assert(mtu_floor <= mtu_ceiling);
@@ -3414,6 +3415,17 @@ void utp_socket_issue_deferred_acks(UTPSocket *conn)
 {
     if (conn->ida >= 0) {
         conn->send_ack();
+    }
+}
+
+void utp_process_mtu_update(utp_context *ctx, const struct sockaddr *to, socklen_t tolen, uint32 mtu)
+{
+    const PackedSockAddr addr((const SOCKADDR_STORAGE*)to, tolen);
+
+    UTPSocketKeyData* keyData;
+
+    if ((keyData = ctx->utp_sockets->Lookup(UTPSocketKey(addr, 0)))) {
+        keyData->socket->mtu_floor = keyData->socket->mtu_ceiling = keyData->socket->mtu_last = mtu;
     }
 }
 

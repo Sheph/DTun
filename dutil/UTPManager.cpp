@@ -304,7 +304,7 @@ namespace DTun
         memcpy(&utpPort[0], &addr.sin_port[0], sizeof(in_port_utp));
 
         peerInfo.portMap[utpPort].port = port;
-        peerInfo.portMap[utpPort].active = true;
+        peerInfo.portMap[utpPort].mtuDiscovery = createMTUDiscovery(cIt->second->conn.lock(), addr.sin_port, ip, port);
 
         lock.unlock();
 
@@ -533,7 +533,8 @@ namespace DTun
                 } else {
                     UTPSocketUserData* ud = new UTPSocketUserData(it->first, NULL);
                     utp_set_userdata(args->socket, ud);
-                    pmIt->second.active = true;
+                    pmIt->second.mtuDiscovery = this_->createMTUDiscovery(it->second->conn.lock(), addr->sin_port,
+                        pIt->first, pmIt->second.port);
                     return 0;
                 }
             }
@@ -587,10 +588,32 @@ namespace DTun
 
     uint64 UTPManager::utpGetMTUFunc(utp_callback_arguments* args)
     {
-        // TODO: quick WAR for yota min MTU, do MTU discovery instead.
-        // MTU discovery actuallu works, but I don't know how to disable DF flag
-        // in linux, setsockopt doesn't work...
-        return 1372;
+        // lowest possible MTU, must be able to pass without fragmentation.
+        return 1024;
+    }
+
+    boost::shared_ptr<MTUDiscovery> UTPManager::createMTUDiscovery(const boost::shared_ptr<SConnection>& conn,
+        const in_port_utp port, UInt32 ip, UInt16 actualPort)
+    {
+        assert(conn);
+
+        UTPPacketHeader header;
+
+        std::vector<char> probeTransportHeader(sizeof(header));
+        std::vector<char> probeReplyTransportHeader(sizeof(header));
+
+        memcpy(&header.port[0], port, sizeof(in_port_utp));
+
+        header.set_type(UTP_PT_MTU_PROBE);
+        memcpy(&probeTransportHeader[0], &header, sizeof(header));
+        header.set_type(UTP_PT_MTU_PROBE_REPLY);
+        memcpy(&probeReplyTransportHeader[0], &header, sizeof(header));
+
+        boost::shared_ptr<MTUDiscovery> mtuDiscovery = boost::make_shared<MTUDiscovery>(boost::ref(innerMgr_.reactor()), conn,
+            probeTransportHeader, probeReplyTransportHeader, utpGetMTUFunc(NULL), 1486);
+        mtuDiscovery->setDest(ip, actualPort);
+        mtuDiscovery->start();
+        return mtuDiscovery;
     }
 
     void UTPManager::onRecv(int err, int numBytes, UInt32 srcIp, UInt16 srcPort,
@@ -602,7 +625,7 @@ namespace DTun
             return;
         }
 
-        if (numBytes < (int)sizeof(in_port_utp)) {
+        if (numBytes < (int)sizeof(UTPPacketHeader)) {
             //LOG4CPLUS_TRACE(logger(), "UTPManager::onRecv(" << err << ", " << numBytes << ", src=" << ipPortToString(srcIp, srcPort) << ", dst=" << portToString(dstPort) << ")");
         }
 
@@ -611,9 +634,17 @@ namespace DTun
             return;
         }
 
-        if (numBytes >= (int)sizeof(in_port_utp)) {
+        if (numBytes >= (int)sizeof(UTPPacketHeader)) {
+            const UTPPacketHeader* header = (const UTPPacketHeader*)&(*rcvBuff)[0];
+
             UTPPort in_port;
-            memcpy(&in_port[0], &(*rcvBuff)[0], sizeof(in_port_utp));
+            memcpy(&in_port[0], &header->port[0], sizeof(in_port_utp));
+
+            struct sockaddr_in_utp addr;
+
+            addr.sin_family = AF_INET_UTP;
+            addr.sin_addr.s_addr = srcIp;
+            memcpy(&addr.sin_port, &header->port[0], sizeof(in_port_utp));
 
             //LOG4CPLUS_TRACE(logger(), "UTPManager::onRecv(" << err << ", " << numBytes << ", src=" << ipPortToString(srcIp, srcPort) << (boost::format(":%02x%02x") % (int)in_port[0] % (int)in_port[1]) << ", dst=" << portToString(dstPort) << ")");
 
@@ -626,29 +657,40 @@ namespace DTun
                 } else {
                     if (it->second.port != srcPort) {
                         LOG4CPLUS_WARN(logger(), "Port " << ntohs(it->second.port) << " remapped to " << ntohs(srcPort) << " at " << ipToString(srcIp));
+                        if (it->second.mtuDiscovery) {
+                            it->second.mtuDiscovery->setDest(srcIp, srcPort);
+                        }
                     }
                     it->second.port = srcPort;
+
+                    if (it->second.mtuDiscovery) {
+                        if (header->type() == UTP_PT_MTU_PROBE) {
+                            it->second.mtuDiscovery->onMTUProbe((const char*)(header + 1), numBytes - sizeof(*header));
+                        } else if (header->type() == UTP_PT_MTU_PROBE_REPLY) {
+                            int newMTU = 0;
+                            if (it->second.mtuDiscovery->onMTUProbeReply((const char*)(header + 1), numBytes - sizeof(*header), newMTU)) {
+                                utp_process_mtu_update(ctx_, (const struct sockaddr *)&addr, sizeof(addr), newMTU);
+                            }
+                        }
+                    }
                 }
             }
 
-            struct sockaddr_in_utp addr;
-
-            addr.sin_family = AF_INET_UTP;
-            addr.sin_addr.s_addr = srcIp;
-            memcpy(&addr.sin_port[0], &(*rcvBuff)[0], sizeof(in_port_utp));
-
-            inRecv_ = true;
-            if (!utp_process_udp(ctx_, (const byte*)(&(*rcvBuff)[0]), numBytes,
-                (const struct sockaddr *)&addr, sizeof(addr))) {
+            if ((header->type() != UTP_PT_MTU_PROBE) &&
+                (header->type() != UTP_PT_MTU_PROBE_REPLY)) {
+                inRecv_ = true;
+                if (!utp_process_udp(ctx_, (const byte*)(&(*rcvBuff)[0]), numBytes,
+                    (const struct sockaddr *)&addr, sizeof(addr))) {
+                    inRecv_ = false;
+                    LOG4CPLUS_WARN(logger(), "UDP packet not handled by UTP. Ignoring.");
+                }
                 inRecv_ = false;
-                LOG4CPLUS_WARN(logger(), "UDP packet not handled by UTP. Ignoring.");
             }
-            inRecv_ = false;
 
             boost::mutex::scoped_lock lock(m_);
             PeerInfo& peerInfo = connInfo->peers[srcIp];
             PortMap::iterator it = peerInfo.portMap.find(in_port);
-            if ((it != peerInfo.portMap.end()) && !it->second.active) {
+            if ((it != peerInfo.portMap.end()) && !it->second.mtuDiscovery) {
                 peerInfo.portMap.erase(it);
                 if (peerInfo.portMap.empty()) {
                     connInfo->peers.erase(srcIp);

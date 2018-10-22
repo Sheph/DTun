@@ -106,6 +106,7 @@ set (COMMON_HEADERS
     ${DTUN_INCLUDE_DIR}/DTun/UTPManager.h
     ${DTUN_INCLUDE_DIR}/DTun/OpWatch.h
     ${DTUN_INCLUDE_DIR}/DTun/Utils.h
+    ${DTUN_INCLUDE_DIR}/DTun/MTUDiscovery.h
 )
 
 include_directories(

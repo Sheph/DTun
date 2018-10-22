@@ -30,6 +30,23 @@ extern "C" {
 #include <stdarg.h>
 #include "utp_types.h"
 
+enum UTPPacketType
+{
+    UTP_PT_MTU_PROBE = 5,
+    UTP_PT_MTU_PROBE_REPLY = 6
+};
+
+#pragma pack(1)
+struct UTPPacketHeader
+{
+    in_port_utp port;
+    byte ver_type;
+
+    byte type() const { return ver_type >> 4; }
+    void set_type(byte t) { ver_type = (1 & 0xf) | (t << 4); }
+};
+#pragma pack()
+
 typedef struct UTPSocket					utp_socket;
 typedef struct struct_utp_context			utp_context;
 
@@ -178,6 +195,7 @@ utp_context*	utp_get_context					(utp_socket *s);
 void			utp_shutdown					(utp_socket *s, int how);
 void			utp_close						(utp_socket *s);
 void			utp_socket_issue_deferred_acks	(utp_socket *s);
+void			utp_process_mtu_update          (utp_context *ctx, const struct sockaddr *to, socklen_t tolen, uint32 mtu);
 
 #ifdef __cplusplus
 }

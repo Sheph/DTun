@@ -30,6 +30,7 @@ set(SOURCES
     UTPManager.cpp
     OpWatch.cpp
     Utils.cpp
+    MTUDiscovery.cpp
 )
 
 add_library(dutil SHARED ${SOURCES})

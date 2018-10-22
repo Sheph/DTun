@@ -3,6 +3,7 @@
 
 #include "DTun/SManager.h"
 #include "DTun/OpWatch.h"
+#include "DTun/MTUDiscovery.h"
 #include <boost/thread/mutex.hpp>
 #include <boost/array.hpp>
 #include "utp.h"
@@ -51,13 +52,13 @@ namespace DTun
         struct PortInfo
         {
             PortInfo()
-            : port(0), active(false) {}
+            : port(0) {}
 
             explicit PortInfo(UInt16 port)
-            : port(port), active(false) {}
+            : port(port) {}
 
             UInt16 port;
-            bool active;
+            boost::shared_ptr<MTUDiscovery> mtuDiscovery;
         };
 
         typedef std::map<UTPPort, PortInfo> PortMap;
@@ -110,6 +111,9 @@ namespace DTun
         static uint64 utpGetReadBufferSizeFunc(utp_callback_arguments* args);
 
         static uint64 utpGetMTUFunc(utp_callback_arguments* args);
+
+        boost::shared_ptr<MTUDiscovery> createMTUDiscovery(const boost::shared_ptr<SConnection>& conn,
+            const in_port_utp port, UInt32 ip, UInt16 actualPort);
 
         void onRecv(int err, int numBytes, UInt32 srcIp, UInt16 srcPort,
             UInt16 dstPort, const boost::shared_ptr<ConnectionInfo>& connInfo,
