@@ -9,7 +9,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "")
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build, options are: None (CMAKE_CXX_FLAGS or CMAKE_C_FLAGS used) Debug Release RelWithDebInfo MinSizeRel." FORCE)
 endif ()
 
-set(UTP_DEBUG TRUE)
+set(UTP_DEBUG FALSE)
 
 #out dir
 
@@ -118,5 +118,6 @@ add_subdirectory(udt)
 add_subdirectory(libutp)
 add_subdirectory(dutil)
 add_subdirectory(lwip)
+add_subdirectory(dcat)
 add_subdirectory(dnode)
 add_subdirectory(dmaster)
