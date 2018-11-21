@@ -16,6 +16,7 @@
 using namespace DCat;
 
 static bool reverse = false;
+static int maxBytesPerSecond = 0;
 
 boost::scoped_ptr<DTun::UTPManager> mgr;
 
@@ -28,6 +29,27 @@ static char buff2[128 * 1024];
 
 static boost::chrono::steady_clock::time_point lastTs;
 static int totalNumBytes;
+
+static void onSend(int err);
+
+static void onSendTimeout()
+{
+    boost::chrono::steady_clock::time_point now = boost::chrono::steady_clock::now();
+
+    int us = boost::chrono::duration_cast<boost::chrono::microseconds>(
+        now - lastTs).count();
+
+    if (us >= 1000000) {
+        float br = (float)totalNumBytes / (float)us;
+
+        LOG4CPLUS_INFO(logger(), "br = " << int(br * 1000000 / 1000) << "kb");
+
+        lastTs = now;
+        totalNumBytes = 0;
+    }
+
+    conn->write(&buff[0], &buff[0] + sizeof(buff), &onSend);
+}
 
 static void onSend(int err)
 {
@@ -43,6 +65,14 @@ static void onSend(int err)
 
     int us = boost::chrono::duration_cast<boost::chrono::microseconds>(
         now - lastTs).count();
+
+    if (maxBytesPerSecond) {
+        int dt = (float)totalNumBytes * 1000000.0f / maxBytesPerSecond - us;
+        if (dt > 0) {
+            mgr->reactor().post(&onSendTimeout, (dt + 999) / 1000);
+            return;
+        }
+    }
 
     if (us >= 1000000) {
         float br = (float)totalNumBytes / (float)us;
@@ -238,6 +268,7 @@ int main(int argc, char* argv[])
             ("localPort", boost::program_options::value<int>(&localPort), "Local port")
             ("targetIp", boost::program_options::value<std::string>(&targetIp), "Target IP")
             ("targetPort", boost::program_options::value<int>(&targetPort), "Target port")
+            ("maxBytesPerSecond", boost::program_options::value<int>(&maxBytesPerSecond), "Max bytes per second")
             ("reverse", "Reverse");
 
         boost::program_options::store(boost::program_options::command_line_parser(
