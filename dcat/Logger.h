@@ -7,7 +7,7 @@
 
 namespace DCat
 {
-	log4cplus::Logger logger();
+    log4cplus::Logger logger();
 }
 
 #endif
