@@ -35,7 +35,8 @@
 #include "utp_internal.h"
 #include "utp_hash.h"
 
-#define	TIMEOUT_CHECK_INTERVAL	500
+#define	TIMEOUT_CHECK_INTERVAL	50
+#define MIN_RTO_VALUE 50
 
 // number of bytes to increase max window size by, per RTT. This is
 // scaled down linearly proportional to off_target. i.e. if all packets
@@ -1189,7 +1190,7 @@ void UTPSocket::check_timeouts()
             }
 
             // We initiated the connection but the other side failed to respond before the rto
-            if (retransmit_count >= 4 || (state == CS_SYN_SENT && retransmit_count >= 4)) {
+            if (retransmit_count >= 4 * (1000 / MIN_RTO_VALUE) || (state == CS_SYN_SENT && retransmit_count >= 4)) {
                 // 4 consecutive transmissions have timed out. Kill it. If we
                 // haven't even connected yet, give up after only 2 consecutive
                 // failed transmissions.
@@ -1386,7 +1387,7 @@ int UTPSocket::ack_packet(uint16 seq)
 //			assert(rtt < 6000);
             rtt_hist.add_sample(ertt, ctx->current_ms);
         }
-        rto = max<uint>(rtt + rtt_var * 4, 1000);
+        rto = max<uint>(rtt + rtt_var * 4, MIN_RTO_VALUE);
 
         #if UTP_DEBUG_LOGGING
         log(UTP_LOG_DEBUG, "rtt:%u avg:%u var:%u rto:%u",

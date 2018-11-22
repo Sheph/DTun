@@ -6,7 +6,7 @@
 #include <boost/make_shared.hpp>
 #include <boost/bind.hpp>
 
-#define DTUN_PROXY_BUFF_SIZE (64 * 1024)
+#define DTUN_PROXY_BUFF_SIZE (208 * 1024)
 #define DTUN_PROXY_CHUNK_SIZE (4 * 1024)
 
 namespace DNode

@@ -13,6 +13,8 @@
 #include <log4cplus/configurator.h>
 #include <iostream>
 
+#define SND_QUEUE_SIZE (208 / 4)
+
 using namespace DCat;
 
 static bool reverse = false;
@@ -25,7 +27,7 @@ boost::shared_ptr<DTun::SAcceptor> acceptor;
 boost::shared_ptr<DTun::SConnector> connector;
 boost::shared_ptr<DTun::SConnection> conn;
 static char buff[4 * 1024];
-static char buff2[128 * 1024];
+static char buff2[208 * 1024];
 
 static boost::chrono::steady_clock::time_point lastTs;
 static int totalNumBytes;
@@ -131,7 +133,7 @@ static void clientOnConnect(int err)
         if (reverse) {
             conn->read(&buff2[0], &buff2[0] + sizeof(buff2), &onRecv, false);
         } else {
-            for (int i = 0; i < 16; ++i) {
+            for (int i = 0; i < SND_QUEUE_SIZE; ++i) {
                 conn->write(&buff[0], &buff[0] + sizeof(buff), &onSend);
             }
         }
@@ -147,7 +149,7 @@ static void serverOnAccept(const boost::shared_ptr<DTun::SHandle>& handle)
     lastTs = boost::chrono::steady_clock::now();
 
     if (reverse) {
-        for (int i = 0; i < 16; ++i) {
+        for (int i = 0; i < SND_QUEUE_SIZE; ++i) {
             conn->write(&buff[0], &buff[0] + sizeof(buff), &onSend);
         }
     } else {

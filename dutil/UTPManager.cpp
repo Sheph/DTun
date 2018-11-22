@@ -168,7 +168,7 @@ namespace DTun
         watch_ = boost::make_shared<OpWatch>(boost::ref(innerMgr_.reactor()));
 
         innerMgr_.reactor().post(
-            watch_->wrap(boost::bind(&UTPManager::onUTPTimeout, this)), 500);
+            watch_->wrap(boost::bind(&UTPManager::onUTPTimeout, this)), 50);
 
         return true;
     }
@@ -733,7 +733,7 @@ namespace DTun
         reapConnCache();
 
         innerMgr_.reactor().post(
-            watch_->wrap(boost::bind(&UTPManager::onUTPTimeout, this)), 500);
+            watch_->wrap(boost::bind(&UTPManager::onUTPTimeout, this)), 50);
     }
 
     void UTPManager::onKillHandles(bool sameThreadOnly)
